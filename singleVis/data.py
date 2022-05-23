@@ -1,6 +1,5 @@
 import os
 import gc
-import re
 import time
 
 from singleVis.utils import *
@@ -47,6 +46,11 @@ class DataProvider:
         gc.collect()
         return test_num
     
+
+class NormalDataProvider(DataProvider):
+    def __init__(self, content_path, model, epoch_start, epoch_end, epoch_period, split, device, verbose=1):
+        super().__init__(content_path, model, epoch_start, epoch_end, epoch_period, split, device, verbose)
+    
     @property
     def representation_dim(self):
         train_data_loc = os.path.join(self.model_path, "Epoch_{:d}".format(self.s), "train_data.npy")
@@ -56,7 +60,6 @@ class DataProvider:
             return repr_dim
         except Exception as e:
             return None
-
 
     def _meta_data(self):
         time_inference = list()
@@ -69,9 +72,6 @@ class DataProvider:
 
         for n_epoch in range(self.s, self.e + 1, self.p):
             t_s = time.time()
-            index_file = os.path.join(self.model_path, "Epoch_{:d}".format(n_epoch), "index.json")
-            index = load_labelled_data_index(index_file)
-            training_data = training_data[index]
 
             # make it possible to choose a subset of testing data for testing
             test_index_file = os.path.join(self.model_path, "Epoch_{:d}".format(n_epoch), "test_index.json")
@@ -327,7 +327,7 @@ class DataProvider:
 
     def testing_accu(self, epoch):
         data = self.test_representation(epoch)
-        labels = self.test_labels()
+        labels = self.test_labels(epoch)
         test_index_file = os.path.join(self.model_path, "Epoch_{}".format(epoch), "test_index.json")
         if os.path.exists(test_index_file):
             index = load_labelled_data_index(test_index_file)
@@ -346,3 +346,327 @@ class DataProvider:
         preds = self.get_pred(epoch, data)
         border = is_B(preds)
         return border
+
+
+class ActiveLearningDataProvider(DataProvider):
+    def __init__(self, content_path, model, base_epoch_start, split, device, verbose=1):
+        # dummy input as epoch_end and epoch_period
+        super().__init__(content_path, model, base_epoch_start, base_epoch_start, 1, split, device, verbose)
+    
+    @property
+    def representation_dim(self):
+        train_data_loc = os.path.join(self.model_path, "Iteration_{:d}".format(self.s), "train_data.npy")
+        try:
+            train_data = np.load(train_data_loc)
+            repr_dim = np.prod(train_data.shape[1:])
+            return repr_dim
+        except Exception as e:
+            return None
+
+    def get_unlabeled_idx(self, pool_num, lb_idx):
+        tot_idx = np.arange(pool_num)
+        # !Noted that tot need to be the first arguement
+        ulb_idx = np.setdiff1d(tot_idx, lb_idx)
+        return ulb_idx
+
+    def _meta_data(self, iteration):
+        training_data_path = os.path.join(self.content_path, "Training_data")
+        training_data = torch.load(os.path.join(training_data_path, "training_dataset_data.pth"),
+                                        map_location=self.DEVICE)
+        testing_data_path = os.path.join(self.content_path, "Testing_data")
+        testing_data = torch.load(os.path.join(testing_data_path, "testing_dataset_data.pth"),
+                                       map_location=self.DEVICE)
+
+        t_s = time.time()
+        index_file = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "index.json")
+        lb_idxs = np.array(load_labelled_data_index(index_file))
+        ulb_idxs = self.get_unlabeled_idx(self.train_num(), lb_idxs)
+
+        # make it possible to choose a subset of testing data for testing
+        test_index_file = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "test_index.json")
+        if os.path.exists(test_index_file):
+            test_index = load_labelled_data_index(test_index_file)
+        else:
+            test_index = range(len(testing_data))
+        testing_data = testing_data[test_index]
+
+        model_location = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "subject_model.pth")
+        self.model.load_state_dict(torch.load(model_location, map_location=torch.device("cpu")))
+        self.model = self.model.to(self.DEVICE)
+        self.model.eval()
+
+        repr_model = torch.nn.Sequential(*(list(self.model.children())[:self.split]))
+
+        # training data clustering
+        data_pool_representation = batch_run(repr_model, training_data)
+        location = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "train_data_lb.npy")
+        np.save(location, data_pool_representation[lb_idxs])
+        location = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "train_data_ulb.npy")
+        np.save(location, data_pool_representation[ulb_idxs])
+
+        # test data
+        test_data_representation = batch_run(repr_model, testing_data)
+        location = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "test_data.npy")
+        np.save(location, test_data_representation)
+
+        t_e = time.time()
+
+        if self.verbose > 0:
+            print("Finish inferencing data for Iteration {:d} in {:.2f} seconds...".format(iteration, t_e-t_s))
+
+        # save result
+        save_dir = os.path.join(self.model_path, "SV_time.json")
+        if not os.path.exists(save_dir):
+            evaluation = dict()
+        else:
+            f = open(save_dir, "r")
+            evaluation = json.load(f)
+            f.close()
+        if type(evaluation["data_inference"]) != type(dict()):
+            evaluation["data_inference"] = dict()
+
+        evaluation["data_inference"][str(iteration)] = round(t_e - t_s, 3)
+        with open(save_dir, 'w') as f:
+            json.dump(evaluation, f)
+
+        del training_data
+        del testing_data
+        gc.collect()
+
+    def _estimate_boundary(self, iteration, num, l_bound):
+        '''
+        Preprocessing data. This process includes find_border_points and find_border_centers
+        save data for later training
+        '''
+
+        training_data_path = os.path.join(self.content_path, "Training_data")
+        training_data = torch.load(os.path.join(training_data_path, "training_dataset_data.pth"),
+                                   map_location=self.DEVICE)
+        index_file = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "index.json")
+        index = load_labelled_data_index(index_file)
+        training_data = training_data[index]
+
+        model_location = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "subject_model.pth")
+        self.model.load_state_dict(torch.load(model_location, map_location=torch.device("cpu")))
+        self.model = self.model.to(self.DEVICE)
+        self.model.eval()
+
+        repr_model = torch.nn.Sequential(*(list(self.model.children())[:self.split]))
+
+        t0 = time.time()
+        confs = batch_run(self.model, training_data)
+        preds = np.argmax(confs, axis=1).squeeze()
+        # TODO how to choose the number of boundary points?
+        num_adv_eg = num
+        border_points, _, _ = get_border_points(model=self.model, input_x=training_data, confs=confs, predictions=preds, device=self.DEVICE, l_bound=l_bound, num_adv_eg=num_adv_eg, lambd=0.05, verbose=0)
+        t1 = time.time()
+
+        # get gap layer data
+        border_points = border_points.to(self.DEVICE)
+        border_centers = batch_run(repr_model, border_points)
+        location = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "border_centers.npy")
+        np.save(location, border_centers)
+
+        location = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "ori_border_centers.npy")
+        np.save(location, border_points.cpu().numpy())
+
+        num_adv_eg = num
+        border_points, _, _ = get_border_points(model=self.model, input_x=training_data, confs=confs, predictions=preds, device=self.DEVICE, l_bound=l_bound, num_adv_eg=num_adv_eg, lambd=0.05, verbose=0)
+
+        # get gap layer data
+        border_points = border_points.to(self.DEVICE)
+        border_centers = batch_run(repr_model, border_points)
+        location = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "test_border_centers.npy")
+        np.save(location, border_centers)
+
+        location = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "test_ori_border_centers.npy")
+        np.save(location, border_points.cpu().numpy())
+
+        if self.verbose > 0:
+            print("Finish generating borders for Iteration {:d} in {:.2f} seconds ...".format(iteration, t1-t0))
+
+        # save result
+        save_dir = os.path.join(self.model_path, "SV_time.json")
+        if not os.path.exists(save_dir):
+            evaluation = dict()
+        else:
+            f = open(save_dir, "r")
+            evaluation = json.load(f)
+            f.close()
+        if type(evaluation["data_B_gene"]) != type(dict()):
+            evaluation["data_B_gene"] = dict()
+        evaluation["data_B_gene"][str(iteration)] = round(t1-t0, 3)
+        with open(save_dir, 'w') as f:
+            json.dump(evaluation, f)
+
+    def initialize_iteration(self, iteration, num, l_bound):
+        self._meta_data(iteration)
+        self._estimate_boundary(iteration, num, l_bound)
+
+    def train_representation_lb(self, iteration):
+        # load train data
+        train_data_loc = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "train_data_lb.npy")
+        try:
+            train_data = np.load(train_data_loc)
+        except Exception as e:
+            print("no train data saved for Iteration {}".format(iteration))
+            train_data = None
+        return train_data
+    
+    def train_labels_lb(self, epoch):
+        # load train data
+        training_data_loc = os.path.join(self.content_path, "Training_data", "training_dataset_label.pth")
+        index_file = os.path.join(self.model_path, "Iteration_{:d}".format(epoch), "index.json")
+        index = load_labelled_data_index(index_file)
+        try:
+            training_labels = torch.load(training_data_loc, map_location=self.DEVICE)
+            training_labels = training_labels[index]
+        except Exception as e:
+            print("no train labels saved for Iteration {}".format(epoch))
+            training_labels = None
+        return training_labels.cpu().numpy()
+    
+    def train_representation_ulb(self, iteration):
+        # load train data
+        train_data_loc = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "train_data_ulb.npy")
+        try:
+            train_data = np.load(train_data_loc)
+        except Exception as e:
+            print("no train data saved for Iteration {}".format(iteration))
+            train_data = None
+        return train_data
+    
+    def train_labels_ulb(self, epoch):
+        # load train data
+        training_data_loc = os.path.join(self.content_path, "Training_data", "training_dataset_label.pth")
+        index_file = os.path.join(self.model_path, "Iteration_{:d}".format(epoch), "index.json")
+        lb_idxs = np.array(load_labelled_data_index(index_file))
+        ulb_idxs = self.get_unlabeled_idx(self.train_num(), lb_idxs)
+        try:
+            training_labels = torch.load(training_data_loc, map_location=self.DEVICE)
+            training_labels = training_labels[ulb_idxs]
+        except Exception as e:
+            print("no train labels saved for Iteration {}".format(epoch))
+            training_labels = None
+        return training_labels.cpu().numpy()
+
+    def test_representation(self, epoch):
+        data_loc = os.path.join(self.model_path, "Iteration_{:d}".format(epoch), "test_data.npy")
+        try:
+            test_data = np.load(data_loc).squeeze()
+            index_file = os.path.join(self.model_path, "Iteration_{:d}".format(epoch), "test_index.json")
+            if os.path.exists(index_file):
+                index = load_labelled_data_index(index_file)
+                test_data = test_data[index]
+        except Exception as e:
+            print("no test data saved for Iteration {}".format(epoch))
+            test_data = None
+        # max_x = self.max_norm(epoch)
+        return test_data
+    
+    def test_labels(self, epoch):
+        # load train data
+        testing_data_loc = os.path.join(self.content_path, "Testing_data", "testing_dataset_label.pth")
+        try:
+            testing_labels = torch.load(testing_data_loc).to(device=self.DEVICE)
+            index_file = os.path.join(self.model_path, "Iteration_{:d}".format(epoch), "test_index.json")
+            if os.path.exists(index_file):
+                idxs = load_labelled_data_index(index_file)
+                testing_labels = testing_labels[idxs]
+        except Exception as e:
+            print("no train labels saved for Iteration {}".format(epoch))
+            testing_labels = None
+        return testing_labels.cpu().numpy()
+
+    def border_representation(self, epoch):
+        border_centers_loc = os.path.join(self.model_path, "Iteration_{:d}".format(epoch),
+                                          "border_centers.npy")
+        try:
+            border_centers = np.load(border_centers_loc).squeeze()
+        except Exception as e:
+            print("no border points saved for Iteration {}".format(epoch))
+            border_centers = None
+        return border_centers
+    
+    def test_border_representation(self, epoch):
+        border_centers_loc = os.path.join(self.model_path, "Iteration_{:d}".format(epoch),
+                                          "test_border_centers.npy")
+        try:
+            border_centers = np.load(border_centers_loc).squeeze()
+        except Exception as e:
+            print("no border points saved for Epoch {}".format(epoch))
+            border_centers = None
+        return border_centers
+    
+    def max_norm(self, epoch):
+        train_data_loc = os.path.join(self.model_path, "Iteration_{:d}".format(epoch), "train_data_lb.npy")
+        try:
+            train_data = np.load(train_data_loc)
+            max_x = np.linalg.norm(train_data, axis=1).max()
+        except Exception as e:
+            print("no train data saved for Iteration {}".format(epoch))
+            max_x = None
+        return max_x
+
+    def prediction_function(self, iteration):
+        model_location = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "subject_model.pth")
+        self.model.load_state_dict(torch.load(model_location, map_location=torch.device("cpu")))
+        self.model = self.model.to(self.DEVICE)
+        self.model.eval()
+
+        model = torch.nn.Sequential(*(list(self.model.children())[self.split:]))
+        model = model.to(self.DEVICE)
+        model = model.eval()
+        return model
+
+    def feature_function(self, epoch):
+        model_location = os.path.join(self.model_path, "Iteration_{:d}".format(epoch), "subject_model.pth")
+        self.model.load_state_dict(torch.load(model_location, map_location=torch.device("cpu")))
+        self.model = self.model.to(self.DEVICE)
+        self.model.eval()
+
+        model = torch.nn.Sequential(*(list(self.model.children())[:self.split]))
+        model = model.to(self.DEVICE)
+        model = model.eval()
+        return model
+
+    def get_pred(self, iteration, data):
+        '''
+        get the prediction score for data in epoch_id
+        :param data: numpy.ndarray
+        :param epoch_id:
+        :return: pred, numpy.ndarray
+        '''
+        prediction_func = self.prediction_function(iteration)
+
+        data = torch.from_numpy(data)
+        data = data.to(self.DEVICE)
+        pred = batch_run(prediction_func, data)
+        return pred.squeeze()
+
+    def training_accu(self, epoch):
+        data = self.train_representation(epoch)
+        labels = self.train_labels_lb(epoch)
+        pred = self.get_pred(epoch, data).argmax(-1)
+        val = evaluate_inv_accu(labels, pred)
+        return val
+
+    def testing_accu(self, epoch):
+        data = self.test_representation(epoch)
+        labels = self.test_labels(epoch)
+        pred = self.get_pred(epoch, data).argmax(-1)
+        val = evaluate_inv_accu(labels, pred)
+        return val
+    
+    def is_deltaB(self, epoch, data):
+        """
+        check wheter input vectors are lying on delta-boundary or not
+        :param epoch_id:
+        :param data: numpy.ndarray
+        :return: numpy.ndarray, boolean, True stands for is_delta_boundary
+        """
+        preds = self.get_pred(epoch, data)
+        border = is_B(preds)
+        return border
+    
+
