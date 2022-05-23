@@ -135,14 +135,14 @@ class ActiveLearningTimeVisBackend(TimeVisBackend):
         return index
 
 
-    def query(self, iteration, strategy):
+    def al_query(self, iteration, strategy):
         # TODO: implement different strategies, return idxs in score ranking
         """get the index of new selection from different strategies"""
         # current_idx = self.data_provider
         # return idxs
         return NotImplemented
     
-    def train(self, iteration, strategy):
+    def al_train(self, iteration, strategy):
         return NotImplemented
 
     def save_human_selection(self, iteration, indices):
