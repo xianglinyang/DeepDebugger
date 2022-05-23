@@ -390,10 +390,10 @@ class Evaluator:
             evaluation["ppr_train"] = dict()
         if "ppr_test" not in evaluation.keys():
             evaluation["ppr_test"] = dict()
-        if "tnn_train" not in evaluation.keys():
-            evaluation["tnn_train"] = dict()
-        if "tnn_test" not in evaluation.keys():
-            evaluation["tnn_test"] = dict()
+        # if "tnn_train" not in evaluation.keys():
+        #     evaluation["tnn_train"] = dict()
+        # if "tnn_test" not in evaluation.keys():
+        #     evaluation["tnn_test"] = dict()
 
         epoch_key = str(n_epoch)
         evaluation[n_key]["nn_train"][epoch_key] = self.eval_nn_train(n_epoch, n_neighbors)
@@ -405,28 +405,28 @@ class Evaluator:
         evaluation["ppr_train"][epoch_key] = self.eval_inv_train(n_epoch)
         evaluation["ppr_test"][epoch_key] = self.eval_inv_test(n_epoch)
 
-        if epoch_key not in evaluation["tnn_train"].keys():
-            evaluation["tnn_train"][epoch_key] = dict()
-        if epoch_key not in evaluation["tnn_test"].keys():
-            evaluation["tnn_test"][epoch_key] = dict()
+        # if epoch_key not in evaluation["tnn_train"].keys():
+        #     evaluation["tnn_train"][epoch_key] = dict()
+        # if epoch_key not in evaluation["tnn_test"].keys():
+        #     evaluation["tnn_test"][epoch_key] = dict()
 
-        evaluation["tnn_train"][epoch_key][str(temporal_k)] = self.eval_temporal_nn_train(n_epoch, temporal_k)
-        evaluation["tnn_test"][epoch_key][str(temporal_k)] = self.eval_temporal_nn_test(n_epoch, temporal_k)
+        # evaluation["tnn_train"][epoch_key][str(temporal_k)] = self.eval_temporal_nn_train(n_epoch, temporal_k)
+        # evaluation["tnn_test"][epoch_key][str(temporal_k)] = self.eval_temporal_nn_test(n_epoch, temporal_k)
 
-        t_train_val, t_train_std = self.eval_temporal_train(n_neighbors)
-        evaluation[n_key]["temporal_train_mean"] = t_train_val
-        evaluation[n_key]["temporal_train_std"] = t_train_std
-        t_test_val, t_test_std = self.eval_temporal_test(n_neighbors)
-        evaluation[n_key]["temporal_test_mean"] = t_test_val
-        evaluation[n_key]["temporal_test_std"] = t_test_std
+        # t_train_val, t_train_std = self.eval_temporal_train(n_neighbors)
+        # evaluation[n_key]["temporal_train_mean"] = t_train_val
+        # evaluation[n_key]["temporal_train_std"] = t_train_std
+        # t_test_val, t_test_std = self.eval_temporal_test(n_neighbors)
+        # evaluation[n_key]["temporal_test_mean"] = t_test_val
+        # evaluation[n_key]["temporal_test_std"] = t_test_std
 
-        if save_corrs:
-            corrs_train, ps_train = self.eval_temporal_global_corr_train()
-            np.save(os.path.join(save_dir, filename + "_corrs.npy"), corrs_train)
-            np.save(os.path.join(save_dir, filename + "_ps.npy"), ps_train)
-            corrs_test, ps_test = self.eval_temporal_global_corr_test()
-            np.save(os.path.join(save_dir, filename + "_test_corrs.npy"), corrs_test)
-            np.save(os.path.join(save_dir, filename + "_test_ps.npy"), ps_test)
+        # if save_corrs:
+        #     corrs_train, ps_train = self.eval_temporal_global_corr_train()
+        #     np.save(os.path.join(save_dir, filename + "_corrs.npy"), corrs_train)
+        #     np.save(os.path.join(save_dir, filename + "_ps.npy"), ps_train)
+        #     corrs_test, ps_test = self.eval_temporal_global_corr_test()
+        #     np.save(os.path.join(save_dir, filename + "_test_corrs.npy"), corrs_test)
+        #     np.save(os.path.join(save_dir, filename + "_test_ps.npy"), ps_test)
 
         with open(save_file, "w") as f:
             json.dump(evaluation, f)

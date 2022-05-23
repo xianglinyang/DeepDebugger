@@ -166,7 +166,7 @@ class RandomSpatialEdgeConstructor(SpatialEdgeConstructor):
                 border_centers = border_centers
                 complex, sigmas_t1, rhos_t1, knn_idxs_t = self._construct_fuzzy_complex(train_data)
                 bw_complex, sigmas_t2, rhos_t2, _ = self._construct_boundary_wise_complex(train_data, border_centers)
-                edge_to_t, edge_from_t, weight_t = self._construct_step_edge_dataset(complex, bw_complex, self.n_epochs)
+                edge_to_t, edge_from_t, weight_t = self._construct_step_edge_dataset(complex, bw_complex)
                 sigmas_t = np.concatenate((sigmas_t1, sigmas_t2[len(sigmas_t1):]), axis=0)
                 rhos_t = np.concatenate((rhos_t1, rhos_t2[len(rhos_t1):]), axis=0)
                 fitting_data = np.concatenate((train_data, border_centers), axis=0)
@@ -513,7 +513,7 @@ class SingleEpochSpatialEdgeConstructor(SpatialEdgeConstructor):
     
     def construct(self):
         # load train data and border centers
-        train_data = self.data_provider.train_representation_lb(self.iteration).squeeze()
+        train_data = self.data_provider.train_representation(self.iteration).squeeze()
 
         if self.b_n_epochs > 0:
             border_centers = self.data_provider.border_representation(self.iteration).squeeze()
@@ -526,7 +526,7 @@ class SingleEpochSpatialEdgeConstructor(SpatialEdgeConstructor):
         elif self.b_n_epochs == 0:
 
             complex, _, _, _ = self._construct_fuzzy_complex(train_data)
-            edge_to, edge_from, weight = self._construct_step_edge_dataset(complex, None, self.n_epochs)
+            edge_to, edge_from, weight = self._construct_step_edge_dataset(complex, None)
             feature_vectors = np.copy(train_data)
             pred_model = self.data_provider.prediction_function(self.iteration)
             attention = get_attention(pred_model, feature_vectors, temperature=.01, device=self.data_provider.DEVICE, verbose=1)            
@@ -534,4 +534,4 @@ class SingleEpochSpatialEdgeConstructor(SpatialEdgeConstructor):
             raise Exception("Illegal border edges proposion!")
 
 
-        return edge_to, edge_from, weight, attention
+        return edge_to, edge_from, weight, feature_vectors, attention

@@ -380,7 +380,7 @@ class ActiveLearningDataProvider(DataProvider):
         t_s = time.time()
         index_file = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "index.json")
         lb_idxs = np.array(load_labelled_data_index(index_file))
-        ulb_idxs = self.get_unlabeled_idx(self.train_num(), lb_idxs)
+        ulb_idxs = self.get_unlabeled_idx(self.train_num, lb_idxs)
 
         # make it possible to choose a subset of testing data for testing
         test_index_file = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "test_index.json")
@@ -415,16 +415,16 @@ class ActiveLearningDataProvider(DataProvider):
             print("Finish inferencing data for Iteration {:d} in {:.2f} seconds...".format(iteration, t_e-t_s))
 
         # save result
-        save_dir = os.path.join(self.model_path, "SV_time.json")
+        save_dir = os.path.join(self.model_path, "SV_time_al.json")
         if not os.path.exists(save_dir):
             evaluation = dict()
+            
         else:
             f = open(save_dir, "r")
             evaluation = json.load(f)
             f.close()
-        if type(evaluation["data_inference"]) != type(dict()):
+        if "data_inference" not in evaluation.keys():
             evaluation["data_inference"] = dict()
-
         evaluation["data_inference"][str(iteration)] = round(t_e - t_s, 3)
         with open(save_dir, 'w') as f:
             json.dump(evaluation, f)
@@ -486,14 +486,14 @@ class ActiveLearningDataProvider(DataProvider):
             print("Finish generating borders for Iteration {:d} in {:.2f} seconds ...".format(iteration, t1-t0))
 
         # save result
-        save_dir = os.path.join(self.model_path, "SV_time.json")
+        save_dir = os.path.join(self.model_path, "SV_time_al.json")
         if not os.path.exists(save_dir):
             evaluation = dict()
         else:
             f = open(save_dir, "r")
             evaluation = json.load(f)
             f.close()
-        if type(evaluation["data_B_gene"]) != type(dict()):
+        if "data_B_gene" not in evaluation.keys():
             evaluation["data_B_gene"] = dict()
         evaluation["data_B_gene"][str(iteration)] = round(t1-t0, 3)
         with open(save_dir, 'w') as f:
@@ -503,7 +503,7 @@ class ActiveLearningDataProvider(DataProvider):
         self._meta_data(iteration)
         self._estimate_boundary(iteration, num, l_bound)
 
-    def train_representation_lb(self, iteration):
+    def train_representation(self, iteration):
         # load train data
         train_data_loc = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "train_data_lb.npy")
         try:
@@ -511,9 +511,9 @@ class ActiveLearningDataProvider(DataProvider):
         except Exception as e:
             print("no train data saved for Iteration {}".format(iteration))
             train_data = None
-        return train_data
+        return train_data.squeeze()
     
-    def train_labels_lb(self, epoch):
+    def train_labels(self, epoch):
         # load train data
         training_data_loc = os.path.join(self.content_path, "Training_data", "training_dataset_label.pth")
         index_file = os.path.join(self.model_path, "Iteration_{:d}".format(epoch), "index.json")
@@ -534,7 +534,7 @@ class ActiveLearningDataProvider(DataProvider):
         except Exception as e:
             print("no train data saved for Iteration {}".format(iteration))
             train_data = None
-        return train_data
+        return train_data.squeeze()
     
     def train_labels_ulb(self, epoch):
         # load train data
@@ -562,7 +562,7 @@ class ActiveLearningDataProvider(DataProvider):
             print("no test data saved for Iteration {}".format(epoch))
             test_data = None
         # max_x = self.max_norm(epoch)
-        return test_data
+        return test_data.squeeze()
     
     def test_labels(self, epoch):
         # load train data
@@ -596,7 +596,7 @@ class ActiveLearningDataProvider(DataProvider):
         except Exception as e:
             print("no border points saved for Epoch {}".format(epoch))
             border_centers = None
-        return border_centers
+        return border_centers.squeeze()
     
     def max_norm(self, epoch):
         train_data_loc = os.path.join(self.model_path, "Iteration_{:d}".format(epoch), "train_data_lb.npy")
