@@ -1,5 +1,3 @@
-from tkinter import HIDDEN
-from matplotlib.pyplot import axis
 import torch
 import sys
 import os
@@ -30,8 +28,8 @@ from singleVis.temporal_edge_constructor import GlobalTemporalEdgeConstructor
 
 parser = argparse.ArgumentParser(description='Process hyperparameters...')
 parser.add_argument('--content_path', type=str)
-parser.add_argument('-d','--dataset', choices=['online','cifar10', 'mnist', 'fmnist', 'cifar10_full', 'mnist_full', 'fmnist_full'])
-parser.add_argument('-p',"--preprocess", choices=[0,1], default=0)
+parser.add_argument('-d','--dataset', type=str)
+parser.add_argument('-p',"--preprocess", choices=[0,1], type=int, default=0)
 parser.add_argument('-g',"--gpu_id", type=int, choices=[0,1,2,3], default=0)
 args = parser.parse_args()
 
@@ -167,6 +165,22 @@ for i in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
 ########################################################################################################################
 #                                                       EVALUATION                                                     #
 ########################################################################################################################
+EVAL_EPOCH_DICT = {
+    "mnist_full":[4, 12, 20],
+    "fmnist_full":[10, 30, 50],
+    "cifar10_full":[40, 120, 200]
+}
+eval_epochs = EVAL_EPOCH_DICT[DATASET]
 
 evaluator = Evaluator(data_provider, trainer)
-evaluator.save_eval(n_neighbors=15, file_name="test_evaluation_tnn")
+# evaluator.save_epoch_eval(eval_epochs[0], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
+evaluator.save_epoch_eval(eval_epochs[0], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_tnn")
+# evaluator.save_epoch_eval(eval_epochs[0], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
+
+# evaluator.save_epoch_eval(eval_epochs[1], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
+evaluator.save_epoch_eval(eval_epochs[1], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_tnn")
+# evaluator.save_epoch_eval(eval_epochs[1], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
+
+# evaluator.save_epoch_eval(eval_epochs[2], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
+evaluator.save_epoch_eval(eval_epochs[2], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_tnn")
+# evaluator.save_epoch_eval(eval_epochs[2], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")

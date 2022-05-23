@@ -1,9 +1,12 @@
+import numpy as np
 from sklearn import datasets
 import torch
 import sys
 import os
 
 import argparse
+import numpy as np
+import json
 
 from umap.umap_ import find_ab_params
 
@@ -21,7 +24,7 @@ from singleVis.eval.evaluator import Evaluator
 
 parser = argparse.ArgumentParser(description='Process hyperparameters...')
 parser.add_argument('--content_path', type=str)
-parser.add_argument('-d','--dataset', choices=['online','cifar10', 'mnist', 'fmnist', 'cifar10_full', 'mnist_full', 'fmnist_full'])
+parser.add_argument('-d','--dataset', type=str)
 parser.add_argument('-p',"--preprocess", choices=[0,1], default=0)
 parser.add_argument('-g',"--gpu_id", type=int, choices=[0,1,2,3], default=0)
 args = parser.parse_args()
@@ -88,33 +91,44 @@ trainer.load(file_path=os.path.join(data_provider.model_path,"tnn.pth"))
 #                                                      VISUALIZATION                                                   #
 ########################################################################################################################
 
-# from singleVis.visualizer import visualizer
+from singleVis.visualizer import visualizer
 
-# vis = visualizer(data_provider, trainer.model, 200, 10, classes)
-# save_dir = os.path.join(data_provider.content_path, "img")
-# if not os.path.exists(save_dir):
-#     os.mkdir(save_dir)
-# for i in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
-#     vis.savefig(i, path=os.path.join(save_dir, "{}_{}_tnn.png".format(DATASET, i)))
+vis = visualizer(data_provider, trainer.model, 200, 10, classes)
+save_dir = os.path.join(data_provider.content_path, "img")
+if not os.path.exists(save_dir):
+    os.mkdir(save_dir)
+
+noise_label = os.path.join(data_provider.content_path, "noisy_label.json")
+with open(noise_label, "r") as f:
+    noise_labels = json.load(f)
+
+for i in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
+    # vis.savefig(i, path=os.path.join(save_dir, "{}_{}_tnn.png".format(DATASET, i)))
+    data = data_provider.train_representation(i)
+    labels = data_provider.train_labels(i)
+    selected = labels != np.array(noise_labels)
+    data = data[selected]
+    labels = np.array(noise_labels)[selected]
+    vis.savefig_cus(i, data, labels, labels, path=os.path.join(save_dir, "{}_{}_tnn.png".format(DATASET, i)))
 ########################################################################################################################
 #                                                       EVALUATION                                                     #
 ########################################################################################################################
-EVAL_EPOCH_DICT = {
-    "mnist_full":[4, 12, 20],
-    "fmnist_full":[10, 30, 50],
-    "cifar10_full":[40, 120, 200]
-}
-eval_epochs = EVAL_EPOCH_DICT[DATASET]
+# EVAL_EPOCH_DICT = {
+#     "mnist_full":[4, 12, 20],
+#     "fmnist_full":[10, 30, 50],
+#     "cifar10_full":[40, 120, 200]
+# }
+# eval_epochs = EVAL_EPOCH_DICT[DATASET]
 
-evaluator = Evaluator(data_provider, trainer)
-evaluator.save_epoch_eval(eval_epochs[0], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
-evaluator.save_epoch_eval(eval_epochs[0], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_tnn")
-evaluator.save_epoch_eval(eval_epochs[0], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
+# evaluator = Evaluator(data_provider, trainer)
+# evaluator.save_epoch_eval(eval_epochs[0], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
+# evaluator.save_epoch_eval(eval_epochs[0], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_tnn")
+# evaluator.save_epoch_eval(eval_epochs[0], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
 
-evaluator.save_epoch_eval(eval_epochs[1], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
-evaluator.save_epoch_eval(eval_epochs[1], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_tnn")
-evaluator.save_epoch_eval(eval_epochs[1], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
+# evaluator.save_epoch_eval(eval_epochs[1], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
+# evaluator.save_epoch_eval(eval_epochs[1], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_tnn")
+# evaluator.save_epoch_eval(eval_epochs[1], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
 
-evaluator.save_epoch_eval(eval_epochs[2], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
-evaluator.save_epoch_eval(eval_epochs[2], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_tnn")
-evaluator.save_epoch_eval(eval_epochs[2], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
+# evaluator.save_epoch_eval(eval_epochs[2], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
+# evaluator.save_epoch_eval(eval_epochs[2], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_tnn")
+# evaluator.save_epoch_eval(eval_epochs[2], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")

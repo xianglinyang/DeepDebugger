@@ -27,6 +27,30 @@ dataset_config = {
         }
         
     },
+    "cifar10_n": {
+        "NET": "resnet18",
+        "TRAINING_LEN": 50000,
+        "TESTING_LEN": 10000,
+        "LAMBDA":10.,
+        "L_BOUND":0.6,
+        "MAX_HAUSDORFF":0.4, # 0.2
+        "ALPHA":0,#0
+        "BETA":.1,#.1
+        "HIDDEN_LAYER":4,
+        "INIT_NUM":300,
+        "EPOCH_START": 40,
+        "EPOCH_END": 200,
+        "EPOCH_PERIOD": 4,
+        "training_config":{
+            "N_NEIGHBORS":15,
+            "MAX_EPOCH": 20,
+            "S_N_EPOCHS": 5,
+            "B_N_EPOCHS":5,
+            "T_N_EPOCHS": 100,
+            "PATIENT": 3,    # early stopping patient
+        }
+        
+    },
     "mnist": {
         "NET": "resnet18",
         "TRAINING_LEN": 60000,
