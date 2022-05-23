@@ -144,8 +144,6 @@ with open(save_dir, 'w') as f:
 save_dir = os.path.join(data_provider.model_path, "Iteration_{}".format(iteration))
 os.system("mkdir -p {}".format(save_dir))
 trainer.save(save_dir=save_dir, file_name="al")
-# trainer.load(file_path=os.path.join(data_provider.model_path,"SV.pth"))
-
     
 # ########################################################################################################################
 # #                                                       EVALUATION                                                     #
