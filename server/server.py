@@ -93,31 +93,6 @@ def filter():
 
     return make_response(jsonify({"selectedPoints": selected_points}), 200)
 
-
-# @app.route('/save_human_selections', methods=["POST"])
-# @cross_origin()
-# def save_human_selections():
-#     data = request.get_json()
-#     indices = data["newIndices"]
-#     CONTENT_PATH = os.path.normpath(data['content_path'])
-#     iteration = data["iteration"]
-#     sys.path.append(CONTENT_PATH)
-
-#     timevis = initialize_backend(CONTENT_PATH)
-#     timevis.save_human_selection(iteration, indices)
-#     sys.path.remove(CONTENT_PATH)
-#     return make_response(jsonify({"message":"Save user selection succefully!"}), 200)
-
-# @app.route('/sprite', methods=["POST","GET"])
-# @cross_origin()
-# def sprite_image():
-#     path= request.args.get("path")
-#     sprite = tf.io.gfile.GFile(path, "rb")
-#     encoded_image_string = sprite.read()
-#     sprite.close()
-#     image_type = "image/png"
-#     return Response(encoded_image_string, status=200, mimetype=image_type)
-
 @app.route('/sprite', methods=["POST","GET"])
 @cross_origin()
 def sprite_image():

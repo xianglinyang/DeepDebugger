@@ -383,9 +383,6 @@ class ActiveLearningDataProvider(DataProvider):
                                        map_location=self.DEVICE)
 
         t_s = time.time()
-        index_file = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "index.json")
-        lb_idxs = np.array(load_labelled_data_index(index_file))
-        ulb_idxs = self.get_unlabeled_idx(self.train_num, lb_idxs)
 
         # make it possible to choose a subset of testing data for testing
         test_index_file = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "test_index.json")
@@ -404,10 +401,8 @@ class ActiveLearningDataProvider(DataProvider):
 
         # training data clustering
         data_pool_representation = batch_run(repr_model, training_data)
-        location = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "train_data_lb.npy")
-        np.save(location, data_pool_representation[lb_idxs])
-        location = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "train_data_ulb.npy")
-        np.save(location, data_pool_representation[ulb_idxs])
+        location = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "train_data.npy")
+        np.save(location, data_pool_representation)
 
         # test data
         test_data_representation = batch_run(repr_model, testing_data)
@@ -510,7 +505,7 @@ class ActiveLearningDataProvider(DataProvider):
 
     def train_representation(self, iteration):
         # load train data
-        train_data_loc = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "train_data_lb.npy")
+        train_data_loc = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "train_data.npy")
         try:
             train_data = np.load(train_data_loc)
         except Exception as e:
@@ -519,6 +514,29 @@ class ActiveLearningDataProvider(DataProvider):
         return train_data.squeeze()
     
     def train_labels(self, epoch):
+        # load train data
+        training_data_loc = os.path.join(self.content_path, "Training_data", "training_dataset_label.pth")
+        try:
+            training_labels = torch.load(training_data_loc, map_location=self.DEVICE)
+        except Exception as e:
+            print("no train labels saved for Iteration {}".format(epoch))
+            training_labels = None
+        return training_labels.cpu().numpy()
+    
+    def train_representation_lb(self, iteration):
+        # load train data
+        train_data_loc = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "train_data.npy")
+        index_file = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "index.json")
+        index = load_labelled_data_index(index_file)
+        try:
+            train_data = np.load(train_data_loc)
+            train_data = train_data[index]
+        except Exception as e:
+            print("no train data saved for Iteration {}".format(iteration))
+            train_data = None
+        return train_data.squeeze()
+    
+    def train_labels_lb(self, epoch):
         # load train data
         training_data_loc = os.path.join(self.content_path, "Training_data", "training_dataset_label.pth")
         index_file = os.path.join(self.model_path, "Iteration_{:d}".format(epoch), "index.json")
@@ -533,9 +551,14 @@ class ActiveLearningDataProvider(DataProvider):
     
     def train_representation_ulb(self, iteration):
         # load train data
-        train_data_loc = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "train_data_ulb.npy")
+        train_data_loc = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "train_data.npy")
+        index_file = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "index.json")
+        lb_idx = np.array(load_labelled_data_index(index_file))
         try:
             train_data = np.load(train_data_loc)
+            pool_num = len(train_data)
+            ulb_idx = self.get_unlabeled_idx(pool_num=pool_num, lb_idx=lb_idx)
+            train_data = train_data[ulb_idx]
         except Exception as e:
             print("no train data saved for Iteration {}".format(iteration))
             train_data = None
@@ -604,13 +627,8 @@ class ActiveLearningDataProvider(DataProvider):
         return border_centers.squeeze()
     
     def max_norm(self, epoch):
-        train_data_loc = os.path.join(self.model_path, "Iteration_{:d}".format(epoch), "train_data_lb.npy")
-        try:
-            train_data = np.load(train_data_loc)
-            max_x = np.linalg.norm(train_data, axis=1).max()
-        except Exception as e:
-            print("no train data saved for Iteration {}".format(epoch))
-            max_x = None
+        train_data = self.train_representation(epoch)
+        max_x = np.linalg.norm(train_data, axis=1).max()
         return max_x
 
     def prediction_function(self, iteration):
@@ -650,7 +668,7 @@ class ActiveLearningDataProvider(DataProvider):
         return pred.squeeze()
 
     def training_accu(self, epoch):
-        data = self.train_representation(epoch)
+        data = self.train_representation_lb(epoch)
         labels = self.train_labels_lb(epoch)
         pred = self.get_pred(epoch, data).argmax(-1)
         val = evaluate_inv_accu(labels, pred)
