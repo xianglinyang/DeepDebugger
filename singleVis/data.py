@@ -362,6 +362,11 @@ class ActiveLearningDataProvider(DataProvider):
             return repr_dim
         except Exception as e:
             return None
+    
+    def get_labeled_idx(self, iteration):
+        index_file = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "index.json")
+        lb_idxs = np.array(load_labelled_data_index(index_file))
+        return lb_idxs
 
     def get_unlabeled_idx(self, pool_num, lb_idx):
         tot_idx = np.arange(pool_num)

@@ -1,6 +1,6 @@
 import os.path
 import time
-
+import gc 
 from tqdm import tqdm
 import torch
 
@@ -29,6 +29,11 @@ class SingleVisTrainer:
     @property
     def loss(self):
         return self._loss
+    
+    def update_edge_loader(self, edge_loader):
+        del self.edge_loader
+        gc.collect()
+        self.edge_loader = edge_loader
 
     def train_step(self):
         self.model.to(device=self.DEVICE)

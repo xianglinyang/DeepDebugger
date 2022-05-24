@@ -23,7 +23,6 @@ from BackendAdapter import TimeVisBackend, ActiveLearningTimeVisBackend
 
 def initialize_backend(CONTENT_PATH):
     GPU_ID = "0"
-
     content_path = CONTENT_PATH
     sys.path.append(content_path)
 
