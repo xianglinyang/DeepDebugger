@@ -16,6 +16,7 @@ import torch
 import numpy as np
 import tensorflow as tf
 from umap.umap_ import find_ab_params
+import base64
 
 from torch.utils.data import DataLoader
 from torch.utils.data import WeightedRandomSampler
@@ -107,15 +108,32 @@ def filter():
 #     sys.path.remove(CONTENT_PATH)
 #     return make_response(jsonify({"message":"Save user selection succefully!"}), 200)
 
+# @app.route('/sprite', methods=["POST","GET"])
+# @cross_origin()
+# def sprite_image():
+#     path= request.args.get("path")
+#     sprite = tf.io.gfile.GFile(path, "rb")
+#     encoded_image_string = sprite.read()
+#     sprite.close()
+#     image_type = "image/png"
+#     return Response(encoded_image_string, status=200, mimetype=image_type)
+
 @app.route('/sprite', methods=["POST","GET"])
 @cross_origin()
 def sprite_image():
-    path= request.args.get("path")
-    sprite = tf.io.gfile.GFile(path, "rb")
-    encoded_image_string = sprite.read()
-    sprite.close()
+    path = request.args.get("path")
+    index=request.args.get("index")
+
+    CONTENT_PATH = os.path.normpath(path)
+    print('index', index)
+    idx = int(index)
+    pic_save_dir_path = os.path.join(CONTENT_PATH, "sprites", "{}.png".format(idx))
+    img_stream = ''
+    with open(pic_save_dir_path, 'rb') as img_f:
+        img_stream = img_f.read()
+        img_stream = base64.b64encode(img_stream).decode()
     image_type = "image/png"
-    return Response(encoded_image_string, status=200, mimetype=image_type)
+    return make_response(jsonify({"imgUrl":img_stream}), 200)
 
 @app.route('/al_query', methods=["POST"])
 @cross_origin()
