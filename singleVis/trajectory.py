@@ -12,6 +12,12 @@ def draw_trajectory(embeddings, save_path=None, x_min=None, x_max=None, y_min=No
 
     plt.xlim((x_min-0.1*(x_max-x_min), x_max+0.1*(x_max-x_min)))
     plt.ylim((y_min-0.1*(y_max-y_min), y_max+0.1*(y_max-y_min)))
+    plt.scatter(embeddings[0,0], embeddings[0,1],marker='^')
+    plt.scatter(embeddings[-1,0],embeddings[-1,1],marker='o')
+    # plt.legend()
+    print(embeddings[0])
+
+
     if save_path is not None:
         plt.savefig(save_path)
 
