@@ -1,4 +1,3 @@
-from msilib.schema import Error
 import os, sys
 sys.path.append("..")
 
@@ -31,7 +30,7 @@ def initialize_backend(CONTENT_PATH):
     # load hyperparameters
     CLASSES = config["CLASSES"]
     DATASET = config["DATASET"]
-    DEVICE = torch.device("cuda:{:d}".format(GPU_ID) if torch.cuda.is_available() else "cpu")
+    DEVICE = torch.device("cuda:{}".format(GPU_ID) if torch.cuda.is_available() else "cpu")
     #################################################   VISUALIZATION PARAMETERS    ########################################
     PREPROCESS = config["VISUALIZATION"]["PREPROCESS"]
     B_N_EPOCHS = config["VISUALIZATION"]["BOUNDARY"]["B_N_EPOCHS"]
@@ -109,9 +108,9 @@ def initialize_backend(CONTENT_PATH):
     evaluator = Evaluator(data_provider, trainer)
 
     if SETTING == "normal":
-        timevis = TimeVisBackend(data_provider, trainer, vis, evaluator, config)
+        timevis = TimeVisBackend(data_provider, trainer, vis, evaluator, **config)
     elif SETTING == "active learning":
-        timevis = ActiveLearningTimeVisBackend(data_provider, trainer, vis, evaluator, config)
+        timevis = ActiveLearningTimeVisBackend(data_provider, trainer, vis, evaluator, **config)
     
     return timevis
 
@@ -121,7 +120,8 @@ def update_epoch_projection(timevis, EPOCH, predicates):
     train_data = timevis.data_provider.train_representation(EPOCH)
     test_data = timevis.data_provider.test_representation(EPOCH)
     all_data = np.concatenate((train_data, test_data), axis=0)
-
+    
+    timevis.trainer.model.to(timevis.trainer.DEVICE)
     embedding_2d = timevis.trainer.model.encoder(
         torch.from_numpy(all_data).to(dtype=torch.float32, device=timevis.trainer.DEVICE)).cpu().detach().numpy().tolist()
 
@@ -143,14 +143,20 @@ def update_epoch_projection(timevis, EPOCH, predicates):
     color = color.astype(int).tolist()
 
     # TODO fix its structure
-    evaluation = timevis.evaluator.get_eval(file_name="test_evaluation")
+    # evaluation = timevis.evaluator.get_eval(file_name="test_evaluation_al")
     eval_new = dict()
-    eval_new["nn_train_15"] = evaluation["15"]['nn_train'][str(EPOCH)]
-    eval_new['nn_test_15'] = evaluation["15"]['nn_test'][str(EPOCH)]
-    eval_new['bound_train_15'] = evaluation["15"]['b_train'][str(EPOCH)]
-    eval_new['bound_test_15'] = evaluation["15"]['b_test'][str(EPOCH)]
-    eval_new['ppr_train'] = evaluation["ppr_train"][str(EPOCH)]
-    eval_new['ppr_test'] = evaluation["ppr_test"][str(EPOCH)]
+    # eval_new["nn_train_15"] = evaluation["15"]['nn_train'][str(EPOCH)]
+    # eval_new['nn_test_15'] = evaluation["15"]['nn_test'][str(EPOCH)]
+    # eval_new['bound_train_15'] = evaluation["15"]['b_train'][str(EPOCH)]
+    # eval_new['bound_test_15'] = evaluation["15"]['b_test'][str(EPOCH)]
+    # eval_new['ppr_train'] = evaluation["ppr_train"][str(EPOCH)]
+    # eval_new['ppr_test'] = evaluation["ppr_test"][str(EPOCH)]
+    eval_new["nn_train_15"] = 1
+    eval_new['nn_test_15'] = 1
+    eval_new['bound_train_15'] = 1
+    eval_new['bound_test_15'] = 1
+    eval_new['ppr_train'] = 1
+    eval_new['ppr_test'] = 1
 
     label_color_list = []
     label_list = []

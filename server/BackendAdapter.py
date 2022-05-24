@@ -1,12 +1,20 @@
 '''This class serves as a intermediate layer for tensorboard frontend and timeVis backend'''
-import os
+import os, sys
 import json
 import torch
 import numpy as np
 from scipy.special import softmax
+import torchvision
+
+import torch.nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, Subset
 
 # sys.path.append("..")
 from singleVis.utils import *
+
+active_learning_path = ""
+sys.path.append(active_learning_path)
 
 
 class TimeVisBackend:
@@ -126,7 +134,7 @@ class TimeVisBackend:
 
 class ActiveLearningTimeVisBackend(TimeVisBackend):
     def __init__(self, data_provider, trainer, vis, evaluator, **hyprparameters) -> None:
-        super().__init__(data_provider, trainer, vis, evaluator, hyprparameters)
+        super().__init__(data_provider, trainer, vis, evaluator, **hyprparameters)
     
     def get_epoch_index(self, iteration):
         """get the training data index for an epoch"""
@@ -135,15 +143,170 @@ class ActiveLearningTimeVisBackend(TimeVisBackend):
         return index
 
 
-    def al_query(self, iteration, strategy):
-        # TODO: implement different strategies, return idxs in score ranking
+    def al_query(self, iteration, budget, strategy):
         """get the index of new selection from different strategies"""
-        # current_idx = self.data_provider
-        # return idxs
-        return NotImplemented
+        CONTENT_PATH = self.data_provider.content_path
+        NUM_QUERY = budget
+        TOTAL_EPOCH = self.hyperparameters["TRAINING"]["total_epoch"]
+        METHOD = strategy
+        GPU = "0"
+        NET = self.hyperparameters["TRAINING"]["NET"]
+        DATA_NAME = self.hyperparameters["DATASET"]
+
+        sys.path.append(CONTENT_PATH)
+
+        # record output information
+        now = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime(time.time())) 
+        sys.stdout = open(os.path.join(CONTENT_PATH, now+".txt"), "w")
+
+        # for reproduce purpose
+        torch.manual_seed(1331)
+        np.random.seed(1131)
+
+        # loading neural network
+        import Model.model as subject_model
+        task_model = eval("subject_model.{}()".format(NET))
+        task_model_type = "pytorch"
+        # start experiment
+        n_pool = self.hyperparameters["TRAINING"]["train_num"]  # 50000
+        n_test = self.hyperparameters["TRAINING"]['test_num']   # 10000
+
+        resume_path = os.path.join(CONTENT_PATH, "Model", "Iteration_{}".format(iteration))
+        idxs_lb = np.array(json.load(open(os.path.join(resume_path, "index.json"), "r")))
+        state_dict = torch.load(os.path.join(resume_path, "subject_model.pth"))
+        task_model.load_state_dict(state_dict)
+        NUM_INIT_LB = len(idxs_lb)
+
+        print('resume from iteration {}'.format(iteration))
+        print('number of labeled pool: {}'.format(NUM_INIT_LB))
+        print('number of unlabeled pool: {}'.format(n_pool - NUM_INIT_LB))
+        print('number of testing pool: {}'.format(n_test))
+
+        # here the training handlers and testing handlers are different
+        complete_dataset = torchvision.datasets.CIFAR10(root="..//data//CIFAR10", download=True, train=True, transform=self.hyperparameters["TRAINING"]['transform_te'])
+
+        if strategy == "random":
+            from query_strategies.random import RandomSampling
+            q_strategy = RandomSampling(task_model, task_model_type, n_pool, idxs_lb, 10, DATA_NAME, NET, gpu=GPU, **self.hyperparameters["TRAINING"])
+        elif strategy == "entropy":
+            from query_strategies.entropy import EntropySampling
+            q_strategy = EntropySampling(task_model, task_model_type, n_pool, idxs_lb, 10, DATA_NAME, NET, gpu=GPU, **self.hyperparameters["TRAINING"])
+
+        # print information
+        print(DATA_NAME)
+        print(type(strategy).__name__)
+
+        print('================Round {:d}==============='.format(iteration+1))
+
+        # query new samples
+        t0 = time.time()
+        new_indices = q_strategy.query(complete_dataset, NUM_QUERY)
+        t1 = time.time()
+        print("Query time is {:.2f}".format(t1-t0))
+        return new_indices
     
-    def al_train(self, iteration, strategy):
-        return NotImplemented
+    def al_train(self, iteration, indices):
+        self.save_human_selection(iteration, indices)
+        lb_idx = self.data_provider.get_labeled_idx(iteration)
+        train_idx = np.hstack((lb_idx, indices))
+
+        CONTENT_PATH = self.data_provider.content_path
+        TOTAL_EPOCH = self.hyperparameters["TRAINING"]["total_epoch"]
+        NET = self.hyperparameters["TRAINING"]["NET"]
+        DEVICE = self.data_provider.DEVICE
+        sys.path.append(CONTENT_PATH)
+
+        # record output information
+        now = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime(time.time())) 
+        sys.stdout = open(os.path.join(CONTENT_PATH, now+".txt"), "w")
+
+        # for reproduce purpose
+        torch.manual_seed(1331)
+        np.random.seed(1131)
+
+        # loading neural network
+        import Model.model as subject_model
+        task_model = eval("subject_model.{}()".format(NET))
+        # start experiment
+
+        new_iteration_dir = os.path.join(CONTENT_PATH, "Model", "Iteration_{}".format(iteration+1))
+        os.system("mkdir -p {}".format(new_iteration_dir))
+
+        save_location = os.path.join(self.data_provider.model_path, "Iteration_{}".format(iteration), "index.json")
+        with open(save_location, "w") as f:
+            json.dump(train_idx.tolist(), f)
+        
+        t1 = time.time()
+        task_model.to(DEVICE)
+        # setting idx_lb
+        train_dataset = torchvision.datasets.CIFAR10(root="..//data//CIFAR10", download=True, train=True, transform=self.hyperparameters["TRAINING"]['transform_tr'])
+        test_dataset = torchvision.datasets.CIFAR10(root="..//data//CIFAR10", download=True, train=False, transform=self.hyperparameters["TRAINING"]['transform_te'])
+        complete_dataset = torchvision.datasets.CIFAR10(root="..//data//CIFAR10", download=True, train=True, transform=self.hyperparameters["TRAINING"]['transform_te'])
+        train_dataset = Subset(complete_dataset, train_idx)
+        train_loader = DataLoader(train_dataset, batch_size=self.kwargs['loader_tr_args']['batch_size'], shuffle=True, num_workers=self.kwargs['loader_tr_args']['num_workers'])
+        optimizer = optim.SGD(
+            task_model.parameters(), lr=self.kwargs['optimizer_args']['lr'], momentum=self.kwargs['optimizer_args']['momentum'], weight_decay=self.kwargs['optimizer_args']['weight_decay']
+        )
+        criterion = torch.nn.CrossEntropyLoss(reduction='none')
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=TOTAL_EPOCH)
+
+        for epoch in range(TOTAL_EPOCH):
+            task_model.train()
+
+            total_loss = 0
+            n_batch = 0
+            acc = 0
+
+            for inputs, targets in train_loader:
+                n_batch += 1
+                inputs, targets = inputs.to(DEVICE), targets.to(DEVICE)
+
+                optimizer.zero_grad()
+                outputs = task_model(inputs)
+                loss = criterion(outputs, targets)
+                loss = torch.mean(loss)
+                loss.backward()
+                optimizer.step()
+
+                total_loss += loss.item()
+                predicted = outputs.argmax(1)
+                b_acc = 1.0 * (targets == predicted).sum().item() / targets.shape[0]
+                acc += b_acc
+
+            total_loss /= n_batch
+            acc /= n_batch
+
+            if epoch % 50 == 0 or epoch == TOTAL_EPOCH-1:
+                print('==========Inner epoch {:d} ========'.format(epoch))
+                print('Training Loss {:.3f}'.format(total_loss))
+                print('Training accuracy {:.3f}'.format(acc*100))
+            scheduler.step()
+        t2 = time.time()
+        print("Training time is {:.2f}".format(t2-t1))
+
+        # compute accuracy at each round
+        loader_te = DataLoader(test_dataset, shuffle=False, **self.kwargs['loader_te_args'])
+        task_model.to(DEVICE)
+        task_model.eval()
+
+        test_num = len(test_dataset.targets)
+        batch_size = self.kwargs['loader_te_args']['batch_size']
+        label = np.array(test_dataset.targets)
+        pred = np.zeros(len(label), dtype=np.long)
+        with torch.no_grad():
+            for idx, (x, y) in enumerate(loader_te):
+                x, y = x.to(self.device), y.to(self.device)
+                out = self.task_model(x)
+                p = out.argmax(1)
+                pred[idx*batch_size:(idx+1)*batch_size] = p.cpu().numpy()
+
+        acc =  np.sum(pred == label) / float(label.shape[0])
+        print('Test Accuracy {:.3f}'.format(100*acc))
+
+        # save model
+        model_path = os.path.join(new_iteration_dir, "subject_model.pth")
+        torch.save(task_model.state_dict(), model_path)
+
 
     def save_human_selection(self, iteration, indices):
         """

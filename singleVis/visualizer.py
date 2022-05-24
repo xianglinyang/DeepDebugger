@@ -112,7 +112,7 @@ class visualizer:
         border[diff < 0.15] = 1
         diff[border == 1] = 0.
 
-        diff = diff/diff.max()
+        diff = diff/(diff.max()+1e-8)
         diff = diff*0.9
 
         mesh_classes = mesh_preds.argmax(axis=1)
