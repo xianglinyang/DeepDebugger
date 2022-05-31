@@ -24,11 +24,14 @@ from singleVis.spatial_edge_constructor import SingleEpochSpatialEdgeConstructor
 ########################################################################################################################
 parser = argparse.ArgumentParser(description='Process hyperparameters...')
 parser.add_argument('--content_path', type=str, default="/home/xianglin/projects/DVI_data/active_learning/base/resnet18/CIFAR10/")
-parser.add_argument('-g',"--gpu_id", type=int, choices=[0,1,2,3], default=0)
+parser.add_argument('-g',"--gpu_id", type=int, choices=[0,1,2,3], default=2)
+parser.add_argument('-i',"--iteration", type=int)
+
 args = parser.parse_args()
 
 CONTENT_PATH = args.content_path
 GPU_ID = args.gpu_id
+iteration = args.iteration
 
 content_path = CONTENT_PATH
 sys.path.append(content_path)
@@ -39,7 +42,7 @@ SETTING = config["SETTING"] # active learning
 CLASSES = config["CLASSES"]
 DATASET = config["DATASET"]
 BASE_ITERATION =config["DATASET"]
-DEVICE = torch.device("cuda:{:d}".format(GPU_ID) if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("cuda:{}".format(GPU_ID) if torch.cuda.is_available() else "cpu")
 
 #################################################   VISUALIZATION PARAMETERS    ########################################
 PREPROCESS = config["VISUALIZATION"]["PREPROCESS"]
@@ -65,12 +68,13 @@ net = eval("subject_model.{}()".format(NET))
 # ########################################################################################################################
 # #                                                    TRAINING SETTING                                                  #
 # ########################################################################################################################
-iteration = 1
-data_provider = ActiveLearningDataProvider(content_path, net, BASE_ITERATION, split=-1, device=DEVICE, verbose=1)
+
+data_provider = ActiveLearningDataProvider(content_path, net, BASE_ITERATION, split=-1, device=DEVICE, classes=CLASSES, verbose=1)
 if PREPROCESS:
     data_provider._meta_data(iteration)
     LEN = len(data_provider.train_labels(iteration))
-    data_provider._estimate_boundary(iteration, LEN//10, l_bound=L_BOUND)
+    if B_N_EPOCHS >0:
+        data_provider._estimate_boundary(iteration, LEN//10, l_bound=L_BOUND)
 
 model = SingleVisualizationModel(input_dims=512, output_dims=2, units=256, hidden_layer=HIDDEN_LAYER)
 negative_sample_rate = 5
