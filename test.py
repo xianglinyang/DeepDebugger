@@ -1,5 +1,4 @@
 import numpy as np
-from sklearn import datasets
 import torch
 import sys
 import os

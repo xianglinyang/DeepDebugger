@@ -13,7 +13,7 @@ DataContainder module
 """
 
 class DataProvider:
-    def __init__(self, content_path, model, epoch_start, epoch_end, epoch_period, split, device, verbose=1):
+    def __init__(self, content_path, model, epoch_start, epoch_end, epoch_period, split, device, classes, verbose=1):
         self.content_path = content_path
         self.model = model
         self.s = epoch_start
@@ -21,6 +21,7 @@ class DataProvider:
         self.p = epoch_period
         self.split = split
         self.DEVICE = device
+        self.classes = classes
         self.verbose = verbose
         self.model_path = os.path.join(self.content_path, "Model")
         if verbose:
@@ -48,8 +49,9 @@ class DataProvider:
     
 
 class NormalDataProvider(DataProvider):
-    def __init__(self, content_path, model, epoch_start, epoch_end, epoch_period, split, device, verbose=1):
-        super().__init__(content_path, model, epoch_start, epoch_end, epoch_period, split, device, verbose)
+    def __init__(self, content_path, model, epoch_start, epoch_end, epoch_period, split, device, classes, verbose=1):
+        super().__init__(content_path, model, epoch_start, epoch_end, epoch_period, split, device, classes, verbose)
+        self.mode = "normal"
     
     @property
     def representation_dim(self):
@@ -349,9 +351,10 @@ class NormalDataProvider(DataProvider):
 
 
 class ActiveLearningDataProvider(DataProvider):
-    def __init__(self, content_path, model, base_epoch_start, split, device, verbose=1):
+    def __init__(self, content_path, model, base_epoch_start, split, device, classes, verbose=1):
         # dummy input as epoch_end and epoch_period
-        super().__init__(content_path, model, base_epoch_start, base_epoch_start, 1, split, device, verbose)
+        super().__init__(content_path, model, base_epoch_start, base_epoch_start, 1, split, device, classes, verbose)
+        self.mode = "al"
     
     @property
     def representation_dim(self):

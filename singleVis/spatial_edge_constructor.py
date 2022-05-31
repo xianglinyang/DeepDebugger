@@ -513,7 +513,10 @@ class SingleEpochSpatialEdgeConstructor(SpatialEdgeConstructor):
     
     def construct(self):
         # load train data and border centers
-        train_data = self.data_provider.train_representation(self.iteration).squeeze()
+        if self.data_provider.mode == "al":
+            train_data = self.data_provider.train_representation_lb(self.iteration).squeeze()
+        elif self.data_provider.mode == "normal":
+            train_data = self.data_provider.train_representation(self.iteration).squeeze()
 
         if self.b_n_epochs > 0:
             border_centers = self.data_provider.border_representation(self.iteration).squeeze()
