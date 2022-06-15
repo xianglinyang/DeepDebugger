@@ -348,7 +348,7 @@ class NormalDataProvider(DataProvider):
         preds = self.get_pred(epoch, data)
         border = is_B(preds)
         return border
-
+    
 
 class ActiveLearningDataProvider(DataProvider):
     def __init__(self, content_path, model, base_epoch_start, split, device, classes, verbose=1):
@@ -572,7 +572,7 @@ class ActiveLearningDataProvider(DataProvider):
         training_data_loc = os.path.join(self.content_path, "Training_data", "training_dataset_label.pth")
         index_file = os.path.join(self.model_path, "Iteration_{:d}".format(epoch), "index.json")
         lb_idxs = np.array(load_labelled_data_index(index_file))
-        ulb_idxs = self.get_unlabeled_idx(self.train_num(), lb_idxs)
+        ulb_idxs = self.get_unlabeled_idx(self.train_num, lb_idxs)
         try:
             training_labels = torch.load(training_data_loc, map_location=self.DEVICE)
             training_labels = training_labels[ulb_idxs]

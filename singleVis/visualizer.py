@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import numpy as np
 import torch
+from io import BytesIO
+import base64
 
 class visualizer:
     def __init__(self, data_provider, sv_model, resolution, class_num, classes, cmap='tab10'):
@@ -265,6 +267,33 @@ class visualizer:
         
         # plt.quiver(prev_embedding[:, 0], prev_embedding[:, 1], embedding[:, 0]-prev_embedding[:, 0],embedding[:, 1]-prev_embedding[:, 1], scale_units='xy', angles='xy', scale=1)  
         plt.savefig(path)
+    
+    def get_background(self, epoch, resolution):
+        '''
+        Initialises matplotlib artists and plots. from DeepView and DVI
+        '''
+        plt.ion()
+        fig, ax = plt.subplots(1, 1, figsize=(8, 8))
+        ax.set_axis_off()
+        cls_plot = ax.imshow(np.zeros([5, 5, 3]),
+            interpolation='gaussian', zorder=0, vmin=0, vmax=1)
+        # self.disable_synth = False
+
+        x_min, y_min, x_max, y_max = self.get_epoch_plot_measures(epoch)
+        _, decision_view = self.get_epoch_decision_view(epoch, resolution)
+
+        cls_plot.set_data(decision_view)
+        cls_plot.set_extent((x_min, x_max, y_max, y_min))
+        ax.set_xlim((x_min, x_max))
+        ax.set_ylim((y_min, y_max))
+        plt.show()
+
+        # write to memory
+        save_file = BytesIO()
+        plt.savefig(save_file, format='png')
+        save_file_base64 = base64.b64encode(save_file.getvalue()).decode()
+    
+        return x_min, y_min, x_max, y_max, save_file_base64
     
     def get_standard_classes_color(self):
         '''
