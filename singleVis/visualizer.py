@@ -273,7 +273,8 @@ class visualizer:
         Initialises matplotlib artists and plots. from DeepView and DVI
         '''
         plt.ion()
-        fig, ax = plt.subplots(1, 1, figsize=(8, 8))
+        px = 1/plt.rcParams['figure.dpi']  # pixel in inches
+        fig, ax = plt.subplots(1, 1, figsize=(200*px, 200*px))
         ax.set_axis_off()
         cls_plot = ax.imshow(np.zeros([5, 5, 3]),
             interpolation='gaussian', zorder=0, vmin=0, vmax=1)
@@ -286,12 +287,13 @@ class visualizer:
         cls_plot.set_extent((x_min, x_max, y_max, y_min))
         ax.set_xlim((x_min, x_max))
         ax.set_ylim((y_min, y_max))
-        plt.show()
+        # plt.show()
 
         # write to memory
         save_file = BytesIO()
         plt.savefig(save_file, format='png')
-        save_file_base64 = base64.b64encode(save_file.getvalue()).decode()
+        save_file.seek(0)
+        save_file_base64 = base64.b64encode(save_file.read())
     
         return x_min, y_min, x_max, y_max, save_file_base64
     
