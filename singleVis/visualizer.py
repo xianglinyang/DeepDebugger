@@ -291,7 +291,7 @@ class visualizer:
 
         # write to memory
         save_file = BytesIO()
-        plt.savefig(save_file, format='png')
+        plt.savefig(save_file, format='png',bbox_inches='tight',pad_inches=0.0)
         save_file.seek(0)
         save_file_base64 = base64.b64encode(save_file.read())
     
