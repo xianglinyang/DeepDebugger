@@ -214,11 +214,12 @@ class RandomSpatialEdgeConstructor(SpatialEdgeConstructor):
     
 
 class kcSpatialEdgeConstructor(SpatialEdgeConstructor):
-    def __init__(self, data_provider, init_num, s_n_epochs, b_n_epochs, n_neighbors, MAX_HAUSDORFF, ALPHA, BETA) -> None:
+    def __init__(self, data_provider, init_num, s_n_epochs, b_n_epochs, n_neighbors, MAX_HAUSDORFF, ALPHA, BETA, init_idxs=None) -> None:
         super().__init__(data_provider, init_num, s_n_epochs, b_n_epochs, n_neighbors)
         self.MAX_HAUSDORFF = MAX_HAUSDORFF
         self.ALPHA = ALPHA
         self.BETA = BETA
+        self.init_idxs = init_idxs
     
     def _get_unit(self, data, adding_num=100):
         t0 = time.time()
@@ -259,7 +260,10 @@ class kcSpatialEdgeConstructor(SpatialEdgeConstructor):
         time_step_idxs_list = list()
 
         train_num = self.data_provider.train_num
-        selected_idxs = np.random.choice(np.arange(train_num), size=self.init_num, replace=False)
+        if self.init_idxs is None:
+            selected_idxs = np.random.choice(np.arange(train_num), size=self.init_num, replace=False)
+        else:
+            selected_idxs = np.copy(self.init_idxs)
 
         baseline_data = self.data_provider.train_representation(self.data_provider.e)
         max_x = np.linalg.norm(baseline_data, axis=1).max()
@@ -275,11 +279,6 @@ class kcSpatialEdgeConstructor(SpatialEdgeConstructor):
 
             # select highly used border centers...
             border_centers = self.data_provider.border_representation(t).squeeze()
-            # neigh = NearestNeighbors(n_neighbors=15, radius=0.4)
-            # neigh.fit(border_centers)
-            # high_ind = neigh.kneighbors(train_data, 15, return_distance=False)
-            # selected_borders = np.bincount(high_ind.reshape(-1), minlength=len(border_centers))>100
-            # border_centers = border_centers[selected_borders]
 
             # normalize data by max ||x||_2
             max_x = np.linalg.norm(train_data, axis=1).max()

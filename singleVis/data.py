@@ -47,6 +47,10 @@ class DataProvider:
         gc.collect()
         return test_num
     
+    def update_interval(self, epoch_s, epoch_e):
+        self.s = epoch_s
+        self.e = epoch_e
+    
 
 class NormalDataProvider(DataProvider):
     def __init__(self, content_path, model, epoch_start, epoch_end, epoch_period, split, device, classes, verbose=1):

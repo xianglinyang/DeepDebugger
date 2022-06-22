@@ -29,6 +29,11 @@ class SingleVisTrainer:
     @property
     def loss(self):
         return self._loss
+
+    def reset_optim(self, optim, lr_s):
+        self.optimizer = optim
+        self.lr_scheduler = lr_s
+        print("Successfully reset optimizer!")
     
     def update_edge_loader(self, edge_loader):
         del self.edge_loader
