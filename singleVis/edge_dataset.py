@@ -34,7 +34,7 @@ class DataHandler(Dataset):
         # return the number of all edges
         return len(self.edge_to)
 
-class HybirdDataHandler(Dataset):
+class HybridDataHandler(Dataset):
     def __init__(self, edge_to, edge_from, feature_vector, attention, embedded, coefficient, transform=None):
         self.edge_to = edge_to
         self.edge_from = edge_from
@@ -53,8 +53,8 @@ class HybirdDataHandler(Dataset):
         a_to = self.attention[edge_to_idx]
         a_from = self.attention[edge_from_idx]
 
-        embedded_to = self.embedded[edge_to]
-        coeffi_to = self.coefficient[edge_to]
+        embedded_to = self.embedded[edge_to_idx]
+        coeffi_to = self.coefficient[edge_to_idx]
         if self.transform is not None:
             # TODO correct or not?
             edge_to = Image.fromarray(edge_to)
