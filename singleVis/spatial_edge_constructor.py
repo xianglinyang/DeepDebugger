@@ -628,7 +628,7 @@ class kcHybridSpatialEdgeConstructor(SpatialEdgeConstructor):
                 json.dump(selected_idxs.tolist(), f)
             print("select {:d} points".format(len(selected_idxs)))
 
-            time_step_idxs_list.insert(0, np.arange(len(selected_idxs)).tolist())
+            time_step_idxs_list.insert(0, selected_idxs)
 
             train_data = self.data_provider.train_representation(t).squeeze()
             train_data = train_data[selected_idxs]
@@ -668,14 +668,14 @@ class kcHybridSpatialEdgeConstructor(SpatialEdgeConstructor):
                 knn_indices = knn_idxs_t
                 # npr = npr_t
                 time_step_nums.insert(0, (t_num, b_num))
-                if self.init_idxs is None:
+                if self.init_embeddings is None:
                     coefficient = np.zeros(len(feature_vectors))
                     embedded = np.zeros((len(feature_vectors), 2))
                 else:
                     coefficient = np.zeros(len(feature_vectors))
-                    coefficient[:len(self.init_idxs)] = 1
+                    coefficient[:len(self.init_embeddings)] = 1
                     embedded = np.zeros((len(feature_vectors), 2))
-                    embedded[:len(self.init_idxs)] = self.init_embeddings
+                    embedded[:len(self.init_embeddings)] = self.init_embeddings
 
             else:
                 # every round, we need to add len(data) to edge_to(as well as edge_from) index

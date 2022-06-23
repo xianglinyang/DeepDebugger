@@ -86,7 +86,7 @@ min_dist = .1
 _a, _b = find_ab_params(1.0, min_dist)
 umap_loss_fn = UmapLoss(negative_sample_rate, DEVICE, _a, _b, repulsion_strength=1.0)
 recon_loss_fn = ReconstructionLoss(beta=1.0)
-smooth_loss_fn = SmoothnessLoss(margin=0.5)
+smooth_loss_fn = SmoothnessLoss(margin=0.25)
 criterion = HybridLoss(umap_loss_fn, recon_loss_fn, smooth_loss_fn, lambd1=LAMBDA, lambd2=S_LAMBDA)
 
 # Resume from a check point
@@ -103,6 +103,7 @@ if RESUME_SEG in range(len(SEGMENTS)):
     print("Resume from {}-th segment with {} points...".format(RESUME_SEG, INIT_NUM))
 else: 
     prev_selected = np.random.choice(np.arange(LEN), size=INIT_NUM, replace=False)
+    prev_embedding = None
     start_point = len(SEGMENTS)-1
 
 for seg in range(start_point,-1,-1):
