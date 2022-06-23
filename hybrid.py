@@ -12,13 +12,13 @@ from umap.umap_ import find_ab_params
 
 from singleVis.custom_weighted_random_sampler import CustomWeightedRandomSampler
 from singleVis.SingleVisualizationModel import SingleVisualizationModel
-from singleVis.losses import SingleVisLoss, UmapLoss, ReconstructionLoss
-from singleVis.edge_dataset import DataHandler
-from singleVis.trainer import SingleVisTrainer
+from singleVis.losses import HybridLoss, SmoothnessLoss, UmapLoss, ReconstructionLoss
+from singleVis.edge_dataset import HybridDataHandler
+from singleVis.trainer import HybridVisTrainer
 from singleVis.data import NormalDataProvider
 import singleVis.config as config
 from singleVis.eval.evaluator import Evaluator
-from singleVis.spatial_edge_constructor import kcSpatialEdgeConstructor
+from singleVis.spatial_edge_constructor import kcHybridSpatialEdgeConstructor
 from singleVis.temporal_edge_constructor import GlobalTemporalEdgeConstructor
 
 ########################################################################################################################
@@ -51,6 +51,7 @@ LEN = TRAINING_PARAMETER["train_num"]
 # Training parameter (visualization model)
 VISUALIZATION_PARAMETER = config["VISUALIZATION"]
 LAMBDA = VISUALIZATION_PARAMETER["LAMBDA"]
+S_LAMBDA = VISUALIZATION_PARAMETER["S_LAMBDA"]
 B_N_EPOCHS = VISUALIZATION_PARAMETER["BOUNDARY"]["B_N_EPOCHS"]
 L_BOUND = VISUALIZATION_PARAMETER["BOUNDARY"]["L_BOUND"]
 INIT_NUM = VISUALIZATION_PARAMETER["INIT_NUM"]
@@ -85,18 +86,20 @@ min_dist = .1
 _a, _b = find_ab_params(1.0, min_dist)
 umap_loss_fn = UmapLoss(negative_sample_rate, DEVICE, _a, _b, repulsion_strength=1.0)
 recon_loss_fn = ReconstructionLoss(beta=1.0)
-criterion = SingleVisLoss(umap_loss_fn, recon_loss_fn, lambd=LAMBDA)
+smooth_loss_fn = SmoothnessLoss(margin=0.5)
+criterion = HybridLoss(umap_loss_fn, recon_loss_fn, smooth_loss_fn, lambd1=LAMBDA, lambd2=S_LAMBDA)
 
 # Resume from a check point
 if RESUME_SEG in range(len(SEGMENTS)):
     prev_epoch = SEGMENTS[RESUME_SEG][0]
     with open(os.path.join(data_provider.content_path, "selected_idxs", "selected_{}.json".format(prev_epoch)), "r") as f:
         prev_selected = json.load(f)
-    INIT_NUM = len(prev_selected)
     save_model_path = os.path.join(data_provider.model_path, "tnn_hybrid_{}.pth".format(RESUME_SEG))
     save_model = torch.load(save_model_path, map_location=torch.device("cpu"))
     model.load_state_dict(save_model["state_dict"])
+    prev_data = torch.from_numpy(data_provider.train_representation(prev_epoch)[prev_selected]).to(dtype=torch.float32)
     start_point = RESUME_SEG - 1
+    prev_embedding = model.encoder(prev_data).detach().numpy()
     print("Resume from {}-th segment with {} points...".format(RESUME_SEG, INIT_NUM))
 else: 
     prev_selected = np.random.choice(np.arange(LEN), size=INIT_NUM, replace=False)
@@ -110,9 +113,14 @@ for seg in range(start_point,-1,-1):
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=4, gamma=.1)
 
     t0 = time.time()
-    spatial_cons = kcSpatialEdgeConstructor(data_provider=data_provider, init_num=INIT_NUM, s_n_epochs=S_N_EPOCHS, b_n_epochs=B_N_EPOCHS, n_neighbors=N_NEIGHBORS, MAX_HAUSDORFF=MAX_HAUSDORFF, ALPHA=ALPHA, BETA=BETA, init_idxs=prev_selected)
-    s_edge_to, s_edge_from, s_probs, feature_vectors, time_step_nums, time_step_idxs_list, knn_indices, sigmas, rhos, attention = spatial_cons.construct()
+    spatial_cons = kcHybridSpatialEdgeConstructor(data_provider=data_provider, init_num=INIT_NUM, s_n_epochs=S_N_EPOCHS, b_n_epochs=B_N_EPOCHS, n_neighbors=N_NEIGHBORS, MAX_HAUSDORFF=MAX_HAUSDORFF, ALPHA=ALPHA, BETA=BETA, init_idxs=prev_selected, init_embeddings=prev_embedding)
+    s_edge_to, s_edge_from, s_probs, feature_vectors, embedded, coefficient, time_step_nums, time_step_idxs_list, knn_indices, sigmas, rhos, attention = spatial_cons.construct()
+    
+    # update prev_idxs and prev_embedding
     prev_selected = time_step_idxs_list[0]
+    prev_data = torch.from_numpy(feature_vectors[:len(prev_selected)]).to(dtype=torch.float32, device=DEVICE)
+    prev_embedding = model.encoder(prev_data).cpu().detach().numpy()
+
     temporal_cons = GlobalTemporalEdgeConstructor(X=feature_vectors, time_step_nums=time_step_nums, sigmas=sigmas, rhos=rhos, n_neighbors=N_NEIGHBORS, n_epochs=T_N_EPOCHS)
     t_edge_to, t_edge_from, t_probs = temporal_cons.construct()
     t1 = time.time()
@@ -141,7 +149,7 @@ for seg in range(start_point,-1,-1):
     print("constructing timeVis complex for {}-th segment in {:.1f} seconds.".format(seg, t1-t0))
 
 
-    dataset = DataHandler(edge_to, edge_from, feature_vectors, attention)
+    dataset = HybridDataHandler(edge_to, edge_from, feature_vectors, attention, embedded, coefficient)
     n_samples = int(np.sum(S_N_EPOCHS * probs) // 1)
     # chosse sampler based on the number of dataset
     if len(edge_to) > 2^24:
@@ -154,7 +162,7 @@ for seg in range(start_point,-1,-1):
     #                                                       TRAIN                                                          #
     ########################################################################################################################
 
-    trainer = SingleVisTrainer(model, criterion, optimizer, lr_scheduler,edge_loader=edge_loader, DEVICE=DEVICE)
+    trainer = HybridVisTrainer(model, criterion, optimizer, lr_scheduler,edge_loader=edge_loader, DEVICE=DEVICE)
 
     t2=time.time()
     trainer.train(PATIENT, MAX_EPOCH)
