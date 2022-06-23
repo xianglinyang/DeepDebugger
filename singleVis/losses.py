@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+import torch.nn.functional as F
 from singleVis.backend import convert_distance_to_probability, compute_cross_entropy
 
 """Losses modules for preserving four propertes"""
@@ -75,6 +76,16 @@ class ReconstructionLoss(nn.Module):
         return (loss1 + loss2)/2
 
 
+class SmoothnessLoss(nn.Module):
+    def __init__(self, margin=1.0):
+        super(SmoothnessLoss, self).__init__()
+        self._margin = margin
+
+    def forward(self, embedding, target, Coefficient):
+        loss = Coefficient*torch.clamp(F.mse_loss(embedding, target)-self._margin, min=0.0)
+        return loss
+
+
 class SingleVisLoss(nn.Module):
     def __init__(self, umap_loss, recon_loss, lambd):
         super(SingleVisLoss, self).__init__()
@@ -93,3 +104,25 @@ class SingleVisLoss(nn.Module):
         loss = umap_l + self.lambd * recon_l
 
         return umap_l, recon_l, loss
+
+class HybridLoss(nn.Module):
+    def __init__(self, umap_loss, recon_loss, smooth_loss, lambd1, lambd2):
+        super(HybridLoss, self).__init__()
+        self.umap_loss = umap_loss
+        self.recon_loss = recon_loss
+        self.smooth_loss = smooth_loss
+        self.lambd1 = lambd1
+        self.lambd2 = lambd2
+
+    def forward(self, edge_to, edge_from, a_to, a_from, embeded_to, coeff, outputs):
+        embedding_to, embedding_from = outputs["umap"]
+        recon_to, recon_from = outputs["recon"]
+
+        recon_l = self.recon_loss(edge_to, edge_from, recon_to, recon_from, a_to, a_from)
+        umap_l = self.umap_loss(embedding_to, embedding_from)
+        smooth_l = self.smooth_loss(embedding_to, embeded_to, coeff)
+
+        loss = umap_l + self.lambd1 * recon_l + self.lambd2 * smooth_l
+
+        return umap_l, recon_l, smooth_l, loss
+
