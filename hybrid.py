@@ -119,6 +119,7 @@ for seg in range(start_point,-1,-1):
     # update prev_idxs and prev_embedding
     prev_selected = time_step_idxs_list[0]
     prev_data = torch.from_numpy(feature_vectors[:len(prev_selected)]).to(dtype=torch.float32, device=DEVICE)
+    model.to(device=DEVICE)
     prev_embedding = model.encoder(prev_data).cpu().detach().numpy()
 
     temporal_cons = GlobalTemporalEdgeConstructor(X=feature_vectors, time_step_nums=time_step_nums, sigmas=sigmas, rhos=rhos, n_neighbors=N_NEIGHBORS, n_epochs=T_N_EPOCHS)
