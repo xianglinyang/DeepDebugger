@@ -82,7 +82,7 @@ class SmoothnessLoss(nn.Module):
         self._margin = margin
 
     def forward(self, embedding, target, Coefficient):
-        loss = Coefficient*torch.clamp(F.mse_loss(embedding, target)-self._margin, min=0.0)
+        loss = torch.mean(Coefficient * torch.clamp(torch.norm(embedding-target, dim=1)-self._margin, min=0))
         return loss
 
 
