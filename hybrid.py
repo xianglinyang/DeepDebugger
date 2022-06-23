@@ -64,6 +64,7 @@ N_NEIGHBORS = VISUALIZATION_PARAMETER["N_NEIGHBORS"]
 PATIENT = VISUALIZATION_PARAMETER["PATIENT"]
 MAX_EPOCH = VISUALIZATION_PARAMETER["MAX_EPOCH"]
 SEGMENTS = VISUALIZATION_PARAMETER["SEGMENTS"]
+RESUME_SEG = VISUALIZATION_PARAMETER["RESUME_SEG"]
 
 # define hyperparameters
 DEVICE = torch.device("cuda:{}".format(GPU_ID) if torch.cuda.is_available() else "cpu")
@@ -86,10 +87,22 @@ umap_loss_fn = UmapLoss(negative_sample_rate, DEVICE, _a, _b, repulsion_strength
 recon_loss_fn = ReconstructionLoss(beta=1.0)
 criterion = SingleVisLoss(umap_loss_fn, recon_loss_fn, lambd=LAMBDA)
 
-prev_selected = np.random.choice(np.arange(LEN), size=INIT_NUM, replace=False)
+# Resume from a check point
+if RESUME_SEG in range(len(SEGMENTS)):
+    prev_epoch = SEGMENTS[RESUME_SEG][0]
+    with open(os.path.join(data_provider.content_path, "selected_idxs", "selected_{}.json".format(prev_epoch)), "r") as f:
+        prev_selected = json.load(f)
+    INIT_NUM = len(prev_selected)
+    save_model_path = os.path.join(data_provider.model_path, "tnn_hybrid_{}.pth".format(RESUME_SEG))
+    save_model = torch.load(save_model_path, map_location=torch.device("cpu"))
+    model.load_state_dict(save_model["state_dict"])
+    start_point = RESUME_SEG - 1
+    print("Resume from {}-th segment with {} points...".format(RESUME_SEG, INIT_NUM))
+else: 
+    prev_selected = np.random.choice(np.arange(LEN), size=INIT_NUM, replace=False)
+    start_point = len(SEGMENTS)-1
 
-
-for seg in range(len(SEGMENTS)-1,-1,-1):
+for seg in range(start_point,-1,-1):
     epoch_start, epoch_end = SEGMENTS[seg]
     data_provider.update_interval(epoch_s=epoch_start, epoch_e=epoch_end)
 
@@ -163,41 +176,41 @@ for seg in range(len(SEGMENTS)-1,-1,-1):
     
     model = trainer.model
 
-data_provider.update_interval(EPOCH_START, EPOCH_END)
-########################################################################################################################
-#                                                      VISUALIZATION                                                   #
-########################################################################################################################
+# data_provider.update_interval(EPOCH_START, EPOCH_END)
+# ########################################################################################################################
+# #                                                      VISUALIZATION                                                   #
+# ########################################################################################################################
 
-from singleVis.visualizer import visualizer
+# from singleVis.visualizer import visualizer
 
-vis = visualizer(data_provider, trainer.model, 200, 10, CLASSES)
-save_dir = os.path.join(data_provider.content_path, "img")
-if not os.path.exists(save_dir):
-    os.mkdir(save_dir)
-for i in range(EPOCH_START, EPOCH_END+1, 2*EPOCH_PERIOD):
-    vis.savefig(i, path=os.path.join(save_dir, "{}_{}_hybrid_tnn.png".format(DATASET, i)))
+# vis = visualizer(data_provider, trainer.model, 200, 10, CLASSES)
+# save_dir = os.path.join(data_provider.content_path, "img")
+# if not os.path.exists(save_dir):
+#     os.mkdir(save_dir)
+# for i in range(EPOCH_START, EPOCH_END+1, 2*EPOCH_PERIOD):
+#     vis.savefig(i, path=os.path.join(save_dir, "{}_{}_hybrid_tnn.png".format(DATASET, i)))
 
     
-########################################################################################################################
-#                                                       EVALUATION                                                     #
-########################################################################################################################
-EVAL_EPOCH_DICT = {
-    "mnist_full":[4, 12, 20],
-    "fmnist_full":[10, 30, 50],
-    "cifar10_full":[40, 120, 200],
-    "cifar10":[5,15,25,35,50,100,150,200]
-}
-eval_epochs = EVAL_EPOCH_DICT[DATASET]
+# ########################################################################################################################
+# #                                                       EVALUATION                                                     #
+# ########################################################################################################################
+# EVAL_EPOCH_DICT = {
+#     "mnist_full":[4, 12, 20],
+#     "fmnist_full":[10, 30, 50],
+#     "cifar10_full":[40, 120, 200],
+#     "cifar10":[5,15,25,35,50,100,150,200]
+# }
+# eval_epochs = EVAL_EPOCH_DICT[DATASET]
 
-evaluator = Evaluator(data_provider, trainer)
-# evaluator.save_epoch_eval(eval_epochs[0], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
-evaluator.save_epoch_eval(eval_epochs[0], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_tnn")
-# evaluator.save_epoch_eval(eval_epochs[0], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
+# evaluator = Evaluator(data_provider, trainer)
+# # evaluator.save_epoch_eval(eval_epochs[0], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
+# evaluator.save_epoch_eval(eval_epochs[0], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_tnn")
+# # evaluator.save_epoch_eval(eval_epochs[0], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
 
-# evaluator.save_epoch_eval(eval_epochs[1], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
-evaluator.save_epoch_eval(eval_epochs[1], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_tnn")
-# evaluator.save_epoch_eval(eval_epochs[1], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
+# # evaluator.save_epoch_eval(eval_epochs[1], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
+# evaluator.save_epoch_eval(eval_epochs[1], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_tnn")
+# # evaluator.save_epoch_eval(eval_epochs[1], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
 
-# evaluator.save_epoch_eval(eval_epochs[2], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
-evaluator.save_epoch_eval(eval_epochs[2], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_tnn")
-# evaluator.save_epoch_eval(eval_epochs[2], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
+# # evaluator.save_epoch_eval(eval_epochs[2], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
+# evaluator.save_epoch_eval(eval_epochs[2], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_tnn")
+# # evaluator.save_epoch_eval(eval_epochs[2], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
