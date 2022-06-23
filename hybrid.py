@@ -116,12 +116,6 @@ for seg in range(start_point,-1,-1):
     t0 = time.time()
     spatial_cons = kcHybridSpatialEdgeConstructor(data_provider=data_provider, init_num=INIT_NUM, s_n_epochs=S_N_EPOCHS, b_n_epochs=B_N_EPOCHS, n_neighbors=N_NEIGHBORS, MAX_HAUSDORFF=MAX_HAUSDORFF, ALPHA=ALPHA, BETA=BETA, init_idxs=prev_selected, init_embeddings=prev_embedding)
     s_edge_to, s_edge_from, s_probs, feature_vectors, embedded, coefficient, time_step_nums, time_step_idxs_list, knn_indices, sigmas, rhos, attention = spatial_cons.construct()
-    
-    # update prev_idxs and prev_embedding
-    prev_selected = time_step_idxs_list[0]
-    prev_data = torch.from_numpy(feature_vectors[:len(prev_selected)]).to(dtype=torch.float32, device=DEVICE)
-    model.to(device=DEVICE)
-    prev_embedding = model.encoder(prev_data).cpu().detach().numpy()
 
     temporal_cons = GlobalTemporalEdgeConstructor(X=feature_vectors, time_step_nums=time_step_nums, sigmas=sigmas, rhos=rhos, n_neighbors=N_NEIGHBORS, n_epochs=T_N_EPOCHS)
     t_edge_to, t_edge_from, t_probs = temporal_cons.construct()
@@ -183,8 +177,15 @@ for seg in range(start_point,-1,-1):
     with open(save_dir, 'w') as f:
         json.dump(evaluation, f)
     trainer.save(save_dir=data_provider.model_path, file_name="tnn_hybrid_{}".format(seg))
-    
     model = trainer.model
+
+    # update prev_idxs and prev_embedding
+    prev_selected = time_step_idxs_list[0]
+    prev_data = torch.from_numpy(feature_vectors[:len(prev_selected)]).to(dtype=torch.float32, device=DEVICE)
+    model.to(device=DEVICE)
+    prev_embedding = model.encoder(prev_data).cpu().detach().numpy()
+    
+    
 
 # data_provider.update_interval(EPOCH_START, EPOCH_END)
 # ########################################################################################################################
