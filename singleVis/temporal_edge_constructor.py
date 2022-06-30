@@ -242,6 +242,7 @@ class GlobalTemporalEdgeConstructor(TemporalEdgeConstructor):
         cols = np.zeros(1, dtype=np.int32)
         vals = np.zeros(1, dtype=np.float32)
 
+        # base_idx denote the starting point of each time step (including borders)
         base_idx = 0
         base_idx_list = list()
         for i in self.time_step_nums:
@@ -249,6 +250,7 @@ class GlobalTemporalEdgeConstructor(TemporalEdgeConstructor):
             base_idx = base_idx + i[0] + i[1]
         base_idx_list = np.array(base_idx_list, dtype=int)
 
+        # denote the training data idxs range at each time step
         valid_idx_list = list()
         for i in range(len(self.time_step_nums)):
             valid_idx_list.append(base_idx_list[i]+self.time_step_nums[i][0])
@@ -262,11 +264,9 @@ class GlobalTemporalEdgeConstructor(TemporalEdgeConstructor):
 
         for time_step in range(self.time_steps):
             start_idx = base_idx_list[time_step]
-            end_idx = start_idx + self.time_step_nums[time_step][0]
-            # move_positions = [i - start_idx for i in base_idx_list]
+            end_idx = start_idx + self.time_step_nums[time_step][0] - 1
             move_positions = base_idx_list - start_idx
             for train_sample_idx in range(start_idx, end_idx + 1, 1):
-                # candidate_idxs = [train_sample_idx + i for i in move_positions if train_sample_idx + i < valid_idx]
                 candidate_idxs = train_sample_idx + move_positions
                 candidate_idxs = candidate_idxs[np.logical_and(candidate_idxs>=base_idx_list, candidate_idxs<valid_idx_list)]
                 nn_dist = knn_dists(self.features, [train_sample_idx], candidate_idxs).squeeze(axis=0)
@@ -296,6 +296,7 @@ class GlobalParallelTemporalEdgeConstructor(TemporalEdgeConstructor):
         self.selected_idxs = selected_idxs_lists
     
     def construct(self):
+        # base index denote the starting point of each epoch (including border points)
         base_idx = 0
         base_idx_list = list()
         for i in self.time_step_nums:
