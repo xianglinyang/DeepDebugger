@@ -246,5 +246,31 @@ def is_B(preds):
     is_border[diff < 0.1] = 1
     return is_border
 
+def find_nearest_dist(query, pool):
+    """
+    find the distance to the nearest neighbor in the pool
+    :param query: ndarray, shape (N,dim) 
+    :param pool: ndarray (N, dim)
+    :return dists: ndarray (N,)
+    """
+    # number of trees in random projection forest
+    n_trees = min(64, 5 + int(round((pool.shape[0]) ** 0.5 / 20.0)))
+    # max number of nearest neighbor iters to perform
+    n_iters = max(5, int(round(np.log2(pool.shape[0]))))
+    # distance metric
+    metric = "euclidean"
+
+    # get nearest neighbors
+    nnd = NNDescent(
+        pool,
+        n_neighbors=1,
+        metric=metric,
+        n_trees=n_trees,
+        n_iters=n_iters,
+        max_candidates=60,
+        verbose=False
+    )
+    _, distances = nnd.query(query, k=1)
+    return distances.squeeze(axis=1)
 
 
