@@ -535,6 +535,7 @@ class ActiveLearningDataProvider(DataProvider):
         train_data_loc = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "train_data.npy")
         index_file = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "index.json")
         index = load_labelled_data_index(index_file)
+        index = [int(i) for i in index]
         try:
             train_data = np.load(train_data_loc)
             train_data = train_data[index]
