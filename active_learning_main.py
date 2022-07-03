@@ -154,3 +154,17 @@ trainer.save(save_dir=save_dir, file_name="al")
 # ########################################################################################################################
 evaluator = Evaluator(data_provider, trainer)
 evaluator.save_epoch_eval(iteration, 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_al")
+
+########################################################################################################################
+#                                                      VISUALIZATION                                                   #
+########################################################################################################################
+
+from singleVis.visualizer import visualizer
+
+vis = visualizer(data_provider, trainer.model, 200, 10, CLASSES)
+save_dir = os.path.join(data_provider.content_path, "img")
+os.system("mkdir -p {}".format(save_dir))
+data = data_provider.train_representation_lb(iteration)
+pred = data_provider.get_pred(iteration, data).argmax(1)
+labels = data_provider.train_labels_lb(iteration)
+vis.savefig_cus(iteration, data, pred, labels, path=os.path.join(save_dir, "{}_{}_al.png".format(DATASET, iteration)))
