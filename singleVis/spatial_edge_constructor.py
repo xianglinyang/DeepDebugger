@@ -12,6 +12,7 @@ from sklearn.utils import check_random_state
 from singleVis.kcenter_greedy import kCenterGreedy
 from singleVis.intrinsic_dim import IntrinsicDim
 from singleVis.backend import get_graph_elements, get_attention
+from singleVis.utils import find_nearest_dist
 
 
 '''Base class for Spatial Edge Constructor'''
@@ -541,13 +542,15 @@ class SingleEpochSpatialEdgeConstructor(SpatialEdgeConstructor):
 
 
 class kcHybridSpatialEdgeConstructor(SpatialEdgeConstructor):
-    def __init__(self, data_provider, init_num, s_n_epochs, b_n_epochs, n_neighbors, MAX_HAUSDORFF, ALPHA, BETA, init_idxs=None, init_embeddings=None) -> None:
+    def __init__(self, data_provider, init_num, s_n_epochs, b_n_epochs, n_neighbors, MAX_HAUSDORFF, ALPHA, BETA, init_idxs=None, init_embeddings=None, c0=None, d0=None) -> None:
         super().__init__(data_provider, init_num, s_n_epochs, b_n_epochs, n_neighbors)
         self.MAX_HAUSDORFF = MAX_HAUSDORFF
         self.ALPHA = ALPHA
         self.BETA = BETA
         self.init_idxs = init_idxs
         self.init_embeddings = init_embeddings
+        self.c0 = c0
+        self.d0 = d0
     
     def _get_unit(self, data, adding_num=100):
         t0 = time.time()
@@ -588,16 +591,27 @@ class kcHybridSpatialEdgeConstructor(SpatialEdgeConstructor):
         embedded = None
 
         train_num = self.data_provider.train_num
+        # load init_idxs
         if self.init_idxs is None:
             selected_idxs = np.random.choice(np.arange(train_num), size=self.init_num, replace=False)
         else:
             selected_idxs = np.copy(self.init_idxs)
-
-        baseline_data = self.data_provider.train_representation(self.data_provider.e)
-        max_x = np.linalg.norm(baseline_data, axis=1).max()
-        baseline_data = baseline_data/max_x
         
-        c0,d0,_ = self._get_unit(baseline_data)
+        # load c0 d0
+        if self.c0 is None or self.d0 is None:
+            baseline_data = self.data_provider.train_representation(self.data_provider.e)
+            max_x = np.linalg.norm(baseline_data, axis=1).max()
+            baseline_data = baseline_data/max_x
+            c0,d0,_ = self._get_unit(baseline_data)
+            save_dir = os.path.join(self.data_provider.content_path, "selected_idxs")
+            os.system("mkdir -p {}".format(save_dir))
+            with open(os.path.join(save_dir,"baseline.json"), "w") as f:
+                json.dump([float(c0), float(d0)], f)
+            print("save c0 and d0 to disk!")
+            
+        else:
+            c0 = self.c0
+            d0 = self.d0
 
         # each time step
         for t in range(self.data_provider.e, self.data_provider.s - 1, -self.data_provider.p):
@@ -619,7 +633,7 @@ class kcHybridSpatialEdgeConstructor(SpatialEdgeConstructor):
             print("Finish calculating normaling factor")
 
             kc = kCenterGreedy(train_data)
-            _ = kc.select_batch_with_cn(selected_idxs, self.MAX_HAUSDORFF, c_c0, d_d0, p=0.95)
+            _, hausd = kc.select_batch_with_cn(selected_idxs, self.MAX_HAUSDORFF, c_c0, d_d0, p=0.95, return_min=True)
             selected_idxs = kc.already_selected.astype("int")
 
             save_dir = os.path.join(self.data_provider.content_path, "selected_idxs")
@@ -654,8 +668,7 @@ class kcHybridSpatialEdgeConstructor(SpatialEdgeConstructor):
                 fitting_data = np.copy(train_data)
                 pred_model = self.data_provider.prediction_function(t)
                 attention_t = get_attention(pred_model, fitting_data, temperature=.01, device=self.data_provider.DEVICE, verbose=1)
-
-
+            
             if edge_to is None:
                 edge_to = edge_to_t
                 edge_from = edge_from_t
@@ -668,6 +681,7 @@ class kcHybridSpatialEdgeConstructor(SpatialEdgeConstructor):
                 knn_indices = knn_idxs_t
                 # npr = npr_t
                 time_step_nums.insert(0, (t_num, b_num))
+
                 if self.init_embeddings is None:
                     coefficient = np.zeros(len(feature_vectors))
                     embedded = np.zeros((len(feature_vectors), 2))
@@ -688,7 +702,7 @@ class kcHybridSpatialEdgeConstructor(SpatialEdgeConstructor):
                 probs = np.concatenate((probs_t, probs), axis=0)
                 sigmas = np.concatenate((sigmas_t, sigmas), axis=0)
                 rhos = np.concatenate((rhos_t, rhos), axis=0)
-                feature_vectors = np.concatenate((fitting_data, feature_vectors), axis=0)
+                feature_vectors = np.concatenate((fitting_data, feature_vectors), axis=0) 
                 attention = np.concatenate((attention_t, attention), axis=0)
                 knn_indices = np.concatenate((knn_idxs_t, knn_indices+increase_idx), axis=0)
                 # npr = np.concatenate((npr_t, npr), axis=0)
@@ -696,4 +710,6 @@ class kcHybridSpatialEdgeConstructor(SpatialEdgeConstructor):
                 coefficient = np.concatenate((np.zeros(len(fitting_data)), coefficient), axis=0)
                 embedded = np.concatenate((np.zeros((len(fitting_data), 2)), embedded), axis=0)
 
-        return edge_to, edge_from, weight, feature_vectors, embedded, coefficient, time_step_nums, time_step_idxs_list, knn_indices, sigmas, rhos, attention
+                
+
+        return edge_to, edge_from, weight, feature_vectors, embedded, coefficient, time_step_nums, time_step_idxs_list, knn_indices, sigmas, rhos, attention, (c0, d0)
