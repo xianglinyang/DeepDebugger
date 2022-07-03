@@ -291,7 +291,7 @@ class NormalDataProvider(DataProvider):
     def prediction_function(self, epoch):
         model_location = os.path.join(self.model_path, "Epoch_{:d}".format(epoch), "subject_model.pth")
         self.model.load_state_dict(torch.load(model_location, map_location=torch.device("cpu")))
-        self.model = self.model.to(self.DEVICE)
+        self.model.to(self.DEVICE)
         self.model.eval()
 
         model = torch.nn.Sequential(*(list(self.model.children())[self.split:]))
@@ -391,13 +391,13 @@ class ActiveLearningDataProvider(DataProvider):
 
         t_s = time.time()
 
-        # make it possible to choose a subset of testing data for testing
-        test_index_file = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "test_index.json")
-        if os.path.exists(test_index_file):
-            test_index = load_labelled_data_index(test_index_file)
-        else:
-            test_index = range(len(testing_data))
-        testing_data = testing_data[test_index]
+        # # make it possible to choose a subset of testing data for testing
+        # test_index_file = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "test_index.json")
+        # if os.path.exists(test_index_file):
+        #     test_index = load_labelled_data_index(test_index_file)
+        # else:
+        #     test_index = range(len(testing_data))
+        # testing_data = testing_data[test_index]
 
         model_location = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "subject_model.pth")
         self.model.load_state_dict(torch.load(model_location, map_location=torch.device("cpu")))
@@ -535,7 +535,7 @@ class ActiveLearningDataProvider(DataProvider):
         train_data_loc = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "train_data.npy")
         index_file = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "index.json")
         index = load_labelled_data_index(index_file)
-        index = [int(i) for i in index]
+        # index = [int(i) for i in index]
         try:
             train_data = np.load(train_data_loc)
             train_data = train_data[index]
@@ -549,6 +549,7 @@ class ActiveLearningDataProvider(DataProvider):
         training_data_loc = os.path.join(self.content_path, "Training_data", "training_dataset_label.pth")
         index_file = os.path.join(self.model_path, "Iteration_{:d}".format(epoch), "index.json")
         index = load_labelled_data_index(index_file)
+        # index = [int(i) for i in index]
         try:
             training_labels = torch.load(training_data_loc, map_location=self.DEVICE)
             training_labels = training_labels[index]
@@ -642,18 +643,18 @@ class ActiveLearningDataProvider(DataProvider):
     def prediction_function(self, iteration):
         model_location = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "subject_model.pth")
         self.model.load_state_dict(torch.load(model_location, map_location=torch.device("cpu")))
-        self.model = self.model.to(self.DEVICE)
+        self.model.to(self.DEVICE)
         self.model.eval()
 
         model = torch.nn.Sequential(*(list(self.model.children())[self.split:]))
-        model = model.to(self.DEVICE)
-        model = model.eval()
+        model.to(self.DEVICE)
+        model.eval()
         return model
 
     def feature_function(self, epoch):
         model_location = os.path.join(self.model_path, "Iteration_{:d}".format(epoch), "subject_model.pth")
         self.model.load_state_dict(torch.load(model_location, map_location=torch.device("cpu")))
-        self.model = self.model.to(self.DEVICE)
+        self.model.to(self.DEVICE)
         self.model.eval()
 
         model = torch.nn.Sequential(*(list(self.model.children())[:self.split]))
