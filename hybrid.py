@@ -20,7 +20,7 @@ import singleVis.config as config
 from singleVis.eval.evaluator import Evaluator
 from singleVis.spatial_edge_constructor import kcHybridSpatialEdgeConstructor
 from singleVis.temporal_edge_constructor import GlobalTemporalEdgeConstructor
-
+from singleVis.intrinsic_dim import IntrinsicDim
 ########################################################################################################################
 #                                                     LOAD PARAMETERS                                                  #
 ########################################################################################################################
@@ -33,6 +33,10 @@ args = parser.parse_args()
 CONTENT_PATH = args.content_path
 sys.path.append(CONTENT_PATH)
 from config import config
+
+# # record output information
+# now = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime(time.time())) 
+# sys.stdout = open(os.path.join(CONTENT_PATH, now+".txt"), "w")
 
 SETTING = config["SETTING"]
 CLASSES = config["CLASSES"]
@@ -94,17 +98,23 @@ if RESUME_SEG in range(len(SEGMENTS)):
     prev_epoch = SEGMENTS[RESUME_SEG][0]
     with open(os.path.join(data_provider.content_path, "selected_idxs", "selected_{}.json".format(prev_epoch)), "r") as f:
         prev_selected = json.load(f)
+    with open(os.path.join(data_provider.content_path, "selected_idxs", "baseline.json".format(prev_epoch)), "r") as f:
+        c0, d0 = json.load(f)
     save_model_path = os.path.join(data_provider.model_path, "tnn_hybrid_{}.pth".format(RESUME_SEG))
     save_model = torch.load(save_model_path, map_location=torch.device("cpu"))
     model.load_state_dict(save_model["state_dict"])
     prev_data = torch.from_numpy(data_provider.train_representation(prev_epoch)[prev_selected]).to(dtype=torch.float32)
     start_point = RESUME_SEG - 1
     prev_embedding = model.encoder(prev_data).detach().numpy()
-    print("Resume from {}-th segment with {} points...".format(RESUME_SEG, INIT_NUM))
+    print("Resume from {}-th segment with {} points...".format(RESUME_SEG, len(prev_embedding)))
 else: 
     prev_selected = np.random.choice(np.arange(LEN), size=INIT_NUM, replace=False)
     prev_embedding = None
     start_point = len(SEGMENTS)-1
+    c0=None
+    d0=None
+
+
 
 for seg in range(start_point,-1,-1):
     epoch_start, epoch_end = SEGMENTS[seg]
@@ -114,8 +124,8 @@ for seg in range(start_point,-1,-1):
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=4, gamma=.1)
 
     t0 = time.time()
-    spatial_cons = kcHybridSpatialEdgeConstructor(data_provider=data_provider, init_num=INIT_NUM, s_n_epochs=S_N_EPOCHS, b_n_epochs=B_N_EPOCHS, n_neighbors=N_NEIGHBORS, MAX_HAUSDORFF=MAX_HAUSDORFF, ALPHA=ALPHA, BETA=BETA, init_idxs=prev_selected, init_embeddings=prev_embedding)
-    s_edge_to, s_edge_from, s_probs, feature_vectors, embedded, coefficient, time_step_nums, time_step_idxs_list, knn_indices, sigmas, rhos, attention = spatial_cons.construct()
+    spatial_cons = kcHybridSpatialEdgeConstructor(data_provider=data_provider, init_num=INIT_NUM, s_n_epochs=S_N_EPOCHS, b_n_epochs=B_N_EPOCHS, n_neighbors=N_NEIGHBORS, MAX_HAUSDORFF=MAX_HAUSDORFF, ALPHA=ALPHA, BETA=BETA, init_idxs=prev_selected, init_embeddings=prev_embedding, c0=c0, d0=d0)
+    s_edge_to, s_edge_from, s_probs, feature_vectors, embedded, coefficient, time_step_nums, time_step_idxs_list, knn_indices, sigmas, rhos, attention, (c0,d0) = spatial_cons.construct()
 
     temporal_cons = GlobalTemporalEdgeConstructor(X=feature_vectors, time_step_nums=time_step_nums, sigmas=sigmas, rhos=rhos, n_neighbors=N_NEIGHBORS, n_epochs=T_N_EPOCHS)
     t_edge_to, t_edge_from, t_probs = temporal_cons.construct()
@@ -209,19 +219,20 @@ for seg in range(start_point,-1,-1):
 #     "mnist_full":[4, 12, 20],
 #     "fmnist_full":[10, 30, 50],
 #     "cifar10_full":[40, 120, 200],
-#     "cifar10":[5,15,25,35,50,100,150,200]
+#     "cifar10":[35,50,100,150,200]
 # }
 # eval_epochs = EVAL_EPOCH_DICT[DATASET]
 
 # evaluator = Evaluator(data_provider, trainer)
 # # evaluator.save_epoch_eval(eval_epochs[0], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
-# evaluator.save_epoch_eval(eval_epochs[0], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_tnn")
-# # evaluator.save_epoch_eval(eval_epochs[0], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
+# for i in eval_epochs:
+#     evaluator.save_epoch_eval(i, 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_tnn")
+# evaluator.save_epoch_eval(eval_epochs[0], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
 
-# # evaluator.save_epoch_eval(eval_epochs[1], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
+# evaluator.save_epoch_eval(eval_epochs[1], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
 # evaluator.save_epoch_eval(eval_epochs[1], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_tnn")
-# # evaluator.save_epoch_eval(eval_epochs[1], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
+# evaluator.save_epoch_eval(eval_epochs[1], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
 
-# # evaluator.save_epoch_eval(eval_epochs[2], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
+# evaluator.save_epoch_eval(eval_epochs[2], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
 # evaluator.save_epoch_eval(eval_epochs[2], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_tnn")
-# # evaluator.save_epoch_eval(eval_epochs[2], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
+# evaluator.save_epoch_eval(eval_epochs[2], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
