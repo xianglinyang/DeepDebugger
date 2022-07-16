@@ -287,13 +287,14 @@ class visualizer:
         cls_plot.set_extent((x_min, x_max, y_max, y_min))
         ax.set_xlim((x_min, x_max))
         ax.set_ylim((y_min, y_max))
-        # plt.show()
 
-        # write to memory
-        save_file = BytesIO()
-        plt.savefig(save_file, format='png',bbox_inches='tight',pad_inches=0.0)
-        save_file.seek(0)
-        save_file_base64 = base64.b64encode(save_file.read())
+        # save first and them load
+        fname = "Epoch" if self.data_provider.mode == "normal" else "Iteration"
+        save_path = os.path.join(self.data_provider.model_path, "{}_{}".format(fname, epoch), "bgimg.png")
+        plt.savefig(save_path, format='png',bbox_inches='tight',pad_inches=0.0)
+        with open(save_path, 'rb') as img_f:
+            img_stream = img_f.read()
+            save_file_base64 = base64.b64encode(img_stream)
     
         return x_min, y_min, x_max, y_max, save_file_base64
     
