@@ -8,16 +8,14 @@ from io import BytesIO
 import base64
 
 class visualizer:
-    def __init__(self, data_provider, sv_model, resolution, class_num, classes, cmap='tab10'):
+    def __init__(self, data_provider, projector, resolution, class_num, classes, cmap='tab10'):
         self.data_provider = data_provider
-        self.model = sv_model
+        self.projector = projector
         self.class_num = class_num
         self.cmap = plt.get_cmap(cmap)
         self.classes = classes
         self.resolution= resolution
 
-        self.model.eval()
-    
     def _init_plot(self, only_img=False):
         '''
         Initialises matplotlib artists and plots. from DeepView and DVI
@@ -65,8 +63,7 @@ class visualizer:
     def get_epoch_plot_measures(self, epoch):
         """get plot measure for visualization"""
         data = self.data_provider.train_representation(epoch)
-        data = torch.from_numpy(data).to(device=self.data_provider.DEVICE, dtype=torch.float)
-        embedded = self.model.encoder(data).cpu().detach().numpy()
+        embedded = self.projector.batch_project(epoch, data)
 
         ebd_min = np.min(embedded, axis=0)
         ebd_max = np.max(embedded, axis=0)
@@ -102,8 +99,7 @@ class visualizer:
         grid = np.swapaxes(grid.reshape(grid.shape[0], -1), 0, 1)
 
         # map gridmpoint to images
-        grid = torch.from_numpy(grid).to(device=self.data_provider.DEVICE, dtype=torch.float)
-        grid_samples = self.model.decoder(grid).cpu().detach().numpy()
+        grid_samples = self.projector.batch_inverse(epoch, grid)
 
         mesh_preds = self.data_provider.get_pred(epoch, grid_samples)
         mesh_preds = mesh_preds + 1e-8
@@ -152,8 +148,8 @@ class visualizer:
         pred = self.data_provider.get_pred(epoch, train_data)
         pred = pred.argmax(axis=1)
 
-        train_data = torch.from_numpy(train_data).to(device=self.data_provider.DEVICE, dtype=torch.float)
-        embedding = self.model.encoder(train_data).cpu().detach().numpy()
+        embedding = self.projector.batch_project(epoch, train_data)
+
         for c in range(self.class_num):
             data = embedding[np.logical_and(train_labels == c, train_labels == pred)]
             self.sample_plots[c].set_data(data.transpose())
@@ -189,9 +185,8 @@ class visualizer:
         # params_str = 'res: %d'
         # desc = params_str % (self.resolution)
         # self.desc.set_text(desc)
+        embedding = self.projector.batch_project(epoch, data)
 
-        data = torch.from_numpy(data).to(device=self.data_provider.DEVICE, dtype=torch.float)
-        embedding = self.model.encoder(data).cpu().detach().numpy()
         for c in range(self.class_num):
             data = embedding[np.logical_and(labels == c, labels == pred)]
             self.sample_plots[c].set_data(data.transpose())
@@ -228,11 +223,8 @@ class visualizer:
         # desc = params_str % (self.resolution)
         # self.desc.set_text(desc)
 
-        data = torch.from_numpy(data).to(device=self.data_provider.DEVICE, dtype=torch.float)
-        embedding = self.model.encoder(data).cpu().detach().numpy()
-
-        prev_data = torch.from_numpy(prev_data).to(device=self.data_provider.DEVICE, dtype=torch.float)
-        prev_embedding = self.model.encoder(prev_data).cpu().detach().numpy()
+        embedding = self.projector.batch_project(epoch, data)
+        prev_embedding = self.projector.batch_project(epoch, prev_data)
 
         # all_labels = np.concatenate((prev_labels, labels), axis=0)
         # all_pred = np.concatenate((prev_pred, pred), axis=0)
