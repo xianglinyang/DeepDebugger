@@ -14,12 +14,12 @@ class Projector:
         self.current_range = (-1,-1)
 
     def load(self, iteration):
-        if iteration <= self.current_range[0] or iteration > self.current_range[1]:
+        if iteration < self.current_range[0] or iteration > self.current_range[1]:
             for i in range(len(self.segments)):
                 s = self.segments[i][0]
                 e = self.segments[i][1]
-                # range (s, e]
-                if iteration > s and iteration <= e:
+                # range [s, e)
+                if iteration >= s and iteration <= e:
                     idx = i
                     break
             file_path = os.path.join(self.content_path, "Model", "tnn_hybrid_{}.pth".format(idx))
