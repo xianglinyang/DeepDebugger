@@ -10,18 +10,16 @@ from singleVis.eval.evaluate import *
 from singleVis.backend import *
 
 class Evaluator:
-    def __init__(self, data_provider, trainer, verbose=1):
+    def __init__(self, data_provider, projector, verbose=1):
         self.data_provider = data_provider
-        self.trainer = trainer
+        self.projector = projector
         self.verbose = verbose
 
     ####################################### ATOM #############################################
 
     def eval_nn_train(self, epoch, n_neighbors):
         train_data = self.data_provider.train_representation(epoch)
-        self.trainer.model.eval()
-        embedding = self.trainer.model.encoder(
-            torch.from_numpy(train_data).to(dtype=torch.float32, device=self.trainer.DEVICE)).cpu().detach().numpy()
+        embedding = self.projector.batch_project(epoch, train_data)
         val = evaluate_proj_nn_perseverance_knn(train_data, embedding, n_neighbors=n_neighbors, metric="euclidean")
         if self.verbose:
             print("#train# nn preserving: {:.2f}/{:d} in epoch {:d}".format(val, n_neighbors, epoch))
@@ -31,23 +29,18 @@ class Evaluator:
         train_data = self.data_provider.train_representation(epoch)
         test_data = self.data_provider.test_representation(epoch)
         fitting_data = np.concatenate((train_data, test_data), axis=0)
-        self.trainer.model.eval()
-        embedding = self.trainer.model.encoder(
-            torch.from_numpy(fitting_data).to(dtype=torch.float32, device=self.trainer.DEVICE)).cpu().detach().numpy()
+        embedding = self.projector.batch_project(epoch, fitting_data)
         val = evaluate_proj_nn_perseverance_knn(fitting_data, embedding, n_neighbors=n_neighbors, metric="euclidean")
         if self.verbose:
             print("#test# nn preserving : {:.2f}/{:d} in epoch {:d}".format(val, n_neighbors, epoch))
         return val
 
     def eval_b_train(self, epoch, n_neighbors):
-        self.trainer.model.eval()
         train_data = self.data_provider.train_representation(epoch)
         border_centers = self.data_provider.border_representation(epoch)
 
-        low_center = self.trainer.model.encoder(
-            torch.from_numpy(border_centers).to(dtype=torch.float32, device=self.trainer.DEVICE)).cpu().detach().numpy()
-        low_train = self.trainer.model.encoder(
-            torch.from_numpy(train_data).to(dtype=torch.float32, device=self.trainer.DEVICE)).cpu().detach().numpy()
+        low_center = self.projector.batch_project(epoch, border_centers)
+        low_train = self.projector.batch_project(epoch, train_data)
 
         val = evaluate_proj_boundary_perseverance_knn(train_data,
                                                       low_train,
@@ -59,14 +52,11 @@ class Evaluator:
         return val
 
     def eval_b_test(self, epoch, n_neighbors):
-        self.trainer.model.eval()
         test_data = self.data_provider.test_representation(epoch)
         border_centers = self.data_provider.test_border_representation(epoch)
 
-        low_center = self.trainer.model.encoder(
-            torch.from_numpy(border_centers).to(dtype=torch.float32, device=self.trainer.DEVICE)).cpu().detach().numpy()
-        low_test = self.trainer.model.encoder(
-            torch.from_numpy(test_data).to(dtype=torch.float32, device=self.trainer.DEVICE)).cpu().detach().numpy()
+        low_center = self.projector.batch_project(epoch, border_centers)
+        low_test = self.projector.batch_project(epoch, test_data)
 
         val = evaluate_proj_boundary_perseverance_knn(test_data,
                                                       low_test,
@@ -79,10 +69,8 @@ class Evaluator:
 
     def eval_inv_train(self, epoch):
         train_data = self.data_provider.train_representation(epoch)
-        embedding = self.trainer.model.encoder(
-            torch.from_numpy(train_data).to(dtype=torch.float32, device=self.trainer.DEVICE)).cpu().detach().numpy()
-        inv_data = self.trainer.model.decoder(
-            torch.from_numpy(embedding).to(dtype=torch.float32, device=self.trainer.DEVICE)).cpu().detach().numpy()
+        embedding = self.projector.batch_project(epoch, train_data)
+        inv_data = self.projector.batch_inverse(epoch, embedding)
 
         pred = self.data_provider.get_pred(epoch, train_data).argmax(axis=1)
         new_pred = self.data_provider.get_pred(epoch, inv_data).argmax(axis=1)
@@ -94,10 +82,8 @@ class Evaluator:
 
     def eval_inv_test(self, epoch):
         test_data = self.data_provider.test_representation(epoch)
-        embedding = self.trainer.model.encoder(
-            torch.from_numpy(test_data).to(dtype=torch.float32, device=self.trainer.DEVICE)).cpu().detach().numpy()
-        inv_data = self.trainer.model.decoder(
-            torch.from_numpy(embedding).to(dtype=torch.float32, device=self.trainer.DEVICE)).cpu().detach().numpy()
+        embedding = self.projector.batch_project(epoch, test_data)
+        inv_data = self.projector.batch_inverse(epoch, embedding)
 
         pred = self.data_provider.get_pred(epoch, test_data).argmax(axis=1)
         new_pred = self.data_provider.get_pred(epoch, inv_data).argmax(axis=1)
@@ -114,15 +100,12 @@ class Evaluator:
         alpha = np.zeros((eval_num, l))
         delta_x = np.zeros((eval_num, l))
 
-        self.trainer.model.eval()
         for t in range(eval_num):
             prev_data = self.data_provider.train_representation(t * self.data_provider.p + self.data_provider.s)
-            prev_embedding = self.trainer.model.encoder(
-                torch.from_numpy(prev_data).to(dtype=torch.float32, device=self.trainer.DEVICE)).cpu().detach().numpy()
+            prev_embedding = self.projector.batch_project(t * self.data_provider.p + self.data_provider.s, prev_data)
 
             curr_data = self.data_provider.train_representation((t+1) * self.data_provider.p + self.data_provider.s)
-            curr_embedding = self.trainer.model.encoder(
-                torch.from_numpy(curr_data).to(dtype=torch.float32, device=self.trainer.DEVICE)).cpu().detach().numpy()
+            curr_embedding = self.projector.batch_project((t+1) * self.data_provider.p + self.data_provider.s, curr_data)
 
             alpha_ = find_neighbor_preserving_rate(prev_data, curr_data, n_neighbors=n_neighbors)
             delta_x_ = np.linalg.norm(prev_embedding - curr_embedding, axis=1)
@@ -145,14 +128,12 @@ class Evaluator:
             prev_data_test = self.data_provider.test_representation(t * self.data_provider.p + self.data_provider.s)
             prev_data_train = self.data_provider.train_representation(t * self.data_provider.p + self.data_provider.s)
             prev_data = np.concatenate((prev_data_train, prev_data_test), axis=0)
-            prev_embedding = self.trainer.model.encoder(
-                torch.from_numpy(prev_data).to(dtype=torch.float32, device=self.trainer.DEVICE)).cpu().detach().numpy()
+            prev_embedding = self.projector.batch_project(t * self.data_provider.p + self.data_provider.s, prev_data)
 
             curr_data_test = self.data_provider.test_representation((t+1) * self.data_provider.p + self.data_provider.s)
             curr_data_train = self.data_provider.train_representation((t+1) * self.data_provider.p + self.data_provider.s)
             curr_data = np.concatenate((curr_data_train, curr_data_test), axis=0)
-            curr_embedding = self.trainer.model.encoder(
-                torch.from_numpy(curr_data).to(dtype=torch.float32, device=self.trainer.DEVICE)).cpu().detach().numpy()
+            curr_embedding = self.projector.batch_project((t+1) * self.data_provider.p + self.data_provider.s, curr_data)
 
             alpha_ = find_neighbor_preserving_rate(prev_data, curr_data, n_neighbors=n_neighbors)
             delta_x_ = np.linalg.norm(prev_embedding - curr_embedding, axis=1)
@@ -171,16 +152,12 @@ class Evaluator:
         high_dists = np.zeros((l, epoch_num))
         low_dists = np.zeros((l, epoch_num))
 
-        self.trainer.model.eval()
-
         curr_data = self.data_provider.train_representation(epoch)
-        curr_embedding = self.trainer.model.encoder(
-            torch.from_numpy(curr_data).to(dtype=torch.float32, device=self.trainer.DEVICE)).cpu().detach().numpy()
+        curr_embedding = self.projector.batch_project(epoch, curr_data)
         
         for t in range(epoch_num):
             data = self.data_provider.train_representation(t * self.data_provider.p + self.data_provider.s)
-            embedding = self.trainer.model.encoder(
-                torch.from_numpy(data).to(dtype=torch.float32, device=self.trainer.DEVICE)).cpu().detach().numpy()
+            embedding = self.projector.batch_project(t * self.data_provider.p + self.data_provider.s, data)
 
             high_dist = np.linalg.norm(curr_data - data, axis=1)
             low_dist = np.linalg.norm(curr_embedding - embedding, axis=1)
@@ -209,15 +186,12 @@ class Evaluator:
         high_dists = np.zeros((l, epoch_num))
         low_dists = np.zeros((l, epoch_num))
 
-        self.trainer.model.eval()
-
         curr_data = self.data_provider.test_representation(epoch)
-        curr_embedding = self.trainer.model.encoder(
-            torch.from_numpy(curr_data).to(dtype=torch.float32, device=self.trainer.DEVICE)).cpu().detach().numpy()
+        curr_embedding = self.projector.batch_project(epoch, curr_data)
+
         for t in range(epoch_num):
             data = self.data_provider.test_representation(t * self.data_provider.p + self.data_provider.s)
-            embedding = self.trainer.model.encoder(
-                torch.from_numpy(data).to(dtype=torch.float32, device=self.trainer.DEVICE)).cpu().detach().numpy()
+            embedding = self.projector.batch_project(t * self.data_provider.p + self.data_provider.s, data)
 
             high_dist = np.linalg.norm(curr_data - data, axis=1)
             low_dist = np.linalg.norm(curr_embedding - embedding, axis=1)
@@ -247,14 +221,12 @@ class Evaluator:
         train_num = self.data_provider.train_num
 
         high_features = np.zeros((epoch_num*train_num, feature_dim))
+        low_features = np.zeros((epoch_num*train_num, 2))
 
-        self.trainer.model.eval()
-        
         for t in range(epoch_num):
             data = self.data_provider.train_representation(t * self.data_provider.p + self.data_provider.s)
             high_features[t*train_num:(t+1)*train_num] = np.copy(data)
-        low_features = self.trainer.model.encoder(
-            torch.from_numpy(high_features).to(dtype=torch.float32, device=self.trainer.DEVICE)).cpu().detach().numpy()
+            low_features[t*train_num:(t+1)*train_num] = self.projector.batch_project(t * self.data_provider.p + self.data_provider.s, data)
         
         val = evaluate_proj_nn_perseverance_knn(high_features, low_features, n_neighbors)
 
@@ -271,16 +243,15 @@ class Evaluator:
         num = train_num + test_num
 
         high_features = np.zeros((epoch_num*num, feature_dim))
+        low_features = np.zeros((epoch_num*num, 2))
 
-        self.trainer.model.eval()
         for t in range(epoch_num):
             train_data = self.data_provider.train_representation(t * self.data_provider.p + self.data_provider.s)
             test_data = self.data_provider.test_representation(t * self.data_provider.p + self.data_provider.s)
             data = np.concatenate((train_data, test_data), axis=0)
-            high_features[t*num:(t+1)*num] = data
+            low_features[t*num:(t+1)*num] = self.projector.batch_project(t * self.data_provider.p + self.data_provider.s, data)
+            high_features[t*num:(t+1)*num] = np.copy(data)
 
-        low_features = self.trainer.model.encoder(
-            torch.from_numpy(high_features).to(dtype=torch.float32, device=self.trainer.DEVICE)).cpu().detach().numpy()
         val =evaluate_proj_nn_perseverance_knn(high_features, low_features, n_neighbors)
     
         if self.verbose:
@@ -299,16 +270,13 @@ class Evaluator:
         EPOCH = (end - start) // period + 1
         repr_dim = self.data_provider.representation_dim()
         all_train_repr = np.zeros((EPOCH,LEN,repr_dim))
+        low_repr = np.zeros((EPOCH,LEN,2))
 
         # save all representation vectors
         for i in range(start,end + 1, period):
             index = (i - start) //  period
             all_train_repr[index] = self.data_provider.train_representation(i)
-
-        model = self.trainer.model
-        low_repr = np.zeros((EPOCH,LEN,2))
-        for e in range(EPOCH):
-            low_repr[e] = model.encoder(torch.from_numpy(all_train_repr[e]).to(device=self.data_provider.DEVICE).float()).detach().cpu().numpy()
+            low_repr[index] = self.projector.batch_project(i, all_train_repr[index])
 
         epochs = [i for i in range(start, end+1, period)]
         corrs = np.zeros((EPOCH,LEN))
@@ -335,15 +303,12 @@ class Evaluator:
         TEST_LEN = self.data_provider.test_num()
         EPOCH = (end - start) // period + 1
         repr_dim = self.data_provider.representation_dim()
-        model = self.trainer.model
 
         all_test_repr = np.zeros((EPOCH,TEST_LEN,repr_dim))
+        low_repr = np.zeros((EPOCH,TEST_LEN,2))
         for i in range(start,end + 1, period):
             all_test_repr[i-1] = self.data_provider.test_representation(i)
-
-        low_repr = np.zeros((EPOCH,TEST_LEN,2))
-        for e in range(EPOCH):
-            low_repr[e] = model.encoder(torch.from_numpy(all_test_repr[e]).to(device=self.data_provider.DEVICE).float()).detach().cpu().numpy()
+            low_repr[i-1] = self.projector.batch_project(i, all_test_repr[i-1])
 
         epochs = [i for i in range(start, end+1, period)]
         corrs = np.zeros((EPOCH,TEST_LEN))

@@ -11,21 +11,26 @@ class Projector:
         self.vis_model = vis_model
         self.segments = segments    #[(1,6),(6, 15),(15,42),(42,200)]
         self.DEVICE = device
+        self.current_range = (-1,-1)
 
     def load(self, iteration):
-        for i in range(len(self.segments)):
-            s = self.segments[i][0]
-            e = self.segments[i][1]
-            # range (s, e]
-            if iteration > s and iteration <= e:
-                idx = i
-                break
-        file_path = os.path.join(self.content_path, "Model", "tnn_hybrid_{}.pth".format(idx))
-        save_model = torch.load(file_path, map_location=self.DEVICE)
-        self.vis_model.load_state_dict(save_model["state_dict"])
-        self.vis_model.to(self.DEVICE)
-        self.vis_model.eval()
-        print("Successfully load the visualization model for range ({},{}]...".format(s,e))
+        if iteration <= self.current_range[0] or iteration > self.current_range[1]:
+            for i in range(len(self.segments)):
+                s = self.segments[i][0]
+                e = self.segments[i][1]
+                # range (s, e]
+                if iteration > s and iteration <= e:
+                    idx = i
+                    break
+            file_path = os.path.join(self.content_path, "Model", "tnn_hybrid_{}.pth".format(idx))
+            save_model = torch.load(file_path, map_location=self.DEVICE)
+            self.vis_model.load_state_dict(save_model["state_dict"])
+            self.vis_model.to(self.DEVICE)
+            self.vis_model.eval()
+            self.current_range = (s, e)
+            print("Successfully load the visualization model for range ({},{}]...".format(s,e))
+        else:
+            print("Same range as current visualization model...")
 
     def batch_project(self, iteration, data):
         self.load(iteration)
