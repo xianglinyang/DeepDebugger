@@ -36,28 +36,29 @@ class Segmenter:
             self.e = range_e
             self.p = range_p
 
-    def cal_interval_dists(self):
+    def _cal_interval_dists(self):
         interval_num = (self.e - self.s)// self.p
 
         dists = np.zeros(interval_num)
         for curr_epoch in range(self.s, self.e, self.p):
-            next_data = self.data_provider.test_representation(curr_epoch+ self.p)
-            curr_data = self.data_provider.test_representation(curr_epoch)
+            next_data = self.data_provider.train_representation(curr_epoch+ self.p)
+            curr_data = self.data_provider.train_representation(curr_epoch)
             dists[(curr_epoch-self.s)//self.p] = hausdorff_d(curr_data=next_data, prev_data=curr_data)
         
-        self.dists = np.copy(dists)
+        # self.dists = np.copy(dists)
         return dists
     def segment(self):
+        dists = self._cal_interval_dists()
         dists_segs = list()
-        
         count = 0
-        base = len(self.dists)-1
-        for i in range(len(self.dists)-1, -1, -1):
-            count = count + self.dists[i]
+        base = len(dists)-1
+        for i in range(len(dists)-1, -1, -1):
+            count = count + dists[i]
             if count >self.threshold:
                 dists_segs.insert(0, (i+1, base))
                 base = i
-                count = 0
+                count = dists[i]
+        dists_segs.insert(0, (0, base))
         segs = [(self.s+i*self.p, self.s+(j+1)*self.p) for i, j in dists_segs]
         return segs
 
