@@ -95,10 +95,11 @@ smooth_loss_fn = SmoothnessLoss(margin=0.25)
 criterion = HybridLoss(umap_loss_fn, recon_loss_fn, smooth_loss_fn, lambd1=LAMBDA, lambd2=S_LAMBDA)
 segmenter = Segmenter(data_provider=data_provider, threshold=100, range_s=EPOCH_START, range_e=EPOCH_END, range_p=EPOCH_PERIOD)
 # segment epoch
-segs = segmenter.segment()
-SEGMENTS = segs
-RESUME_SEG = len(segs)
+SEGMENTS = segmenter.segment()
+RESUME_SEG = len(SEGMENTS)
 projector = Projector(vis_model=model, content_path=CONTENT_PATH, segments=SEGMENTS, device=DEVICE)
+
+
 # Resume from a checkpoint
 if RESUME_SEG in range(len(SEGMENTS)):
     prev_epoch = SEGMENTS[RESUME_SEG][0]
@@ -119,7 +120,6 @@ else:
     start_point = len(SEGMENTS)-1
     c0=None
     d0=None
-
 
 
 for seg in range(start_point,-1,-1):
