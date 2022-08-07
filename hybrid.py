@@ -21,6 +21,8 @@ from singleVis.eval.evaluator import Evaluator
 from singleVis.spatial_edge_constructor import kcHybridSpatialEdgeConstructor
 from singleVis.temporal_edge_constructor import GlobalTemporalEdgeConstructor
 from singleVis.intrinsic_dim import IntrinsicDim
+from singleVis.projector import Projector
+from singleVis.segmenter import Segmenter
 ########################################################################################################################
 #                                                     LOAD PARAMETERS                                                  #
 ########################################################################################################################
@@ -34,9 +36,9 @@ CONTENT_PATH = args.content_path
 sys.path.append(CONTENT_PATH)
 from config import config
 
-# # record output information
-# now = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime(time.time())) 
-# sys.stdout = open(os.path.join(CONTENT_PATH, now+".txt"), "w")
+# record output information
+now = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime(time.time())) 
+sys.stdout = open(os.path.join(CONTENT_PATH, now+".txt"), "w")
 
 SETTING = config["SETTING"]
 CLASSES = config["CLASSES"]
@@ -68,8 +70,8 @@ T_N_EPOCHS = VISUALIZATION_PARAMETER["T_N_EPOCHS"]
 N_NEIGHBORS = VISUALIZATION_PARAMETER["N_NEIGHBORS"]
 PATIENT = VISUALIZATION_PARAMETER["PATIENT"]
 MAX_EPOCH = VISUALIZATION_PARAMETER["MAX_EPOCH"]
-SEGMENTS = VISUALIZATION_PARAMETER["SEGMENTS"]
-RESUME_SEG = VISUALIZATION_PARAMETER["RESUME_SEG"]
+# SEGMENTS = VISUALIZATION_PARAMETER["SEGMENTS"]
+# RESUME_SEG = VISUALIZATION_PARAMETER["RESUME_SEG"]
 
 # define hyperparameters
 DEVICE = torch.device("cuda:{}".format(GPU_ID) if torch.cuda.is_available() else "cpu")
@@ -83,7 +85,6 @@ net = eval("subject_model.{}()".format(NET))
 data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, split=-1, device=DEVICE, classes=CLASSES,verbose=1)
 if PREPROCESS:
     data_provider.initialize(LEN//10, l_bound=L_BOUND)
-
 model = SingleVisualizationModel(input_dims=512, output_dims=2, units=256, hidden_layer=HIDDEN_LAYER)
 negative_sample_rate = 5
 min_dist = .1
@@ -92,8 +93,13 @@ umap_loss_fn = UmapLoss(negative_sample_rate, DEVICE, _a, _b, repulsion_strength
 recon_loss_fn = ReconstructionLoss(beta=1.0)
 smooth_loss_fn = SmoothnessLoss(margin=0.25)
 criterion = HybridLoss(umap_loss_fn, recon_loss_fn, smooth_loss_fn, lambd1=LAMBDA, lambd2=S_LAMBDA)
-
-# Resume from a check point
+segmenter = Segmenter(data_provider=data_provider, threshold=100, range_s=EPOCH_START, range_e=EPOCH_END, range_p=EPOCH_PERIOD)
+# segment epoch
+segs = segmenter.segment()
+SEGMENTS = segs
+RESUME_SEG = len(segs)
+projector = Projector(vis_model=model, content_path=CONTENT_PATH, segments=SEGMENTS, device=DEVICE)
+# Resume from a checkpoint
 if RESUME_SEG in range(len(SEGMENTS)):
     prev_epoch = SEGMENTS[RESUME_SEG][0]
     with open(os.path.join(data_provider.content_path, "selected_idxs", "selected_{}.json".format(prev_epoch)), "r") as f:
