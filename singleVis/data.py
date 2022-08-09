@@ -679,14 +679,14 @@ class ActiveLearningDataProvider(DataProvider):
     def training_accu(self, epoch):
         data = self.train_representation_lb(epoch)
         labels = self.train_labels_lb(epoch)
-        pred = self.get_pred(epoch, data).argmax(-1)
+        pred = self.get_pred(epoch, data).argmax(1)
         val = evaluate_inv_accu(labels, pred)
         return val
 
     def testing_accu(self, epoch):
         data = self.test_representation(epoch)
         labels = self.test_labels(epoch)
-        pred = self.get_pred(epoch, data).argmax(-1)
+        pred = self.get_pred(epoch, data).argmax(1)
         val = evaluate_inv_accu(labels, pred)
         return val
     
