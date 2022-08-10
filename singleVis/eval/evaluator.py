@@ -5,9 +5,12 @@ import json
 import numpy as np
 from scipy import stats
 from sklearn import neighbors
+from sklearn.neighbors import NearestNeighbors
 
 from singleVis.eval.evaluate import *
 from singleVis.backend import *
+from singleVis.utils import is_B
+from singleVis.visualizer import visualizer
 
 class Evaluator:
     def __init__(self, data_provider, projector, verbose=1):
@@ -326,6 +329,76 @@ class Evaluator:
                 corrs[e][i] = corr
                 ps[e][i] = p
         return corrs, ps
+    
+    def eval_moving_invariants_train(self, e_s, e_t, resolution=500):
+        train_data_s = self.data_provider.train_representation(e_s)
+        train_data_t = self.data_provider.train_representation(e_t)
+
+        pred_s = self.data_provider.get_pred(e_s, train_data_s)
+        pred_t = self.data_provider.get_pred(e_t, train_data_t)
+
+        low_s = self.projector.batch_project(e_s, train_data_s)
+        low_t = self.projector.batch_project(e_t, train_data_t)
+
+        s_B = is_B(pred_s)
+        t_B = is_B(pred_t)
+
+        predictions_s = pred_s.argmax(1)
+        predictions_t = pred_t.argmax(1)
+
+        confident_sample = np.logical_and(np.logical_not(s_B),np.logical_not(t_B))
+        diff_pred = predictions_s!=predictions_t
+
+        selected = np.logical_and(diff_pred, confident_sample)
+
+        # background related
+        vis = visualizer(self.data_provider, self.projector, resolution, cmap='tab10')
+        grid_view_s, decision_view_s = vis.get_epoch_decision_view(e_s, resolution)
+        grid_view_t, decision_view_t = vis.get_epoch_decision_view(e_t, resolution)
+
+        grid_view_s = grid_view_s.reshape(resolution*resolution, -1)
+        grid_view_t = grid_view_t.reshape(resolution*resolution, -1)
+
+        grid_samples_s = self.projector.batch_project(e_s, grid_view_s)
+        grid_samples_t = self.projector.batch_project(e_t, grid_view_t)
+
+        grid_pred_s = self.data_provider.get_pred(e_s, grid_samples_s)+1e-8
+        grid_pred_t = self.data_provider.get_pred(e_t, grid_samples_t)+1e-8
+        
+        grid_s_B = is_B(grid_pred_s)
+        grid_t_B = is_B(grid_pred_t)
+
+        grid_predictions_s = grid_pred_s.argmax(1)
+        grid_predictions_t = grid_pred_t.argmax(1)
+
+        # find nearest grid samples
+        high_neigh = NearestNeighbors(n_neighbors=1, radius=0.4)
+        high_neigh.fit(grid_view_s)
+
+        knn_dists, knn_indices = high_neigh.kneighbors(low_s, n_neighbors=1, return_distance=True)
+
+        close_s_pred = grid_predictions_s[knn_indices].squeeze()
+        close_s_B = grid_s_B[knn_indices].squeeze()
+        s_true = np.logical_and(close_s_pred==predictions_s, close_s_B == s_B)
+        np.sum(s_true[selected])
+
+        high_neigh = NearestNeighbors(n_neighbors=1, radius=0.4)
+        high_neigh.fit(grid_view_t)
+        knn_dists, knn_indices = high_neigh.kneighbors(low_t, n_neighbors=1, return_distance=True)
+
+        close_t_pred = grid_predictions_t[knn_indices].squeeze()
+        close_t_B = grid_t_B[knn_indices].squeeze()
+        np.sum(grid_t_B), np.sum(t_B)
+
+        t_true = np.logical_and(close_t_pred==predictions_t, close_t_B == t_B)
+        np.sum(t_true[selected])
+
+        np.sum(np.logical_and(s_true[selected], t_true[selected])), np.sum(selected)
+
+
+
+
+
 
     #################################### helper functions #############################################
 
