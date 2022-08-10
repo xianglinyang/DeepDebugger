@@ -8,12 +8,12 @@ from io import BytesIO
 import base64
 
 class visualizer:
-    def __init__(self, data_provider, projector, resolution, class_num, classes, cmap='tab10'):
+    def __init__(self, data_provider, projector, resolution, cmap='tab10'):
         self.data_provider = data_provider
         self.projector = projector
-        self.class_num = class_num
         self.cmap = plt.get_cmap(cmap)
-        self.classes = classes
+        self.classes = data_provider.classes
+        self.class_num = len(self.classes)
         self.resolution= resolution
 
     def _init_plot(self, only_img=False):
