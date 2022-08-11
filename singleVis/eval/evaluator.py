@@ -1,16 +1,16 @@
-from fileinput import filename
 import os
 import json
 
 import numpy as np
 from scipy import stats
-from sklearn import neighbors
 from sklearn.neighbors import NearestNeighbors
+from scipy.spatial.distance import cosine
 
 from singleVis.eval.evaluate import *
 from singleVis.backend import *
-from singleVis.utils import is_B
+from singleVis.utils import is_B, js_div, find_nearest
 from singleVis.visualizer import visualizer
+
 
 class Evaluator:
     def __init__(self, data_provider, projector, verbose=1):
@@ -353,14 +353,14 @@ class Evaluator:
 
         # background related
         vis = visualizer(self.data_provider, self.projector, resolution, cmap='tab10')
-        grid_view_s, decision_view_s = vis.get_epoch_decision_view(e_s, resolution)
-        grid_view_t, decision_view_t = vis.get_epoch_decision_view(e_t, resolution)
+        grid_view_s, _ = vis.get_epoch_decision_view(e_s, resolution)
+        grid_view_t, _ = vis.get_epoch_decision_view(e_t, resolution)
 
         grid_view_s = grid_view_s.reshape(resolution*resolution, -1)
         grid_view_t = grid_view_t.reshape(resolution*resolution, -1)
 
-        grid_samples_s = self.projector.batch_project(e_s, grid_view_s)
-        grid_samples_t = self.projector.batch_project(e_t, grid_view_t)
+        grid_samples_s = self.projector.batch_inverse(e_s, grid_view_s)
+        grid_samples_t = self.projector.batch_inverse(e_t, grid_view_t)
 
         grid_pred_s = self.data_provider.get_pred(e_s, grid_samples_s)+1e-8
         grid_pred_t = self.data_provider.get_pred(e_t, grid_samples_t)+1e-8
@@ -374,31 +374,151 @@ class Evaluator:
         # find nearest grid samples
         high_neigh = NearestNeighbors(n_neighbors=1, radius=0.4)
         high_neigh.fit(grid_view_s)
-
-        knn_dists, knn_indices = high_neigh.kneighbors(low_s, n_neighbors=1, return_distance=True)
+        _, knn_indices = high_neigh.kneighbors(low_s, n_neighbors=1, return_distance=True)
 
         close_s_pred = grid_predictions_s[knn_indices].squeeze()
         close_s_B = grid_s_B[knn_indices].squeeze()
         s_true = np.logical_and(close_s_pred==predictions_s, close_s_B == s_B)
-        np.sum(s_true[selected])
+        
 
         high_neigh = NearestNeighbors(n_neighbors=1, radius=0.4)
         high_neigh.fit(grid_view_t)
-        knn_dists, knn_indices = high_neigh.kneighbors(low_t, n_neighbors=1, return_distance=True)
+        _, knn_indices = high_neigh.kneighbors(low_t, n_neighbors=1, return_distance=True)
 
         close_t_pred = grid_predictions_t[knn_indices].squeeze()
         close_t_B = grid_t_B[knn_indices].squeeze()
-        np.sum(grid_t_B), np.sum(t_B)
-
         t_true = np.logical_and(close_t_pred==predictions_t, close_t_B == t_B)
-        np.sum(t_true[selected])
 
-        np.sum(np.logical_and(s_true[selected], t_true[selected])), np.sum(selected)
+        return np.sum(np.logical_and(s_true[selected], t_true[selected])), np.sum(s_true[selected]), np.sum(t_true[selected]), np.sum(selected)
+    
 
+    def eval_moving_invariants_test(self, e_s, e_t, resolution=500):
+        test_data_s = self.data_provider.test_representation(e_s)
+        test_data_t = self.data_provider.test_representation(e_t)
 
+        pred_s = self.data_provider.get_pred(e_s, test_data_s)
+        pred_t = self.data_provider.get_pred(e_t, test_data_t)
 
+        low_s = self.projector.batch_project(e_s, test_data_s)
+        low_t = self.projector.batch_project(e_t, test_data_t)
 
+        s_B = is_B(pred_s)
+        t_B = is_B(pred_t)
 
+        predictions_s = pred_s.argmax(1)
+        predictions_t = pred_t.argmax(1)
+
+        confident_sample = np.logical_and(np.logical_not(s_B),np.logical_not(t_B))
+        diff_pred = predictions_s!=predictions_t
+
+        selected = np.logical_and(diff_pred, confident_sample)
+
+        # background related
+        vis = visualizer(self.data_provider, self.projector, resolution, cmap='tab10')
+        grid_view_s, _ = vis.get_epoch_decision_view(e_s, resolution)
+        grid_view_t, _ = vis.get_epoch_decision_view(e_t, resolution)
+
+        grid_view_s = grid_view_s.reshape(resolution*resolution, -1)
+        grid_view_t = grid_view_t.reshape(resolution*resolution, -1)
+
+        grid_samples_s = self.projector.batch_inverse(e_s, grid_view_s)
+        grid_samples_t = self.projector.batch_inverse(e_t, grid_view_t)
+
+        grid_pred_s = self.data_provider.get_pred(e_s, grid_samples_s)+1e-8
+        grid_pred_t = self.data_provider.get_pred(e_t, grid_samples_t)+1e-8
+        
+        grid_s_B = is_B(grid_pred_s)
+        grid_t_B = is_B(grid_pred_t)
+
+        grid_predictions_s = grid_pred_s.argmax(1)
+        grid_predictions_t = grid_pred_t.argmax(1)
+
+        # find nearest grid samples
+        high_neigh = NearestNeighbors(n_neighbors=1, radius=0.4)
+        high_neigh.fit(grid_view_s)
+        _, knn_indices = high_neigh.kneighbors(low_s, n_neighbors=1, return_distance=True)
+
+        close_s_pred = grid_predictions_s[knn_indices].squeeze()
+        close_s_B = grid_s_B[knn_indices].squeeze()
+        s_true = np.logical_and(close_s_pred==predictions_s, close_s_B == s_B)
+        
+
+        high_neigh = NearestNeighbors(n_neighbors=1, radius=0.4)
+        high_neigh.fit(grid_view_t)
+        _, knn_indices = high_neigh.kneighbors(low_t, n_neighbors=1, return_distance=True)
+
+        close_t_pred = grid_predictions_t[knn_indices].squeeze()
+        close_t_B = grid_t_B[knn_indices].squeeze()
+        t_true = np.logical_and(close_t_pred==predictions_t, close_t_B == t_B)
+        return np.sum(np.logical_and(s_true[selected], t_true[selected])), np.sum(s_true[selected]), np.sum(t_true[selected]), np.sum(selected)
+    
+    def eval_fixing_invariants_train(self, e_s, e_t, low_threshold, metric="euclidean"):
+        train_data_s = self.data_provider.train_representation(e_s)
+        train_data_t = self.data_provider.train_representation(e_t)
+
+        _, high_threshold = find_nearest(train_data_s)
+        pred_s = self.data_provider.get_pred(e_s, train_data_s)
+        pred_t = self.data_provider.get_pred(e_t, train_data_t)
+        softmax_s = softmax(pred_s, axis=1)
+        softmax_t = softmax(pred_t, axis=1)
+
+        low_s = self.projector.batch_project(e_s, train_data_s)
+        low_t = self.projector.batch_project(e_t, train_data_t)
+
+        # normalize low_t
+        y_max = max(low_s[:, 1].max(), low_t[:, 1].max())
+        y_min = max(low_s[:, 1].min(), low_t[:, 1].min())
+        x_max = max(low_s[:, 0].max(), low_t[:, 0].max())
+        x_min = max(low_s[:, 0].min(), low_t[:, 0].min())
+        scale = min(100/(x_max - x_min), 100/(y_max - y_min))
+        low_t = low_t*scale
+        low_s = low_s*scale
+
+        if metric == "euclidean":
+            high_dists = np.linalg.norm(train_data_s-train_data_t, axis=1)
+        elif metric == "cosine":
+            high_dists = np.array([cosine(low_t[i], low_s[i]) for i in range(len(low_s))])
+        elif metric == "softmax":
+            high_dists = np.array([js_div(softmax_s[i], softmax_t[i]) for i in range(len(softmax_t))])
+        low_dists = np.linalg.norm(low_s-low_t, axis=1)
+
+        selected = high_dists<=high_threshold
+
+        return np.sum(np.logical_and(selected, low_dists<=low_threshold)), np.sum(selected)
+
+    def eval_fixing_invariants_test(self, e_s, e_t, low_threshold, metric="euclidean"):
+        test_data_s = self.data_provider.test_representation(e_s)
+        test_data_t = self.data_provider.test_representation(e_t)
+
+        _, high_threshold = find_nearest(test_data_s)
+        pred_s = self.data_provider.get_pred(e_s, test_data_s)
+        pred_t = self.data_provider.get_pred(e_t, test_data_t)
+        softmax_s = softmax(pred_s, axis=1)
+        softmax_t = softmax(pred_t, axis=1)
+
+        low_s = self.projector.batch_project(e_s, test_data_s)
+        low_t = self.projector.batch_project(e_t, test_data_t)
+
+        # normalize low_t
+        y_max = max(low_s[:, 1].max(), low_t[:, 1].max())
+        y_min = max(low_s[:, 1].min(), low_t[:, 1].min())
+        x_max = max(low_s[:, 0].max(), low_t[:, 0].max())
+        x_min = max(low_s[:, 0].min(), low_t[:, 0].min())
+        scale = min(100/(x_max - x_min), 100/(y_max - y_min))
+        low_t = low_t*scale
+        low_s = low_s*scale
+
+        if metric == "euclidean":
+            high_dists = np.linalg.norm(test_data_s-test_data_t, axis=1)
+        elif metric == "cosine":
+            high_dists = np.array([cosine(low_t[i], low_s[i]) for i in range(len(low_s))])
+        elif metric == "softmax":
+            high_dists = np.array([js_div(softmax_s[i], softmax_t[i]) for i in range(len(softmax_t))])
+        low_dists = np.linalg.norm(low_s-low_t, axis=1)
+
+        selected = high_dists<=high_threshold
+
+        return np.sum(np.logical_and(selected, low_dists<=low_threshold)), np.sum(selected)
 
     #################################### helper functions #############################################
 

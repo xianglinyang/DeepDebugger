@@ -8,6 +8,7 @@ import time
 from pynndescent import NNDescent
 from sklearn.neighbors import KDTree
 from sklearn.metrics import pairwise_distances
+from scipy import stats as stats
 
 def mixup_bi(model, image1, image2, label, target_cls, device, diff=0.1, max_iter=8, l_bound=0.8):
     '''Get BPs based on mixup method, fast
@@ -245,8 +246,9 @@ def is_B(preds):
     is_border = np.zeros(len(diff), dtype=np.bool)
     is_border[diff < 0.1] = 1
     return is_border
+    
 
-def find_nearest_dist(query, pool):
+def find_nearest(query):
     """
     find the distance to the nearest neighbor in the pool
     :param query: ndarray, shape (N,dim) 
@@ -254,23 +256,32 @@ def find_nearest_dist(query, pool):
     :return dists: ndarray (N,)
     """
     # number of trees in random projection forest
-    n_trees = min(64, 5 + int(round((pool.shape[0]) ** 0.5 / 20.0)))
+    n_trees = min(64, 5 + int(round((query.shape[0]) ** 0.5 / 20.0)))
     # max number of nearest neighbor iters to perform
-    n_iters = max(5, int(round(np.log2(pool.shape[0]))))
+    n_iters = max(5, int(round(np.log2(query.shape[0]))))
     # distance metric
     metric = "euclidean"
 
     # get nearest neighbors
     nnd = NNDescent(
-        pool,
-        n_neighbors=1,
+        query,
+        n_neighbors=2,
         metric=metric,
         n_trees=n_trees,
         n_iters=n_iters,
         max_candidates=60,
         verbose=False
     )
-    _, distances = nnd.query(query, k=1)
-    return distances.squeeze(axis=1)
+    indices, distances = nnd.neighbor_graph
+    return indices[:, 1], distances[:, 1]
+
+
+def kl_div(p, q):
+    return stats.entropy(p, q, base=2)
+
+
+def js_div(p, q):
+    M = (p+q)/2
+    return .5*kl_div(p, M)+.5*kl_div(q, M)
 
 
