@@ -94,10 +94,27 @@ recon_loss_fn = ReconstructionLoss(beta=1.0)
 smooth_loss_fn = SmoothnessLoss(margin=0.25)
 criterion = HybridLoss(umap_loss_fn, recon_loss_fn, smooth_loss_fn, lambd1=LAMBDA, lambd2=S_LAMBDA)
 segmenter = Segmenter(data_provider=data_provider, threshold=100, range_s=EPOCH_START, range_e=EPOCH_END, range_p=EPOCH_PERIOD)
+
+
 # segment epoch
+t0 = time.time()
 SEGMENTS = segmenter.segment()
+t1 = time.time()
 RESUME_SEG = len(SEGMENTS)
 projector = Projector(vis_model=model, content_path=CONTENT_PATH, segments=SEGMENTS, device=DEVICE)
+
+# save time result
+save_dir = os.path.join(data_provider.model_path, "SV_time_tnn_hybrid.json")
+if not os.path.exists(save_dir):
+    evaluation = dict()
+else:
+    f = open(save_dir, "r")
+    evaluation = json.load(f)
+    f.close()
+evaluation["segment"] = round(t1-t0, 3)
+with open(save_dir, 'w') as f:
+    json.dump(evaluation, f)
+print("Segmentation takes {:.1f} seconds.".format(round(t1-t0, 3)))
 
 
 # Resume from a checkpoint
@@ -129,13 +146,13 @@ for seg in range(start_point,-1,-1):
     optimizer = torch.optim.Adam(model.parameters(), lr=.01, weight_decay=1e-5)
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=4, gamma=.1)
 
-    t0 = time.time()
+    t2 = time.time()
     spatial_cons = kcHybridSpatialEdgeConstructor(data_provider=data_provider, init_num=INIT_NUM, s_n_epochs=S_N_EPOCHS, b_n_epochs=B_N_EPOCHS, n_neighbors=N_NEIGHBORS, MAX_HAUSDORFF=MAX_HAUSDORFF, ALPHA=ALPHA, BETA=BETA, init_idxs=prev_selected, init_embeddings=prev_embedding, c0=c0, d0=d0)
     s_edge_to, s_edge_from, s_probs, feature_vectors, embedded, coefficient, time_step_nums, time_step_idxs_list, knn_indices, sigmas, rhos, attention, (c0,d0) = spatial_cons.construct()
 
     temporal_cons = GlobalTemporalEdgeConstructor(X=feature_vectors, time_step_nums=time_step_nums, sigmas=sigmas, rhos=rhos, n_neighbors=N_NEIGHBORS, n_epochs=T_N_EPOCHS)
     t_edge_to, t_edge_from, t_probs = temporal_cons.construct()
-    t1 = time.time()
+    t3 = time.time()
 
     edge_to = np.concatenate((s_edge_to, t_edge_to),axis=0)
     edge_from = np.concatenate((s_edge_from, t_edge_from), axis=0)
@@ -154,11 +171,12 @@ for seg in range(start_point,-1,-1):
         f = open(save_dir, "r")
         evaluation = json.load(f)
         f.close()
-    evaluation["complex_construction"] = dict()
-    evaluation["complex_construction"][str(seg)] = round(t1-t0, 3)
+    if "complex_construction" not in evaluation.keys():
+        evaluation["complex_construction"] = dict()
+    evaluation["complex_construction"][str(seg)] = round(t3-t2, 3)
     with open(save_dir, 'w') as f:
         json.dump(evaluation, f)
-    print("constructing timeVis complex for {}-th segment in {:.1f} seconds.".format(seg, t1-t0))
+    print("constructing timeVis complex for {}-th segment in {:.1f} seconds.".format(seg, t3-t2))
 
 
     dataset = HybridDataHandler(edge_to, edge_from, feature_vectors, attention, embedded, coefficient)
@@ -187,8 +205,9 @@ for seg in range(start_point,-1,-1):
         f = open(save_dir, "r")
         evaluation = json.load(f)
         f.close()
-
-    evaluation["training"] = dict()
+    
+    if "training" not in evaluation.keys():
+        evaluation["training"] = dict()
     evaluation["training"][str(seg)] = round(t3-t2, 3)
     with open(save_dir, 'w') as f:
         json.dump(evaluation, f)
@@ -202,7 +221,6 @@ for seg in range(start_point,-1,-1):
     prev_embedding = model.encoder(prev_data).cpu().detach().numpy()
     
     
-
 # data_provider.update_interval(EPOCH_START, EPOCH_END)
 # ########################################################################################################################
 # #                                                      VISUALIZATION                                                   #
