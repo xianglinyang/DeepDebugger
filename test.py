@@ -6,6 +6,7 @@ import os
 import argparse
 import numpy as np
 import json
+import time
 
 from umap.umap_ import find_ab_params
 
@@ -14,6 +15,7 @@ from singleVis.data import NormalDataProvider
 import singleVis.config as config
 from singleVis.eval.evaluator import Evaluator
 from singleVis.projector import Projector
+from singleVis.segmenter import Segmenter
 
 ########################################################################################################################
 #                                                     LOAD PARAMETERS                                                  #
@@ -84,50 +86,59 @@ if PREPROCESS:
 
 model = SingleVisualizationModel(input_dims=512, output_dims=2, units=256, hidden_layer=HIDDEN_LAYER)
 projector = Projector(vis_model=model, content_path=CONTENT_PATH, segments=SEGMENTS, device=DEVICE)
+segmenter = Segmenter(data_provider=data_provider, threshold=78.5, range_s=EPOCH_START, range_e=EPOCH_END, range_p=EPOCH_PERIOD)
 
-########################################################################################################################
-#                                                      VISUALIZATION                                                   #
-########################################################################################################################
 
-from singleVis.visualizer import visualizer
+# segment epoch
+t0 = time.time()
+SEGMENTS = segmenter.segment()
+t1 = time.time()
+RESUME_SEG = len(SEGMENTS)
+print(SEGMENTS)
 
-vis = visualizer(data_provider, projector, 200, 10, classes)
-save_dir = os.path.join(data_provider.content_path, "img")
-os.system("mkdir -p {}".format(save_dir))
+# ########################################################################################################################
+# #                                                      VISUALIZATION                                                   #
+# ########################################################################################################################
 
-# noise_label = os.path.join(data_provider.content_path, "noisy_label.json")
-# with open(noise_label, "r") as f:
-#     noise_labels = json.load(f)
+# from singleVis.visualizer import visualizer
 
-# for i in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
-for i in [20]:
-    vis.savefig(i, path=os.path.join(save_dir, "{}_{}_tnn.png".format(DATASET, i)))
-    # data = data_provider.train_representation(i)
-    # labels = data_provider.train_labels(i)
-    # selected = labels != np.array(noise_labels)
-    # data = data[selected]
-    # labels = np.array(noise_labels)[selected]
-    # vis.savefig_cus(i, data, labels, labels, path=os.path.join(save_dir, "{}_{}_tnn.png".format(DATASET, i)))
-########################################################################################################################
-#                                                       EVALUATION                                                     #
-########################################################################################################################
-EVAL_EPOCH_DICT = {
-    "mnist_full":[4, 12, 20],
-    "fmnist_full":[10, 30, 50],
-    "cifar10_full":[40, 120, 200],
-    "cifar10":[50]
-}
-eval_epochs = EVAL_EPOCH_DICT[DATASET]
+# vis = visualizer(data_provider, projector, 200, 10, classes)
+# save_dir = os.path.join(data_provider.content_path, "img")
+# os.system("mkdir -p {}".format(save_dir))
 
-evaluator = Evaluator(data_provider, projector)
-# evaluator.save_epoch_eval(eval_epochs[0], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
-evaluator.save_epoch_eval(eval_epochs[0], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_tnn")
-# evaluator.save_epoch_eval(eval_epochs[0], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
+# # noise_label = os.path.join(data_provider.content_path, "noisy_label.json")
+# # with open(noise_label, "r") as f:
+# #     noise_labels = json.load(f)
 
-# evaluator.save_epoch_eval(eval_epochs[1], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
-# evaluator.save_epoch_eval(eval_epochs[1], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_tnn")
-# evaluator.save_epoch_eval(eval_epochs[1], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
+# # for i in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
+# for i in [20]:
+#     vis.savefig(i, path=os.path.join(save_dir, "{}_{}_tnn.png".format(DATASET, i)))
+#     # data = data_provider.train_representation(i)
+#     # labels = data_provider.train_labels(i)
+#     # selected = labels != np.array(noise_labels)
+#     # data = data[selected]
+#     # labels = np.array(noise_labels)[selected]
+#     # vis.savefig_cus(i, data, labels, labels, path=os.path.join(save_dir, "{}_{}_tnn.png".format(DATASET, i)))
+# ########################################################################################################################
+# #                                                       EVALUATION                                                     #
+# ########################################################################################################################
+# EVAL_EPOCH_DICT = {
+#     "mnist_full":[4, 12, 20],
+#     "fmnist_full":[10, 30, 50],
+#     "cifar10_full":[40, 120, 200],
+#     "cifar10":[50]
+# }
+# eval_epochs = EVAL_EPOCH_DICT[DATASET]
 
-# evaluator.save_epoch_eval(eval_epochs[2], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
-# evaluator.save_epoch_eval(eval_epochs[2], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_tnn")
-# evaluator.save_epoch_eval(eval_epochs[2], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
+# evaluator = Evaluator(data_provider, projector)
+# # evaluator.save_epoch_eval(eval_epochs[0], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
+# evaluator.save_epoch_eval(eval_epochs[0], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_tnn")
+# # evaluator.save_epoch_eval(eval_epochs[0], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
+
+# # evaluator.save_epoch_eval(eval_epochs[1], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
+# # evaluator.save_epoch_eval(eval_epochs[1], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_tnn")
+# # evaluator.save_epoch_eval(eval_epochs[1], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
+
+# # evaluator.save_epoch_eval(eval_epochs[2], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
+# # evaluator.save_epoch_eval(eval_epochs[2], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_tnn")
+# # evaluator.save_epoch_eval(eval_epochs[2], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")

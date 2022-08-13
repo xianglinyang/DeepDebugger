@@ -452,11 +452,11 @@ class Evaluator:
         t_true = np.logical_and(close_t_pred==predictions_t, close_t_B == t_B)
         return np.sum(np.logical_and(s_true[selected], t_true[selected])), np.sum(s_true[selected]), np.sum(t_true[selected]), np.sum(selected)
     
-    def eval_fixing_invariants_train(self, e_s, e_t, low_threshold, metric="euclidean"):
+    def eval_fixing_invariants_train(self, e_s, e_t, high_threshold, low_threshold, metric="euclidean"):
         train_data_s = self.data_provider.train_representation(e_s)
         train_data_t = self.data_provider.train_representation(e_t)
 
-        _, high_threshold = find_nearest(train_data_s)
+        # _, high_threshold = find_nearest(train_data_s)
         pred_s = self.data_provider.get_pred(e_s, train_data_s)
         pred_t = self.data_provider.get_pred(e_t, train_data_t)
         softmax_s = softmax(pred_s, axis=1)
@@ -486,11 +486,11 @@ class Evaluator:
 
         return np.sum(np.logical_and(selected, low_dists<=low_threshold)), np.sum(selected)
 
-    def eval_fixing_invariants_test(self, e_s, e_t, low_threshold, metric="euclidean"):
+    def eval_fixing_invariants_test(self, e_s, e_t, high_threshold, low_threshold, metric="euclidean"):
         test_data_s = self.data_provider.test_representation(e_s)
         test_data_t = self.data_provider.test_representation(e_t)
 
-        _, high_threshold = find_nearest(test_data_s)
+        # _, high_threshold = find_nearest(test_data_s)
         pred_s = self.data_provider.get_pred(e_s, test_data_s)
         pred_t = self.data_provider.get_pred(e_t, test_data_t)
         softmax_s = softmax(pred_s, axis=1)
@@ -519,6 +519,75 @@ class Evaluator:
         selected = high_dists<=high_threshold
 
         return np.sum(np.logical_and(selected, low_dists<=low_threshold)), np.sum(selected)
+    
+    def eval_proj_invariants_train(self, e, resolution=500):
+        train_data = self.data_provider.train_representation(e)
+        pred_s = self.data_provider.get_pred(e, train_data)
+        low_s = self.projector.batch_project(e, train_data)
+        s_B = is_B(pred_s)
+        predictions_s = pred_s.argmax(1)
+
+        # background related
+        vis = visualizer(self.data_provider, self.projector, resolution, cmap='tab10')
+        grid_view_s, _ = vis.get_epoch_decision_view(e, resolution)
+        grid_view_s = grid_view_s.reshape(resolution*resolution, -1)
+        grid_samples_s = self.projector.batch_inverse(e, grid_view_s)
+        grid_pred_s = self.data_provider.get_pred(e, grid_samples_s)+1e-8
+        grid_s_B = is_B(grid_pred_s)
+        grid_predictions_s = grid_pred_s.argmax(1)
+
+        # find nearest grid samples
+        high_neigh = NearestNeighbors(n_neighbors=1, radius=0.4)
+        high_neigh.fit(grid_view_s)
+        _, knn_indices = high_neigh.kneighbors(low_s, n_neighbors=1, return_distance=True)
+
+        close_s_pred = grid_predictions_s[knn_indices].squeeze()
+        close_s_B = grid_s_B[knn_indices].squeeze()
+
+        border_true = np.logical_and(s_B, close_s_B)
+        pred_true = np.logical_and(close_s_pred==predictions_s, np.logical_not(s_B))
+
+        print("border fixing invariants:\t{}/{}".format(np.sum(border_true), np.sum(s_B)))
+        print("prediction fixing invariants:\t{}/{}".format(np.sum(pred_true), np.sum(np.logical_not(s_B))))
+        print("invariants:\t{}/{}".format(np.sum(border_true)+np.sum(pred_true), len(train_data)))
+
+        
+        return np.sum(border_true), np.sum(pred_true), len(train_data)
+    
+    def eval_proj_invariants_test(self, e, resolution=500):
+        test_data = self.data_provider.test_representation(e)
+        pred_s = self.data_provider.get_pred(e, test_data)
+        low_s = self.projector.batch_project(e, test_data)
+        s_B = is_B(pred_s)
+        predictions_s = pred_s.argmax(1)
+
+        # background related
+        vis = visualizer(self.data_provider, self.projector, resolution, cmap='tab10')
+        grid_view_s, _ = vis.get_epoch_decision_view(e, resolution)
+        grid_view_s = grid_view_s.reshape(resolution*resolution, -1)
+        grid_samples_s = self.projector.batch_inverse(e, grid_view_s)
+        grid_pred_s = self.data_provider.get_pred(e, grid_samples_s)+1e-8
+        grid_s_B = is_B(grid_pred_s)
+        grid_predictions_s = grid_pred_s.argmax(1)
+
+        # find nearest grid samples
+        high_neigh = NearestNeighbors(n_neighbors=1, radius=0.4)
+        high_neigh.fit(grid_view_s)
+        _, knn_indices = high_neigh.kneighbors(low_s, n_neighbors=1, return_distance=True)
+
+        close_s_pred = grid_predictions_s[knn_indices].squeeze()
+        close_s_B = grid_s_B[knn_indices].squeeze()
+
+        border_true = np.logical_and(s_B, close_s_B)
+        pred_true = np.logical_and(close_s_pred==predictions_s, np.logical_not(s_B))
+
+        print("border fixing invariants:\t{}/{}".format(np.sum(border_true), np.sum(s_B)))
+        print("prediction fixing invariants:\t{}/{}".format(np.sum(pred_true), np.sum(np.logical_not(s_B))))
+        print("invariants:\t{}/{}".format(np.sum(border_true)+np.sum(pred_true), len(test_data)))
+
+        
+        return np.sum(border_true), np.sum(pred_true), len(test_data)
+    
 
     #################################### helper functions #############################################
 
@@ -557,10 +626,10 @@ class Evaluator:
         evaluation[n_key]["nn_train"][epoch_key] = self.eval_nn_train(n_epoch, n_neighbors)
         evaluation[n_key]["nn_test"][epoch_key] = self.eval_nn_test(n_epoch, n_neighbors)
 
-        # evaluation[n_key]["b_train"][epoch_key] = self.eval_b_train(n_epoch, n_neighbors)
-        # evaluation[n_key]["b_test"][epoch_key] = self.eval_b_test(n_epoch, n_neighbors)
-        evaluation[n_key]["b_train"][epoch_key] = 1
-        evaluation[n_key]["b_test"][epoch_key] = 1
+        evaluation[n_key]["b_train"][epoch_key] = self.eval_b_train(n_epoch, n_neighbors)
+        evaluation[n_key]["b_test"][epoch_key] = self.eval_b_test(n_epoch, n_neighbors)
+        # evaluation[n_key]["b_train"][epoch_key] = 1
+        # evaluation[n_key]["b_test"][epoch_key] = 1
 
         evaluation["ppr_train"][epoch_key] = self.eval_inv_train(n_epoch)
         evaluation["ppr_test"][epoch_key] = self.eval_inv_test(n_epoch)

@@ -12,7 +12,6 @@ from sklearn.utils import check_random_state
 from singleVis.kcenter_greedy import kCenterGreedy
 from singleVis.intrinsic_dim import IntrinsicDim
 from singleVis.backend import get_graph_elements, get_attention
-from singleVis.utils import find_nearest_dist
 
 
 '''Base class for Spatial Edge Constructor'''

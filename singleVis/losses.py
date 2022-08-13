@@ -77,7 +77,7 @@ class ReconstructionLoss(nn.Module):
 
 
 class SmoothnessLoss(nn.Module):
-    def __init__(self, margin=1.0):
+    def __init__(self, margin=0.0):
         super(SmoothnessLoss, self).__init__()
         self._margin = margin
 
