@@ -625,7 +625,7 @@ class Evaluator:
         evaluation["nn_train"][epoch_key][n_key] = self.eval_nn_train(n_epoch, n_neighbors)
         if epoch_key not in evaluation["nn_test"]:
             evaluation["nn_test"][epoch_key] = dict()
-        evaluation[n_key]["nn_test"][epoch_key][n_key] = self.eval_nn_test(n_epoch, n_neighbors)
+        evaluation["nn_test"][epoch_key][n_key] = self.eval_nn_test(n_epoch, n_neighbors)
         # if epoch_key not in evaluation["b_train"]:
         #     evaluation["b_train"][epoch_key] = dict()
         # evaluation["b_train"][epoch_key][n_key] = self.eval_b_train(n_epoch, n_neighbors)
