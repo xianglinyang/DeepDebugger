@@ -48,6 +48,17 @@ def main():
 
                 data = np.concatenate((data, np.array([[dataset, "TimeVis", "Train", "TimeVis-Train", "{}".format(k), "{}".format(str(epoch_id)), bound_train]])), axis=0)
                 data = np.concatenate((data, np.array([[dataset, "TimeVis", "Test", "TimeVis-Test", "{}".format(k), "{}".format(str(epoch_id)), bound_test]])), axis=0)
+            
+            eval_path = "/home/xianglin/projects/DVI_data/resnet18_{}/Model/test_evaluation_hybrid.json".format(dataset)
+            with open(eval_path, "r") as f:
+                    eval = json.load(f)
+            for epoch_id  in range(3):
+                epoch = selected_epochs[epoch_id]
+                bound_train = round(eval["b_train"][str(epoch)][str(k)], 3)
+                bound_test = round(eval["b_test"][str(epoch)][str(k)], 3)
+
+                data = np.concatenate((data, np.array([[dataset, "DeepDebugger", "Train", "DeepDebugger-Train", "{}".format(k), "{}".format(str(epoch_id)), bound_train]])), axis=0)
+                data = np.concatenate((data, np.array([[dataset, "DeepDebugger", "Test", "DeepDebugger-Test", "{}".format(k), "{}".format(str(epoch_id)), bound_test]])), axis=0)
 
             df_tmp = pd.DataFrame(data, columns=col)
             df = df.append(df_tmp, ignore_index=True)
@@ -56,7 +67,7 @@ def main():
             df[["eval"]] = df[["eval"]].astype(float)
 
     #%%
-    df.to_excel("./singleVis/plot/new_plot_results/boundary.xlsx")
+    df.to_excel("./plot_results/boundary.xlsx")
     for k in k_neighbors:
         df_tmp = df[df["k"] == k]
 
@@ -65,9 +76,11 @@ def main():
         hue_dict = {
             "DVI-Train": pal20c[0],
             "TimeVis-Train": pal20c[4],
+            "DeepDebugger-Train": pal20c[8],
 
             "DVI-Test": pal20c[3],
             "TimeVis-Test": pal20c[7],
+            "DeepDebugger-Test":pal20c[11]
         }
         sns.palplot([hue_dict[i] for i in hue_dict.keys()])
 
@@ -76,7 +89,7 @@ def main():
         mpl.rc('axes', **axes)
         mpl.rcParams['xtick.labelsize'] = 15
 
-        hue_list = ["DVI-Train", "DVI-Test", "TimeVis-Train", "TimeVis-Test"]
+        hue_list = ["DVI-Train", "DVI-Test", "TimeVis-Train", "TimeVis-Test", "DeepDebugger-Train", "DeepDebugger-Test"]
 
         fg = sns.catplot(
             x="period",
@@ -111,13 +124,12 @@ def main():
          )
         # fg.fig.suptitle("Boundary preserving property")
 
-        #%%
         fg.savefig(
-            "./singleVis/plot/new_plot_results/boundary_{}.png".format(k),
+            "./plot_results/boundary_{}.png".format(k),
             dpi=300,
             bbox_inches="tight",
             pad_inches=0.0,
-            # transparent=True,
+            transparent=True,
         )
 
 if __name__ == "__main__":
