@@ -75,7 +75,7 @@ DEVICE = torch.device("cuda:{}".format(GPU_ID) if torch.cuda.is_available() else
 
 import Model.model as subject_model
 
-for exp in range(2):
+for exp in range(20):
 
     net = eval("subject_model.{}()".format(NET))
     ########################################################################################################################
