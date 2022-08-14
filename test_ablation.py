@@ -14,22 +14,24 @@ from singleVis.projector import EvalProjector
 parser = argparse.ArgumentParser(description='Process hyperparameters...')
 parser.add_argument('--content_path', type=str)
 parser.add_argument('--exp','-e', type=str)
+parser.add_argument('--gpu','-g', type=str)
 args = parser.parse_args()
 
 CONTENT_PATH = args.content_path
 EXP = args.exp
+GPU_ID = args.gpu
 sys.path.append(CONTENT_PATH)
 from config import config
 
-# record output information
-now = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime(time.time())) 
-sys.stdout = open(os.path.join(CONTENT_PATH, "Model", "exp_{}".format(EXP), now+".txt"), "w")
+# # record output information
+# now = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime(time.time())) 
+# sys.stdout = open(os.path.join(CONTENT_PATH, "Model", "{}".format(EXP), now+".txt"), "w")
 
 SETTING = config["SETTING"]
 CLASSES = config["CLASSES"]
 DATASET = config["DATASET"]
 PREPROCESS = config["VISUALIZATION"]["PREPROCESS"]
-GPU_ID = config["GPU"]
+# GPU_ID = config["GPU"]
 EPOCH_START = config["EPOCH_START"]
 EPOCH_END = config["EPOCH_END"]
 EPOCH_PERIOD = config["EPOCH_PERIOD"]
@@ -107,7 +109,7 @@ projector = EvalProjector(vis_model=model, content_path=CONTENT_PATH, device=DEV
 ########################################################################################################################
 
 EVAL_EPOCH_DICT = {
-    "cifar10": [20,100,200],
+    "cifar10": [40,120,200],
     "fmnist": [10,30,50],
     "mnist":[4,12,20]
 }
@@ -115,14 +117,7 @@ EVAL_EPOCH_DICT = {
 eval_epochs = EVAL_EPOCH_DICT[DATASET]
 
 evaluator = SegEvaluator(data_provider, projector, EXP)
-# evaluator.save_epoch_eval(eval_epochs[0], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
-evaluator.save_epoch_eval(eval_epochs[0], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_hybrid")
-# evaluator.save_epoch_eval(eval_epochs[0], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
-
-# evaluator.save_epoch_eval(eval_epochs[1], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
-# evaluator.save_epoch_eval(eval_epochs[1], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_tnn")
-# evaluator.save_epoch_eval(eval_epochs[1], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
-
-# evaluator.save_epoch_eval(eval_epochs[2], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
-# evaluator.save_epoch_eval(eval_epochs[2], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_tnn")
-# evaluator.save_epoch_eval(eval_epochs[2], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
+for eval_epoch in eval_epochs:
+    # evaluator.save_epoch_eval(eval_epoch, 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
+    evaluator.save_epoch_eval(eval_epoch, 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_hybrid")
+    # evaluator.save_epoch_eval(eval_epoch, 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")

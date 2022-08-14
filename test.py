@@ -126,14 +126,7 @@ EVAL_EPOCH_DICT = {
 eval_epochs = EVAL_EPOCH_DICT[DATASET]
 
 evaluator = Evaluator(data_provider, projector)
-# evaluator.save_epoch_eval(eval_epochs[0], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
-evaluator.save_epoch_eval(eval_epochs[0], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_hybrid")
-# evaluator.save_epoch_eval(eval_epochs[0], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
-
-# evaluator.save_epoch_eval(eval_epochs[1], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
-evaluator.save_epoch_eval(eval_epochs[1], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_hybrid")
-# evaluator.save_epoch_eval(eval_epochs[1], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
-
-# evaluator.save_epoch_eval(eval_epochs[2], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
-evaluator.save_epoch_eval(eval_epochs[2], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_hybrid")
-# evaluator.save_epoch_eval(eval_epochs[2], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
+for eval_epoch in eval_epochs:
+    # evaluator.save_epoch_eval(eval_epoch, 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_hybrid")
+    evaluator.save_epoch_eval(eval_epoch, 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_hybrid")
+    # evaluator.save_epoch_eval(eval_epoch, 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_hybrid")
