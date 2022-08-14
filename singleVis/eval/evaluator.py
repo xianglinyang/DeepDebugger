@@ -676,11 +676,11 @@ class Evaluator:
 class SegEvaluator(Evaluator):
     def __init__(self, data_provider, projector, exp, verbose=1):
         super().__init__(data_provider, projector, verbose)
-        self.exo = exp
+        self.exp = exp
     
     def save_epoch_eval(self, n_epoch, n_neighbors, temporal_k=5, save_corrs=False, file_name="evaluation"):
         # save result
-        save_dir = os.path.join(self.data_provider.model_path, "exp_{}".format(self.exp))
+        save_dir = os.path.join(self.data_provider.model_path, "{}".format(self.exp))
         save_file = os.path.join(save_dir, file_name + ".json")
         if not os.path.exists(save_file):
             evaluation = dict()
@@ -712,7 +712,7 @@ class SegEvaluator(Evaluator):
         evaluation["nn_train"][epoch_key][n_key] = self.eval_nn_train(n_epoch, n_neighbors)
         if epoch_key not in evaluation["nn_test"]:
             evaluation["nn_test"][epoch_key] = dict()
-        evaluation[n_key]["nn_test"][epoch_key][n_key] = self.eval_nn_test(n_epoch, n_neighbors)
+        evaluation["nn_test"][epoch_key][n_key] = self.eval_nn_test(n_epoch, n_neighbors)
         # if epoch_key not in evaluation["b_train"]:
         #     evaluation["b_train"][epoch_key] = dict()
         # evaluation["b_train"][epoch_key][n_key] = self.eval_b_train(n_epoch, n_neighbors)
@@ -753,7 +753,7 @@ class SegEvaluator(Evaluator):
             print("Successfully save evaluation with {:d} neighbors...".format(n_neighbors))
     
     def get_eval(self, file_name="evaluation"):
-        save_dir = os.path.join(self.data_provider.model_path, "exp_{}".format(self.exp), file_name + ".json")
+        save_dir = os.path.join(self.data_provider.model_path, "{}".format(self.exp), file_name + ".json")
         f = open(save_dir, "r")
         evaluation = json.load(f)
         f.close()

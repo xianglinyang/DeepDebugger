@@ -71,7 +71,7 @@ class EvalProjector(Projector):
     def __init__(self, vis_model, content_path, device, exp) -> None:
         super().__init__(vis_model, content_path, None, device)
         self.exp = exp
-        file_path = os.path.join(content_path, "Model", "exp_{}".format(exp), "segments.json")
+        file_path = os.path.join(content_path, "Model", "{}".format(exp), "segments.json")
         with open(file_path, "r") as f:
             self.segments = json.load(f)
     
@@ -84,7 +84,7 @@ class EvalProjector(Projector):
                 if iteration >= s and iteration <= e:
                     idx = i
                     break
-            file_path = os.path.join(self.content_path, "Model", "exp_{}".format(self.exp), "tnn_hybrid_{}.pth".format(idx))
+            file_path = os.path.join(self.content_path, "Model", "{}".format(self.exp), "tnn_hybrid_{}.pth".format(idx))
             save_model = torch.load(file_path, map_location=self.DEVICE)
             self.vis_model.load_state_dict(save_model["state_dict"])
             self.vis_model.to(self.DEVICE)
