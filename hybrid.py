@@ -16,11 +16,8 @@ from singleVis.losses import HybridLoss, SmoothnessLoss, UmapLoss, Reconstructio
 from singleVis.edge_dataset import HybridDataHandler
 from singleVis.trainer import HybridVisTrainer
 from singleVis.data import NormalDataProvider
-import singleVis.config as config
-from singleVis.eval.evaluator import Evaluator
 from singleVis.spatial_edge_constructor import kcHybridSpatialEdgeConstructor
 from singleVis.temporal_edge_constructor import GlobalTemporalEdgeConstructor
-from singleVis.intrinsic_dim import IntrinsicDim
 from singleVis.projector import Projector
 from singleVis.segmenter import Segmenter
 ########################################################################################################################
@@ -221,43 +218,3 @@ for seg in range(start_point,-1,-1):
     model.to(device=DEVICE)
     prev_embedding = model.encoder(prev_data).cpu().detach().numpy()
     
-    
-# data_provider.update_interval(EPOCH_START, EPOCH_END)
-# ########################################################################################################################
-# #                                                      VISUALIZATION                                                   #
-# ########################################################################################################################
-
-# from singleVis.visualizer import visualizer
-
-# vis = visualizer(data_provider, trainer.model, 200, 10, CLASSES)
-# save_dir = os.path.join(data_provider.content_path, "img")
-# if not os.path.exists(save_dir):
-#     os.mkdir(save_dir)
-# for i in range(EPOCH_START, EPOCH_END+1, 2*EPOCH_PERIOD):
-#     vis.savefig(i, path=os.path.join(save_dir, "{}_{}_hybrid_tnn.png".format(DATASET, i)))
-
-    
-# ########################################################################################################################
-# #                                                       EVALUATION                                                     #
-# ########################################################################################################################
-# EVAL_EPOCH_DICT = {
-#     "mnist_full":[4, 12, 20],
-#     "fmnist_full":[10, 30, 50],
-#     "cifar10_full":[40, 120, 200],
-#     "cifar10":[35,50,100,150,200]
-# }
-# eval_epochs = EVAL_EPOCH_DICT[DATASET]
-
-# evaluator = Evaluator(data_provider, trainer)
-# # evaluator.save_epoch_eval(eval_epochs[0], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_hybrid")
-# for i in eval_epochs:
-#     evaluator.save_epoch_eval(i, 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_hybrid")
-# evaluator.save_epoch_eval(eval_epochs[0], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_hybrid")
-
-# evaluator.save_epoch_eval(eval_epochs[1], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_hybrid")
-# evaluator.save_epoch_eval(eval_epochs[1], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_hybrid")
-# evaluator.save_epoch_eval(eval_epochs[1], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_hybrid")
-
-# evaluator.save_epoch_eval(eval_epochs[2], 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_hybrid")
-# evaluator.save_epoch_eval(eval_epochs[2], 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_hybrid")
-evaluator.save_epoch_eval(eval_epochs[2], 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_hybrid")
