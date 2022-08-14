@@ -12,7 +12,7 @@ def main():
     # hyperparameters
     datasets = ["mnist", "fmnist", "cifar10"]
     # datasets=["mnist","fmnist"]
-    EXP_NUM = 2
+    EXP_NUM = 20
     selected_epochs_dict = {"mnist":[4, 12, 20],"fmnist":[10,30,50], "cifar10":[40, 120,200]}
     k_neighbors = [15]
 
@@ -118,8 +118,8 @@ def main():
         # min_ = df["eval"].min()
         axs[0].set_ylim(0., max_*1.1)
         axs[0].set_title("MNIST")
-        # axs[1].set_title("FMNIST")
-        # axs[2].set_title("CIFAR-10")
+        axs[1].set_title("FMNIST")
+        axs[2].set_title("CIFAR-10")
 
         (fg.despine(bottom=False, right=False, left=False, top=False)
          .set_xticklabels(['Begin', 'Mid', 'End'])
