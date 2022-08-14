@@ -10,7 +10,6 @@ import seaborn as sns
 
 def main():
     datasets = ["mnist", "fmnist", "cifar10"]
-    datasets = ["mnist", "fmnist"]
     EXP_NUM = 20
     exps = list(range(EXP_NUM))
 

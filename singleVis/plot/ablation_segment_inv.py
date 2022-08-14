@@ -11,16 +11,15 @@ import seaborn as sns
 def main():
     # hyperparameters
     datasets = ["mnist", "fmnist", "cifar10"]
-    # datasets=["mnist","fmnist"]
-    EXP_NUM = 2
+    EXP_NUM = 20
     selected_epochs_dict = {"mnist":[4, 12, 20],"fmnist":[10,30,50], "cifar10":[40, 120,200]}
     k_neighbors = [15]
 
 
+    # start
     exps = list(range(EXP_NUM))
     col = np.array(["dataset", "method", "type", "hue", "k", "period", "eval"])
     df = pd.DataFrame({}, columns=col)
-
     for k in k_neighbors: # k neighbors
         for i in range(len(datasets)): # dataset
             dataset = datasets[i]
@@ -33,14 +32,14 @@ def main():
                     eval = json.load(f)
             for epoch_id in range(3):
                 epoch = selected_epochs[epoch_id]
-                nn_train = round(eval["nn_train"][str(epoch)][str(k)], 3)
-                nn_test = round(eval["nn_test"][str(epoch)][str(k)], 3)
+                ppr_train = round(eval["ppr_train"][str(epoch)], 3)
+                ppr_test = round(eval["ppr_test"][str(epoch)], 3)
 
                 if len(data) == 0:
-                    data = np.array([[dataset, "DeepDebugger", "Train", "DeepDebugger-Train", "{}".format(k), "{}".format(str(epoch_id)), nn_train]])
+                    data = np.array([[dataset, "DeepDebugger", "Train", "DeepDebugger-Train", "{}".format(k), "{}".format(str(epoch_id)), ppr_train]])
                 else:
-                    data = np.concatenate((data, np.array([[dataset, "DeepDebugger", "Train", "DeepDebugger-Train", "{}".format(k), "{}".format(str(epoch_id)), nn_train]])), axis=0)
-                data = np.concatenate((data, np.array([[dataset, "DeepDebugger", "Test", "DeepDebugger-Test", "{}".format(k), "{}".format(str(epoch_id)), nn_test]])), axis=0)
+                    data = np.concatenate((data, np.array([[dataset, "DeepDebugger", "Train", "DeepDebugger-Train", "{}".format(k), "{}".format(str(epoch_id)), ppr_train]])), axis=0)
+                data = np.concatenate((data, np.array([[dataset, "DeepDebugger", "Test", "DeepDebugger-Test", "{}".format(k), "{}".format(str(epoch_id)), ppr_test]])), axis=0)
             
             # DeepDebugger Random segments
             for epoch_id in range(3):
@@ -51,8 +50,8 @@ def main():
                     with open(eval_path, "r") as f:
                             eval = json.load(f)
                     epoch = selected_epochs[epoch_id]
-                    nn_train = round(eval["nn_train"][str(epoch)][str(k)], 3)
-                    nn_test = round(eval["nn_test"][str(epoch)][str(k)], 3)
+                    nn_train = round(eval["ppr_train"][str(epoch)], 3)
+                    nn_test = round(eval["ppr_test"][str(epoch)], 3)
                     nn_train_list.append(nn_train)
                     nn_test_list.append(nn_test)
                 
@@ -68,7 +67,7 @@ def main():
             df[["k"]] = df[["k"]].astype(int)
             df[["eval"]] = df[["eval"]].astype(float)
 
-    df.to_excel("./plot_results/ablation_segment_nn.xlsx")
+    df.to_excel("./plot_results/ablation_segment_ppr.xlsx")
 
     for k in k_neighbors:
         df_tmp = df[df["k"] == k]
@@ -118,17 +117,17 @@ def main():
         # min_ = df["eval"].min()
         axs[0].set_ylim(0., max_*1.1)
         axs[0].set_title("MNIST")
-        # axs[1].set_title("FMNIST")
-        # axs[2].set_title("CIFAR-10")
+        axs[1].set_title("FMNIST")
+        axs[2].set_title("CIFAR-10")
 
         (fg.despine(bottom=False, right=False, left=False, top=False)
          .set_xticklabels(['Begin', 'Mid', 'End'])
          .set_axis_labels("Period", "")
          )
-        # fg.fig.suptitle("NN preserving property")
+        # fg.fig.suptitle("Prediction Preserving Rate")
 
         fg.savefig(
-            "./plot_results/ablation_segment_nn_{}.png".format(k),
+            "./plot_results/ablation_segment_ppr_{}.png".format(k),
             dpi=300,
             bbox_inches="tight",
             pad_inches=0.0,
