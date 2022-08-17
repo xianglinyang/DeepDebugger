@@ -41,7 +41,7 @@ from config import config
 SETTING = config["SETTING"] # active learning
 CLASSES = config["CLASSES"]
 DATASET = config["DATASET"]
-BASE_ITERATION =config["DATASET"]
+BASE_ITERATION =config["BASE_ITERATION"]
 DEVICE = torch.device("cuda:{}".format(GPU_ID) if torch.cuda.is_available() else "cpu")
 
 #################################################   VISUALIZATION PARAMETERS    ########################################
