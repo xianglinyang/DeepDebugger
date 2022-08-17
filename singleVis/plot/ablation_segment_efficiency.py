@@ -1,11 +1,5 @@
-
-import os
-import json
-
 import numpy as np
-import pandas as pd
-import matplotlib as mpl
-import seaborn as sns
+import json
 
 
 def main():
@@ -30,7 +24,7 @@ def main():
         print("\tsegment time:\t{:.3f}".format(seg_time))
         print("\tcomplex construction:\t{:.3f}".format(complex_con_time))
         print("\ttraining:\t{:.3f}".format(training_time))
-        print("\tTotal:\t{:.3f}".format(complex_con_time+training_time))
+        print("\tTotal:\t{:.3f}".format(complex_con_time+training_time+seg_time))
         
         # DeepDebugger Random segments
         segments = list()
@@ -51,13 +45,13 @@ def main():
         print("\tcomplex construction:\t{:.3f}".format(sum(complex_con_list)/EXP_NUM))
         print("\ttraining:\t{:.3f}".format(sum(training_list)/EXP_NUM))
         print("\tTotal:\t{:.3f}".format(sum(complex_con_list)/EXP_NUM+sum(training_list)/EXP_NUM))
-        # print("Best Random:")
-        # total_time = np.array(complex_con_time)+np.array(training_list)
-        # id = np.argmin(total_time)
-        # print("\tSegments:\t{}".format(segments[id]))
-        # print("\tcomplex construction:\t{}".format(complex_con_list[id]))
-        # print("\ttraining:\t{}".format(training_list[id]))
-        # print("\tTotal:\t{}".format(total_time[id]))
+        print("Best Random:")
+        total_time = np.array(complex_con_time)+np.array(training_list)
+        id = np.argmin(total_time)
+        print("\tSegments:\t{:.3f}".format(segments[id]))
+        print("\tcomplex construction:\t{}".format(complex_con_list[id]))
+        print("\ttraining:\t{:.3f}".format(training_list[id]))
+        print("\tTotal:\t{:.3f}".format(total_time[id]))
 
 
 if __name__ == "__main__":
