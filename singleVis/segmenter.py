@@ -61,6 +61,37 @@ class Segmenter:
         dists_segs.insert(0, (0, base))
         segs = [(self.s+i*self.p, self.s+(j+1)*self.p) for i, j in dists_segs]
         return segs
+    
+
+class DenseALSegmenter(Segmenter):
+    def __init__(self, data_provider, threshold, epoch_num):
+        super().__init__(data_provider, threshold, 1, epoch_num, 1)
+    
+    def _cal_interval_dists(self, iteration):
+        interval_num = (self.e - self.s)// self.p
+
+        dists = np.zeros(interval_num)
+        for curr_epoch in range(self.s, self.e, self.p):
+            next_data = self.data_provider.train_representation_lb(iteration, curr_epoch+ self.p)
+            curr_data = self.data_provider.train_representation_lb(iteration, curr_epoch)
+            dists[(curr_epoch-self.s)//self.p] = hausdorff_d(curr_data=next_data, prev_data=curr_data)
+        
+        # self.dists = np.copy(dists)
+        return dists
+    def segment(self, iteration):
+        dists = self._cal_interval_dists(iteration)
+        dists_segs = list()
+        count = 0
+        base = len(dists)-1
+        for i in range(len(dists)-1, -1, -1):
+            count = count + dists[i]
+            if count >self.threshold:
+                dists_segs.insert(0, (i+1, base))
+                base = i
+                count = dists[i]
+        dists_segs.insert(0, (0, base))
+        segs = [(self.s+i*self.p, self.s+(j+1)*self.p) for i, j in dists_segs]
+        return segs
 
 
         
