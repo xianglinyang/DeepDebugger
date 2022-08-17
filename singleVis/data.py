@@ -261,7 +261,7 @@ class NormalDataProvider(DataProvider):
             border_centers = np.load(border_centers_loc).squeeze()
         except Exception as e:
             print("no border points saved for Epoch {}".format(epoch))
-            border_centers = None
+            border_centers = np.array([])
         return border_centers
     
     def test_border_representation(self, epoch):
@@ -271,7 +271,7 @@ class NormalDataProvider(DataProvider):
             border_centers = np.load(border_centers_loc).squeeze()
         except Exception as e:
             print("no border points saved for Epoch {}".format(epoch))
-            border_centers = None
+            border_centers = np.array([])
         return border_centers
     
     def max_norm(self, epoch):
@@ -360,9 +360,11 @@ class ActiveLearningDataProvider(DataProvider):
         super().__init__(content_path, model, base_epoch_start, base_epoch_start, 1, split, device, classes, verbose)
         self.mode = "al"
     
-    @property
-    def representation_dim(self):
-        train_data_loc = os.path.join(self.model_path, "Iteration_{:d}".format(self.s), "train_data.npy")
+    def label_num(self, iteration):
+        return len(self.get_labeled_idx(iteration))
+
+    def representation_dim(self, iteration):
+        train_data_loc = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "train_data.npy")
         try:
             train_data = np.load(train_data_loc)
             repr_dim = np.prod(train_data.shape[1:])
@@ -549,7 +551,6 @@ class ActiveLearningDataProvider(DataProvider):
         training_data_loc = os.path.join(self.content_path, "Training_data", "training_dataset_label.pth")
         index_file = os.path.join(self.model_path, "Iteration_{:d}".format(epoch), "index.json")
         index = load_labelled_data_index(index_file)
-        # index = [int(i) for i in index]
         try:
             training_labels = torch.load(training_data_loc, map_location=self.DEVICE)
             training_labels = training_labels[index]
@@ -622,7 +623,7 @@ class ActiveLearningDataProvider(DataProvider):
             border_centers = np.load(border_centers_loc).squeeze()
         except Exception as e:
             print("no border points saved for Iteration {}".format(epoch))
-            border_centers = None
+            border_centers = np.array([])
         return border_centers
     
     def test_border_representation(self, epoch):
@@ -632,7 +633,7 @@ class ActiveLearningDataProvider(DataProvider):
             border_centers = np.load(border_centers_loc).squeeze()
         except Exception as e:
             print("no border points saved for Epoch {}".format(epoch))
-            border_centers = None
+            border_centers = np.array([])
         return border_centers.squeeze()
     
     def max_norm(self, epoch):
@@ -701,14 +702,12 @@ class ActiveLearningDataProvider(DataProvider):
         border = is_B(preds)
         return border
     
-class DenseActiveLearningDataProvider(DataProvider):
+class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
     def __init__(self, content_path, model, base_epoch_start, epoch_num, split, device, classes, verbose=1):
-        # dummy input as epoch_end and epoch_period
-        super().__init__(content_path, model, base_epoch_start, base_epoch_start, 1, split, device, classes, verbose)
+        super().__init__(content_path, model, base_epoch_start, split, device, classes, verbose)
         self.mode = "dense_al"
         self.epoch_num = epoch_num
-    
-    @property
+
     def representation_dim(self):
         train_data_loc = os.path.join(self.model_path, "Iteration_{}".format(self.s), "Epoch_{:d}".format(self.epoch_num), "train_data.npy")
         try:
@@ -717,17 +716,6 @@ class DenseActiveLearningDataProvider(DataProvider):
             return repr_dim
         except Exception as e:
             return None
-    
-    def get_labeled_idx(self, iteration):
-        index_file = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "index.json")
-        lb_idxs = np.array(load_labelled_data_index(index_file))
-        return lb_idxs
-
-    def get_unlabeled_idx(self, pool_num, lb_idx):
-        tot_idx = np.arange(pool_num)
-        # !Noted that tot need to be the first arguement
-        ulb_idx = np.setdiff1d(tot_idx, lb_idx)
-        return ulb_idx
 
     def _meta_data(self, iteration):
         time_inference = list()
@@ -859,10 +847,6 @@ class DenseActiveLearningDataProvider(DataProvider):
         evaluation["data_B_gene"] = round(sum(time_borders_gen) / len(time_borders_gen), 3)
         with open(save_dir, 'w') as f:
             json.dump(evaluation, f)
-    
-    def initialize_iteration(self, iteration, num, l_bound):
-        self._meta_data(iteration)
-        self._estimate_boundary(iteration, num, l_bound)
 
     def train_representation(self, iteration, epoch):
         # load train data
@@ -873,17 +857,6 @@ class DenseActiveLearningDataProvider(DataProvider):
             print("no train data saved for Iteration {}".format(iteration))
             train_data = None
         return train_data.squeeze()
-    
-    def train_labels(self, epoch):
-        # load train data
-        training_data_loc = os.path.join(self.content_path, "Training_data", "training_dataset_label.pth")
-        try:
-            training_labels = torch.load(training_data_loc, map_location=self.DEVICE)
-        except Exception as e:
-            print("no train labels saved for Iteration {}".format(epoch))
-            training_labels = None
-        return training_labels.cpu().numpy()
-    
 
     def train_representation_lb(self, iteration, epoch):
         # load train data
@@ -897,19 +870,6 @@ class DenseActiveLearningDataProvider(DataProvider):
             print("no train data saved for Iteration {} Epoch {}".format(iteration, epoch))
             train_data = None
         return train_data.squeeze()
-    
-    def train_labels_lb(self, iteration):
-        # load train data
-        training_data_loc = os.path.join(self.content_path, "Training_data", "training_dataset_label.pth")
-        index_file = os.path.join(self.model_path, "Iteration_{}".format(iteration), "index.json")
-        index = load_labelled_data_index(index_file)
-        try:
-            training_labels = torch.load(training_data_loc, map_location=self.DEVICE)
-            training_labels = training_labels[index]
-        except Exception as e:
-            print("no train labels saved for Iteration {}".format(iteration))
-            training_labels = None
-        return training_labels.cpu().numpy()
     
     def train_representation_ulb(self, iteration, epoch):
         # load train data
@@ -952,20 +912,6 @@ class DenseActiveLearningDataProvider(DataProvider):
             print("no test data saved for Iteration {} Epoch {}".format(iteration, epoch))
             test_data = None
         return test_data
-    
-    def test_labels(self,iteration):
-        # load train data
-        testing_data_loc = os.path.join(self.content_path, "Testing_data", "testing_dataset_label.pth")
-        try:
-            testing_labels = torch.load(testing_data_loc).to(device=self.DEVICE)
-            index_file = os.path.join(self.model_path, "Iteration_{}".format(iteration), "test_index.json")
-            if os.path.exists(index_file):
-                idxs = load_labelled_data_index(index_file)
-                testing_labels = testing_labels[idxs]
-        except Exception as e:
-            print("no train labels saved for Iteration {}".format(iteration))
-            testing_labels = None
-        return testing_labels.cpu().numpy()
 
     def border_representation(self, iteration, epoch):
         border_centers_loc = os.path.join(self.model_path, "Iteration_{}".format(iteration), "Epoch_{:d}".format(epoch),
@@ -974,7 +920,7 @@ class DenseActiveLearningDataProvider(DataProvider):
             border_centers = np.load(border_centers_loc).squeeze()
         except Exception as e:
             print("no border points saved for Epoch {}".format(epoch))
-            border_centers = None
+            border_centers = np.array([])
         return border_centers
     
     def test_border_representation(self, iteration, epoch):
@@ -984,7 +930,7 @@ class DenseActiveLearningDataProvider(DataProvider):
             border_centers = np.load(border_centers_loc).squeeze()
         except Exception as e:
             print("no border points saved for Iteration {} Epoch {}".format(iteration, epoch))
-            border_centers = None
+            border_centers = np.array([])
         return border_centers
     
     def max_norm(self, iteration, epoch):
@@ -999,7 +945,6 @@ class DenseActiveLearningDataProvider(DataProvider):
             print("no train data saved for Iteration {} Epoch {}".format(iteration, epoch))
             max_x = None
         return max_x
-
 
     def prediction_function(self, iteration, epoch):
         model_location = os.path.join(self.model_path, "Iteration_{}".format(iteration), "Epoch_{:d}".format(epoch), "subject_model.pth")
