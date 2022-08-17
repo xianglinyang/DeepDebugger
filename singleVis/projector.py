@@ -67,6 +67,61 @@ class ALProjector(Projector):
         self.vis_model.eval()
         print("Successfully load the visualization model for Iteration {}...".format(iteration))
 
+
+class DenseALProjector(Projector):
+    def __init__(self, vis_model, content_path, vis_model_name, device) -> None:
+        super().__init__(vis_model, content_path, None, device)
+        self.current_range = [-1,-1,-1] # iteration, e_s, e_e
+        self.vis_model_name = vis_model_name
+
+    def load(self, iteration, epoch):
+        curr_iteration, curr_s, curr_e = self.current_range
+        segment_path = os.path.join(self.content_path, "Model", "Iteration_{}".format(iteration), "segments.json")
+        with open(segment_path, "r") as f:
+            segments = json.load(f)
+        init_s = segments[0][0]
+        # (s, e]
+        if iteration == curr_iteration:
+            if (curr_s==init_s and epoch == curr_s) or (epoch > curr_s and iteration <= curr_e):
+                print("Same range as current visualization model...")
+                return
+        
+        for i in range(len(segments)):
+            s = self.segments[i][0]
+            e = self.segments[i][1]
+            # range [s, e)
+            if (epoch > s and iteration <= e) or (s == init_s and epoch == s):
+                idx = i
+                break
+        file_path = os.path.join(self.content_path, "Model","Iteration_{}".format(iteration), "{}_{}.pth".format(self.vis_model_name, idx))
+        save_model = torch.load(file_path, map_location=self.DEVICE)
+        self.vis_model.load_state_dict(save_model["state_dict"])
+        self.vis_model.to(self.DEVICE)
+        self.vis_model.eval()
+        self.current_range = (s, e)
+        print("Successfully load the visualization model in iteration {} for range ({},{}]...".format(iteration, s,e))
+    
+    def batch_project(self, iteration, epoch, data):
+        self.load(iteration, epoch)
+        embedding = self.vis_model.encoder(torch.from_numpy(data).to(dtype=torch.float32, device=self.DEVICE)).cpu().detach().numpy()
+        return embedding
+    
+    def individual_project(self, iteration, epoch, data):
+        self.load(iteration, epoch)
+        embedding = self.vis_model.encoder(torch.from_numpy(np.expand_dims(data, axis=0)).to(dtype=torch.float32, device=self.DEVICE)).cpu().detach().numpy()
+        return embedding.squeeze(axis=0)
+    
+    def batch_inverse(self, iteration, epoch, embedding):
+        self.load(iteration, epoch)
+        data = self.vis_model.decoder(torch.from_numpy(embedding).to(dtype=torch.float32, device=self.DEVICE)).cpu().detach().numpy()
+        return data
+    
+    def individual_inverse(self, iteration, epoch, embedding):
+        self.load(iteration, epoch)
+        data = self.vis_model.decoder(torch.from_numpy(np.expand_dims(embedding, axis=0)).to(dtype=torch.float32, device=self.DEVICE)).cpu().detach().numpy()
+        return data.squeeze(axis=0)
+
+
 class EvalProjector(Projector):
     def __init__(self, vis_model, content_path, device, exp) -> None:
         super().__init__(vis_model, content_path, None, device)
