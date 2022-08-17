@@ -212,7 +212,7 @@ class Evaluator:
             corr[i] = len(np.intersect1d(high_rankings[i], low_rankings[i]))
 
         if self.verbose:
-            print("Temporal ranking preserving (test) for {}-th epoch {}: {:.3f}\t std:{:.3f}".format(epoch, n_neighbors, corr.mean(), corr.std()))
+            print("Temporal nn preserving (test) for {}-th epoch {}: {:.3f}\t std:{:.3f}".format(epoch, n_neighbors, corr.mean(), corr.std()))
         return float(corr.mean())
 
     def eval_spatial_temporal_nn_train(self, n_neighbors, feature_dim):
