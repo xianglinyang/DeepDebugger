@@ -18,13 +18,13 @@ from singleVis.trainer import SingleVisTrainer
 from singleVis.data import ActiveLearningDataProvider
 from singleVis.eval.evaluator import Evaluator
 from singleVis.spatial_edge_constructor import SingleEpochSpatialEdgeConstructor
-
+from singleVis.projector import ALProjector
 ########################################################################################################################
 #                                                     LOAD PARAMETERS                                                  #
 ########################################################################################################################
 parser = argparse.ArgumentParser(description='Process hyperparameters...')
 parser.add_argument('--content_path', type=str, default="/home/xianglin/projects/DVI_data/active_learning/base/resnet18/CIFAR10/")
-parser.add_argument('-g',"--gpu_id", type=int, choices=[0,1,2,3], default=2)
+parser.add_argument('-g',"--gpu_id", type=int, choices=[0,1], default=0)
 parser.add_argument('-i',"--iteration", type=int)
 
 args = parser.parse_args()
@@ -86,6 +86,7 @@ criterion = SingleVisLoss(umap_loss_fn, recon_loss_fn, lambd=LAMBDA)
 
 optimizer = torch.optim.Adam(model.parameters(), lr=.01, weight_decay=1e-5)
 lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=4, gamma=.1)
+projector = ALProjector(vis_model=model, content_path=CONTENT_PATH, vis_model_name="al.pth", device=DEVICE)
 
 
 t0 = time.time()
@@ -152,7 +153,7 @@ trainer.save(save_dir=save_dir, file_name="al")
 # ########################################################################################################################
 # #                                                       EVALUATION                                                     #
 # ########################################################################################################################
-evaluator = Evaluator(data_provider, trainer)
+evaluator = Evaluator(data_provider, projector)
 evaluator.save_epoch_eval(iteration, 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_al")
 
 ########################################################################################################################
@@ -161,7 +162,7 @@ evaluator.save_epoch_eval(iteration, 15, temporal_k=5, save_corrs=False, file_na
 
 from singleVis.visualizer import visualizer
 
-vis = visualizer(data_provider, trainer.model, 200, 10, CLASSES)
+vis = visualizer(data_provider, projector, 200)
 save_dir = os.path.join(data_provider.content_path, "img")
 os.system("mkdir -p {}".format(save_dir))
 data = data_provider.train_representation_lb(iteration)
