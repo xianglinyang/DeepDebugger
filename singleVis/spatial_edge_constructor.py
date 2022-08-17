@@ -278,9 +278,6 @@ class kcSpatialEdgeConstructor(SpatialEdgeConstructor):
             # load train data and border centers
             train_data = self.data_provider.train_representation(t).squeeze()
 
-            # select highly used border centers...
-            border_centers = self.data_provider.border_representation(t).squeeze()
-
             # normalize data by max ||x||_2
             max_x = np.linalg.norm(train_data, axis=1).max()
             train_data = train_data/max_x
@@ -308,6 +305,8 @@ class kcSpatialEdgeConstructor(SpatialEdgeConstructor):
             train_data = train_data[selected_idxs]
 
             if self.b_n_epochs != 0:
+                # select highly used border centers...
+                border_centers = self.data_provider.border_representation(t).squeeze()
                 t_num = len(selected_idxs)
                 b_num = len(border_centers)
 
@@ -423,9 +422,6 @@ class kcParallelSpatialEdgeConstructor(SpatialEdgeConstructor):
             # load train data and border centers
             train_data = self.data_provider.train_representation(t).squeeze()
 
-            # select highly used border centers...
-            border_centers = self.data_provider.border_representation(t).squeeze()
-
             # normalize data by max ||x||_2
             max_x = np.linalg.norm(train_data, axis=1).max()
             train_data = train_data/max_x
@@ -453,6 +449,8 @@ class kcParallelSpatialEdgeConstructor(SpatialEdgeConstructor):
             train_data = train_data[selected_idxs]
             
             if self.b_n_epochs != 0:
+                # select highly used border centers...
+                border_centers = self.data_provider.border_representation(t).squeeze()
                 t_num = len(selected_idxs)
                 b_num = len(border_centers)
 
@@ -618,9 +616,6 @@ class kcHybridSpatialEdgeConstructor(SpatialEdgeConstructor):
             # load train data and border centers
             train_data = self.data_provider.train_representation(t).squeeze()
 
-            # select highly used border centers...
-            border_centers = self.data_provider.border_representation(t).squeeze()
-
             # normalize data by max ||x||_2
             max_x = np.linalg.norm(train_data, axis=1).max()
             train_data = train_data/max_x
@@ -647,6 +642,8 @@ class kcHybridSpatialEdgeConstructor(SpatialEdgeConstructor):
             train_data = train_data[selected_idxs]
 
             if self.b_n_epochs != 0:
+                # select highly used border centers...
+                border_centers = self.data_provider.border_representation(t).squeeze()
                 t_num = len(selected_idxs)
                 b_num = len(border_centers)
 
@@ -710,5 +707,177 @@ class kcHybridSpatialEdgeConstructor(SpatialEdgeConstructor):
                 embedded = np.concatenate((np.zeros((len(fitting_data), 2)), embedded), axis=0)
 
                 
+
+        return edge_to, edge_from, weight, feature_vectors, embedded, coefficient, time_step_nums, time_step_idxs_list, knn_indices, sigmas, rhos, attention, (c0, d0)
+
+
+class kcHybridDenseALSpatialEdgeConstructor(SpatialEdgeConstructor):
+    def __init__(self, data_provider, init_num, s_n_epochs, b_n_epochs, n_neighbors, MAX_HAUSDORFF, ALPHA, BETA, iteration, init_idxs=None, init_embeddings=None, c0=None, d0=None) -> None:
+        super().__init__(data_provider, init_num, s_n_epochs, b_n_epochs, n_neighbors)
+        self.MAX_HAUSDORFF = MAX_HAUSDORFF
+        self.ALPHA = ALPHA
+        self.BETA = BETA
+        self.init_idxs = init_idxs
+        self.init_embeddings = init_embeddings
+        self.c0 = c0
+        self.d0 = d0
+        self.iteration = iteration
+    
+    def _get_unit(self, data, adding_num=100):
+        t0 = time.time()
+        l = len(data)
+        idxs = np.random.choice(np.arange(l), size=self.init_num, replace=False)
+
+        id = IntrinsicDim(data)
+        d0 = id.twonn_dimension_fast()
+
+        kc = kCenterGreedy(data)
+        _ = kc.select_batch_with_budgets(idxs, adding_num)
+        c0 = kc.hausdorff()
+        t1 = time.time()
+        return c0, d0, "{:.1f}".format(t1-t0)
+    
+    def construct(self):
+        """construct spatio-temporal complex and get edges
+
+        Returns
+        -------
+        _type_
+            _description_
+        """
+
+        # dummy input
+        edge_to = None
+        edge_from = None
+        sigmas = None
+        rhos = None
+        weight = None
+        probs = None
+        feature_vectors = None
+        attention = None
+        knn_indices = None
+        time_step_nums = list()
+        time_step_idxs_list = list()
+        coefficient = None
+        embedded = None
+
+        train_num = self.data_provider.label_num(self.iteration)
+        # load init_idxs
+        if self.init_idxs is None:
+            selected_idxs = np.random.choice(np.arange(train_num), size=self.init_num, replace=False)
+        else:
+            selected_idxs = np.copy(self.init_idxs)
+        
+        # load c0 d0
+        if self.c0 is None or self.d0 is None:
+            baseline_data = self.data_provider.train_representation_lb(self.iteration, self.data_provider.e)
+            max_x = np.linalg.norm(baseline_data, axis=1).max()
+            baseline_data = baseline_data/max_x
+            c0,d0,_ = self._get_unit(baseline_data)
+            save_dir = os.path.join(self.data_provider.content_path, "Model", "Iteration_{}".format(self.iteration), "selected_idxs")
+            os.system("mkdir -p {}".format(save_dir))
+            with open(os.path.join(save_dir,"baseline.json"), "w") as f:
+                json.dump([float(c0), float(d0)], f)
+            print("save c0 and d0 to disk!")
+            
+        else:
+            c0 = self.c0
+            d0 = self.d0
+
+        # each time step
+        for t in range(self.data_provider.e, self.data_provider.s - 1, -self.data_provider.p):
+            print("=================+++={:d}=+++================".format(t))
+            # load train data and border centers
+            train_data = self.data_provider.train_representation_lb(self.iteration, t).squeeze()
+
+            # normalize data by max ||x||_2
+            max_x = np.linalg.norm(train_data, axis=1).max()
+            train_data = train_data/max_x
+
+            # get normalization parameters for different epochs
+            c,d,_ = self._get_unit(train_data)
+            c_c0 = math.pow(c/c0, self.BETA)
+            d_d0 = math.pow(d/d0, self.ALPHA)
+            print("Finish calculating normaling factor")
+
+            kc = kCenterGreedy(train_data)
+            _, hausd = kc.select_batch_with_cn(selected_idxs, self.MAX_HAUSDORFF, c_c0, d_d0, p=0.95, return_min=True)
+            selected_idxs = kc.already_selected.astype("int")
+
+            save_dir = os.path.join(self.data_provider.content_path, "Model", "Iteration_{}".format(self.iteration), "selected_idxs")
+            os.system("mkdir -p {}".format(save_dir))
+            with open(os.path.join(save_dir,"selected_{}.json".format(t)), "w") as f:
+                json.dump(selected_idxs.tolist(), f)
+            print("select {:d} points".format(len(selected_idxs)))
+
+            time_step_idxs_list.insert(0, selected_idxs)
+
+            train_data = self.data_provider.train_representation_lb(self.iteration, t).squeeze()
+            train_data = train_data[selected_idxs]
+
+            if self.b_n_epochs != 0:
+                # select highly used border centers...
+                border_centers = self.data_provider.border_representation(self.iteration, t).squeeze()
+                t_num = len(selected_idxs)
+                b_num = len(border_centers)
+
+                complex, sigmas_t1, rhos_t1, knn_idxs_t = self._construct_fuzzy_complex(train_data)
+                bw_complex, sigmas_t2, rhos_t2, _ = self._construct_boundary_wise_complex(train_data, border_centers)
+                edge_to_t, edge_from_t, weight_t = self._construct_step_edge_dataset(complex, bw_complex)
+                sigmas_t = np.concatenate((sigmas_t1, sigmas_t2[len(sigmas_t1):]), axis=0)
+                rhos_t = np.concatenate((rhos_t1, rhos_t2[len(rhos_t1):]), axis=0)
+                fitting_data = np.concatenate((train_data, border_centers), axis=0)
+                pred_model = self.data_provider.prediction_function(t)
+                attention_t = get_attention(pred_model, fitting_data, temperature=.01, device=self.data_provider.DEVICE, verbose=1)
+            else:
+                t_num = len(selected_idxs)
+                b_num = 0
+
+                complex, sigmas_t, rhos_t, knn_idxs_t = self._construct_fuzzy_complex(train_data)
+                edge_to_t, edge_from_t, weight_t = self._construct_step_edge_dataset(complex, None)
+                fitting_data = np.copy(train_data)
+                pred_model = self.data_provider.prediction_function(self.iteration,t)
+                attention_t = get_attention(pred_model, fitting_data, temperature=.01, device=self.data_provider.DEVICE, verbose=1)
+            
+            if edge_to is None:
+                edge_to = edge_to_t
+                edge_from = edge_from_t
+                weight = weight_t
+                probs = weight_t / weight_t.max()
+                feature_vectors = fitting_data
+                attention = attention_t
+                sigmas = sigmas_t
+                rhos = rhos_t
+                knn_indices = knn_idxs_t
+                # npr = npr_t
+                time_step_nums.insert(0, (t_num, b_num))
+
+                if self.init_embeddings is None:
+                    coefficient = np.zeros(len(feature_vectors))
+                    embedded = np.zeros((len(feature_vectors), 2))
+                else:
+                    coefficient = np.zeros(len(feature_vectors))
+                    coefficient[:len(self.init_embeddings)] = 1
+                    embedded = np.zeros((len(feature_vectors), 2))
+                    embedded[:len(self.init_embeddings)] = self.init_embeddings
+
+            else:
+                # every round, we need to add len(data) to edge_to(as well as edge_from) index
+                increase_idx = len(fitting_data)
+                edge_to = np.concatenate((edge_to_t, edge_to + increase_idx), axis=0)
+                edge_from = np.concatenate((edge_from_t, edge_from + increase_idx), axis=0)
+                # normalize weight to be in range (0, 1)
+                weight = np.concatenate((weight_t, weight), axis=0)
+                probs_t = weight_t / weight_t.max()
+                probs = np.concatenate((probs_t, probs), axis=0)
+                sigmas = np.concatenate((sigmas_t, sigmas), axis=0)
+                rhos = np.concatenate((rhos_t, rhos), axis=0)
+                feature_vectors = np.concatenate((fitting_data, feature_vectors), axis=0) 
+                attention = np.concatenate((attention_t, attention), axis=0)
+                knn_indices = np.concatenate((knn_idxs_t, knn_indices+increase_idx), axis=0)
+                # npr = np.concatenate((npr_t, npr), axis=0)
+                time_step_nums.insert(0, (t_num, b_num))
+                coefficient = np.concatenate((np.zeros(len(fitting_data)), coefficient), axis=0)
+                embedded = np.concatenate((np.zeros((len(fitting_data), 2)), embedded), axis=0)
 
         return edge_to, edge_from, weight, feature_vectors, embedded, coefficient, time_step_nums, time_step_idxs_list, knn_indices, sigmas, rhos, attention, (c0, d0)
