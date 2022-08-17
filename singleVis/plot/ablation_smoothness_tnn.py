@@ -12,7 +12,8 @@ def main():
     # hyperparameters
     datasets = ["mnist", "fmnist", "cifar10"]
     selected_epochs_dict = {"mnist":[4, 12, 20],"fmnist":[10,30,50], "cifar10":[40, 120,200]}
-    k_neighbors = [15]
+    selected_epochs_dict = {"mnist":[4,5,6,10],"fmnist":[2,4,6,11], "cifar10":[3,9,18,41]}
+    k_neighbors = [5]
 
     col = np.array(["dataset", "method", "type", "hue", "k", "period", "eval"])
     df = pd.DataFrame({}, columns=col)
@@ -27,7 +28,7 @@ def main():
             eval_path = "/home/xianglin/projects/DVI_data/resnet18_{}/Model/test_evaluation_hybrid.json".format(dataset)
             with open(eval_path, "r") as f:
                     eval = json.load(f)
-            for epoch_id in range(3):
+            for epoch_id in range(len(selected_epochs)):
                 epoch = selected_epochs[epoch_id]
                 nn_train = round(eval["tnn_train"][str(epoch)][str(k)], 3)
                 nn_test = round(eval["tnn_test"][str(epoch)][str(k)], 3)
@@ -42,7 +43,7 @@ def main():
             eval_path = "/home/xianglin/projects/DVI_data/resnet18_{}/Model/without_smoothness/test_evaluation_hybrid.json".format(dataset)
             with open(eval_path, "r") as f:
                     eval = json.load(f)
-            for epoch_id in range(3):
+            for epoch_id in range(len(selected_epochs)):
                 epoch = selected_epochs[epoch_id]
                 nn_train = round(eval["tnn_train"][str(epoch)][str(k)], 3)
                 nn_test = round(eval["tnn_test"][str(epoch)][str(k)], 3)
@@ -54,7 +55,7 @@ def main():
             eval_path = "/home/xianglin/projects/DVI_data/resnet18_{}/Model/without_tl/test_evaluation_hybrid.json".format(dataset)
             with open(eval_path, "r") as f:
                     eval = json.load(f)
-            for epoch_id in range(3):
+            for epoch_id in range(len(selected_epochs)):
                 epoch = selected_epochs[epoch_id]
                 nn_train = round(eval["tnn_train"][str(epoch)][str(k)], 3)
                 nn_test = round(eval["tnn_test"][str(epoch)][str(k)], 3)
@@ -121,7 +122,7 @@ def main():
         axs[2].set_title("CIFAR-10")
 
         (fg.despine(bottom=False, right=False, left=False, top=False)
-         .set_xticklabels(['Begin', 'Mid', 'End'])
+        #  .set_xticklabels(['Begin', 'Mid', 'End'])
          .set_axis_labels("Period", "")
          )
         # fg.fig.suptitle("NN preserving property")
