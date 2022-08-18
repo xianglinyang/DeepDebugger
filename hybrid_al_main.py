@@ -1,4 +1,3 @@
-# %%
 import torch
 import sys
 import os
@@ -21,13 +20,11 @@ from singleVis.temporal_edge_constructor import GlobalTemporalEdgeConstructor
 from singleVis.projector import DenseALProjector
 from singleVis.segmenter import DenseALSegmenter
 
-# %%
 CONTENT_PATH = "/home/xianglin/DVI_data/active_learning/random/resnet18/CIFAR10"
 GPU_ID = "1"
 epoch_num = 200
 iteration = 1
 
-# %%
 sys.path.append(CONTENT_PATH)
 from config import config
 
@@ -64,10 +61,9 @@ DEVICE = torch.device("cuda:{}".format(GPU_ID) if torch.cuda.is_available() else
 import Model.model as subject_model
 net = eval("subject_model.{}()".format(NET))
 
-# %%
 data_provider = DenseActiveLearningDataProvider(CONTENT_PATH, net, BASE_ITERATION, epoch_num, split=-1, device=DEVICE, classes=CLASSES,verbose=1)
+data_provider._meta_data(iteration)
 
-# %%
 model = SingleVisualizationModel(input_dims=512, output_dims=2, units=256, hidden_layer=HIDDEN_LAYER)
 negative_sample_rate = 5
 min_dist = .1
@@ -79,24 +75,20 @@ criterion = HybridLoss(umap_loss_fn, recon_loss_fn, smooth_loss_fn, lambd1=LAMBD
 segmenter = DenseALSegmenter(data_provider=data_provider, threshold=78.5, epoch_num=epoch_num)
 
 
-# %%
-# # segment epoch
-# t0 = time.time()
-# SEGMENTS = segmenter.segment(iteration)
-# t1 = time.time()
-# RESUME_SEG = len(SEGMENTS)
-# print(SEGMENTS)
-SEGMENTS = [(1, 2), (2, 21), (21, 52), (52, 74), (74, 95), (95, 117), (117, 200)]
+# segment epoch
+t0 = time.time()
+SEGMENTS = segmenter.segment(iteration)
+t1 = time.time()
+RESUME_SEG = len(SEGMENTS)
+print(SEGMENTS)
+# SEGMENTS = [(1, 2), (2, 21), (21, 52), (52, 74), (74, 95), (95, 117), (117, 200)]
 
-# %%
-# segment_path = os.path.join(CONTENT_PATH, "Model", "Iteration_{}".format(iteration),"segments.json")
-# with open(segment_path, "w") as f:
-#     json.dump(f)
+segment_path = os.path.join(CONTENT_PATH, "Model", "Iteration_{}".format(iteration),"segments.json")
+with open(segment_path, "w") as f:
+    json.dump(SEGMENTS, f)
 
-# %%
 projector = DenseALProjector(vis_model=model, content_path=CONTENT_PATH, vis_model_name="al_hybrid", device=DEVICE)
 
-# %%
 LEN = data_provider.label_num(iteration)
 prev_selected = np.random.choice(np.arange(LEN), size=INIT_NUM, replace=False)
 prev_embedding = None
@@ -176,7 +168,7 @@ for seg in range(start_point,-1,-1):
     evaluation["training"][str(seg)] = round(t3-t2, 3)
     with open(save_dir, 'w') as f:
         json.dump(evaluation, f)
-    trainer.save(save_dir=data_provider.model_path, file_name="al_hybrid_{}".format(seg))
+    trainer.save(save_dir=os.path.join(data_provider.model_path, "Iteration_{}".format(iteration)), file_name="al_hybrid_{}".format(seg))
     model = trainer.model
 
     # update prev_idxs and prev_embedding
