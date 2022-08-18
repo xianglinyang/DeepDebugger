@@ -35,7 +35,7 @@ CLASSES = config["CLASSES"]
 DATASET = config["DATASET"]
 PREPROCESS = config["VISUALIZATION"]["PREPROCESS"]
 GPU_ID = config["GPU"]
-GPU_ID = "0"
+GPU_ID = "1"
 EPOCH_START = config["EPOCH_START"]
 EPOCH_END = config["EPOCH_END"]
 EPOCH_PERIOD = config["EPOCH_PERIOD"]
@@ -123,10 +123,20 @@ EVAL_EPOCH_DICT = {
     "fmnist":[10, 30, 50],
     "cifar10":[40,120,200]
 }
+EVAL_EPOCH_DICT = {
+    "cifar10": [3,9,18,41],
+    "fmnist": [2,4,6,11],
+    "mnist":[4,5,6]
+}
+EVAL_EPOCH_DICT = {
+    "mnist":[1,2,3,10,15, 20],
+    "fmnist":[1,2,3,4,5,15,20,25,40,45,50],
+    "cifar10":[1,5,10,20,30,100, 150, 190,200]
+}
 eval_epochs = EVAL_EPOCH_DICT[DATASET]
 
 evaluator = Evaluator(data_provider, projector)
 for eval_epoch in eval_epochs:
-    # evaluator.save_epoch_eval(eval_epoch, 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_hybrid")
-    evaluator.save_epoch_eval(eval_epoch, 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_hybrid")
-    # evaluator.save_epoch_eval(eval_epoch, 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_hybrid")
+    # evaluator.save_epoch_eval(eval_epoch, 10, temporal_k=3, file_name="test_evaluation_hybrid")
+    evaluator.save_epoch_eval(eval_epoch, 15, temporal_k=5, file_name="test_evaluation_hybrid")
+    # evaluator.save_epoch_eval(eval_epoch, 20, temporal_k=7,file_name="test_evaluation_hybrid")

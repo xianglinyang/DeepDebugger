@@ -109,15 +109,20 @@ projector = EvalProjector(vis_model=model, content_path=CONTENT_PATH, device=DEV
 ########################################################################################################################
 
 EVAL_EPOCH_DICT = {
-    "cifar10": [40,120,200],
-    "fmnist": [10,30,50],
-    "mnist":[4,12,20]
+    "cifar10": [3,9,18,41],
+    "fmnist": [2,4,6,11],
+    "mnist":[4,5,6]
+}
+EVAL_EPOCH_DICT = {
+    "mnist":[1,2,3,10,15,20],
+    "fmnist":[1,2,3,4,5,15,20,25,40,45,50],
+    "cifar10":[1,5,10,20,30,100, 150, 190,200]
 }
 
 eval_epochs = EVAL_EPOCH_DICT[DATASET]
 
 evaluator = SegEvaluator(data_provider, projector, EXP)
 for eval_epoch in eval_epochs:
-    # evaluator.save_epoch_eval(eval_epoch, 10, temporal_k=3, save_corrs=True, file_name="test_evaluation_tnn")
-    evaluator.save_epoch_eval(eval_epoch, 15, temporal_k=5, save_corrs=False, file_name="test_evaluation_hybrid")
-    # evaluator.save_epoch_eval(eval_epoch, 20, temporal_k=7, save_corrs=False, file_name="test_evaluation_tnn")
+    # evaluator.save_epoch_eval(eval_epoch, 10, temporal_k=3, file_name="test_evaluation_tnn")
+    evaluator.save_epoch_eval(eval_epoch, 15, temporal_k=5, file_name="test_evaluation_hybrid")
+    # evaluator.save_epoch_eval(eval_epoch, 20, temporal_k=7, file_name="test_evaluation_tnn")
