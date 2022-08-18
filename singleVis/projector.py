@@ -86,7 +86,7 @@ class DenseALProjector(Projector):
         init_s = segments[0][0]
         # (s, e]
         if iteration == curr_iteration:
-            if (curr_s==init_s and epoch == curr_s) or (epoch > curr_s and iteration <= curr_e):
+            if (curr_s==init_s and epoch == curr_s) or (epoch > curr_s and epoch <= curr_e):
                 print("Same range as current visualization model...")
                 return
         
