@@ -10,7 +10,8 @@ import seaborn as sns
 
 def main():
     datasets = ["mnist", "fmnist", "cifar10"]
-    selected_epochs_dict = {"mnist":[4, 12, 20],"fmnist":[10,30,50], "cifar10":[40, 120,200]}
+    # selected_epochs_dict = {"mnist":[4, 12, 20],"fmnist":[10,30,50], "cifar10":[40, 120,200]}
+    selected_epochs_dict = {"mnist":[1, 10, 20],"fmnist":[1,25,50], "cifar10":[1, 100,200]}
     col = np.array(["dataset", "method", "type", "hue", "period", "eval"])
     df = pd.DataFrame({}, columns=col)
 
