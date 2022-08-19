@@ -67,8 +67,8 @@ T_N_EPOCHS = VISUALIZATION_PARAMETER["T_N_EPOCHS"]
 N_NEIGHBORS = VISUALIZATION_PARAMETER["N_NEIGHBORS"]
 PATIENT = VISUALIZATION_PARAMETER["PATIENT"]
 MAX_EPOCH = VISUALIZATION_PARAMETER["MAX_EPOCH"]
-SEGMENTS = VISUALIZATION_PARAMETER["SEGMENTS"]
-RESUME_SEG = VISUALIZATION_PARAMETER["RESUME_SEG"]
+# SEGMENTS = VISUALIZATION_PARAMETER["SEGMENTS"]
+# RESUME_SEG = VISUALIZATION_PARAMETER["RESUME_SEG"]
 
 # define hyperparameters
 DEVICE = torch.device("cuda:{}".format(GPU_ID) if torch.cuda.is_available() else "cpu")
@@ -81,7 +81,10 @@ net = eval("subject_model.{}()".format(NET))
 ########################################################################################################################
 data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, split=-1, device=DEVICE, classes=CLASSES,verbose=1)
 if PREPROCESS:
-    data_provider.initialize(LEN//10, l_bound=L_BOUND)
+    data_provider._meta_data()
+    if B_N_EPOCHS >0:
+        data_provider._estimate_boundary(LEN//10, l_bound=L_BOUND)
+        
 model = SingleVisualizationModel(input_dims=512, output_dims=2, units=256, hidden_layer=HIDDEN_LAYER)
 negative_sample_rate = 5
 min_dist = .1

@@ -11,8 +11,7 @@ import seaborn as sns
 def main():
     # hyperparameters
     datasets = ["mnist", "fmnist", "cifar10"]
-    selected_epochs_dict = {"mnist":[4, 12, 20],"fmnist":[10,30,50], "cifar10":[40, 120,200]}
-    selected_epochs_dict = {"mnist":[4,5,6,10],"fmnist":[2,4,6,11], "cifar10":[3,9,18,41]}
+    selected_epochs_dict = {"mnist":[5],"fmnist":[2,6,11], "cifar10":[3,9,18,41]}
     k_neighbors = [5]
 
     col = np.array(["dataset", "method", "type", "hue", "k", "period", "eval"])
@@ -30,8 +29,8 @@ def main():
                     eval = json.load(f)
             for epoch_id in range(len(selected_epochs)):
                 epoch = selected_epochs[epoch_id]
-                nn_train = round(eval["tnn_train"][str(epoch)][str(k)], 3)
-                nn_test = round(eval["tnn_test"][str(epoch)][str(k)], 3)
+                nn_train = round(eval["tr_train"][str(epoch)], 3)
+                nn_test = round(eval["tr_test"][str(epoch)], 3)
 
                 if len(data) == 0:
                     data = np.array([[dataset, "DeepDebugger", "Train", "DeepDebugger-Train", "{}".format(k), "{}".format(str(epoch_id)), nn_train]])
@@ -45,8 +44,8 @@ def main():
                     eval = json.load(f)
             for epoch_id in range(len(selected_epochs)):
                 epoch = selected_epochs[epoch_id]
-                nn_train = round(eval["tnn_train"][str(epoch)][str(k)], 3)
-                nn_test = round(eval["tnn_test"][str(epoch)][str(k)], 3)
+                nn_train = round(eval["tr_train"][str(epoch)], 3)
+                nn_test = round(eval["tr_test"][str(epoch)], 3)
 
                 data = np.concatenate((data, np.array([[dataset, "no_Smoothness", "Train", "no_Smoothness-Train", "{}".format(k), "{}".format(str(epoch_id)), nn_train]])), axis=0)
                 data = np.concatenate((data, np.array([[dataset, "no_Smoothness", "Test", "no_Smoothness-Test", "{}".format(k), "{}".format(str(epoch_id)), nn_test]])), axis=0)
@@ -57,8 +56,8 @@ def main():
                     eval = json.load(f)
             for epoch_id in range(len(selected_epochs)):
                 epoch = selected_epochs[epoch_id]
-                nn_train = round(eval["tnn_train"][str(epoch)][str(k)], 3)
-                nn_test = round(eval["tnn_test"][str(epoch)][str(k)], 3)
+                nn_train = round(eval["tr_train"][str(epoch)], 3)
+                nn_test = round(eval["tr_test"][str(epoch)], 3)
 
                 data = np.concatenate((data, np.array([[dataset, "no_TL", "Train", "no_TL-Train", "{}".format(k), "{}".format(str(epoch_id)), nn_train]])), axis=0)
                 data = np.concatenate((data, np.array([[dataset, "no_TL", "Test", "no_TL-Test", "{}".format(k), "{}".format(str(epoch_id)), nn_test]])), axis=0)
@@ -114,9 +113,9 @@ def main():
         mpl.pyplot.setp(fg._legend.get_texts(), fontsize='10')
 
         axs = fg.axes[0]
-        max_ = df_tmp["eval"].max()
+        # max_ = df_tmp["eval"].max()
         # min_ = df["eval"].min()
-        axs[0].set_ylim(0., max_*1.1)
+        # axs[0].set_ylim(0., max_*1.1)
         axs[0].set_title("MNIST")
         axs[1].set_title("FMNIST")
         axs[2].set_title("CIFAR-10")
