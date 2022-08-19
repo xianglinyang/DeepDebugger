@@ -83,27 +83,27 @@ class FeedbackTrajectoryManager(TrajectoryManager):
         self.user_interested = np.zeros(self.train_num)
         self.success_rate = np.ones(self.cls_num)
     
-    # def sample_one(self):
-    #     interested_idxs = np.argwhere(self.user_interested==1).squeeze()
-    #     # scores of success rate
-    #     cls_rate = self.sample_rate*self.success_rate
-    #     success_rate = cls_rate[self.predict_sub_labels]
+    def sample_one(self):
+        interested_idxs = np.argwhere(self.user_interested==1).squeeze()
+        # scores of success rate
+        cls_rate = self.sample_rate*self.success_rate
+        success_rate = cls_rate[self.predict_sub_labels]
 
-    #     # similarity scores
-    #     sim_rate = np.zeros(self.train_num)+0.5
-    #     if len(interested_idxs)>0:
-    #         interested_embedding = self.samples[interested_idxs,:]
-    #         nd = NNDescent(self.samples)
-    #         indices, _ = nd.query(interested_embedding, k=3)
-    #         indices = np.unique(indices.reshape(-1))
-    #         sim_rate[indices] = 1
+        # similarity scores
+        sim_rate = np.zeros(self.train_num)+0.5
+        if len(interested_idxs)>0:
+            interested_embedding = self.samples[interested_idxs,:]
+            nd = NNDescent(self.samples)
+            indices, _ = nd.query(interested_embedding, k=3)
+            indices = np.unique(indices.reshape(-1))
+            sim_rate[indices] = 1
 
-    #     rate = sim_rate*success_rate
-    #     not_selected = np.argwhere(self.selected==0).squeeze()
-    #     norm_rate = rate[not_selected]/np.sum(rate[not_selected])
-    #     s_idx = np.random.choice(not_selected, p=norm_rate, size=1)[0]
-    #     self.selected[s_idx]=1
-    #     return s_idx
+        rate = sim_rate*success_rate
+        not_selected = np.argwhere(self.selected==0).squeeze()
+        norm_rate = rate[not_selected]/np.sum(rate[not_selected])
+        s_idx = np.random.choice(not_selected, p=norm_rate, size=1)[0]
+        self.selected[s_idx]=1
+        return s_idx
     
     def sample_batch(self, budget):
         interested_idxs = np.argwhere(self.user_interested==1).squeeze()
@@ -121,6 +121,7 @@ class FeedbackTrajectoryManager(TrajectoryManager):
             sim_rate[indices] = 1
 
         rate = sim_rate*success_rate
+        # rate = success_rate
         not_selected = np.argwhere(self.selected==0).squeeze()
         norm_rate = rate[not_selected]/np.sum(rate[not_selected])
         s_idxs = np.random.choice(not_selected, p=norm_rate, size=budget, replace=False)
