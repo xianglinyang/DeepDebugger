@@ -69,6 +69,35 @@ class TrajectoryManager:
         for _ in range(budget):
             selected_idxs.append(self.sample_one())
         return np.array(selected_idxs)
+    
+    def sample_normal_one(self):
+        # sample class
+        normal_rate = 1 - self.sample_rate
+        rate = normal_rate/np.sum(normal_rate)
+        cls = np.random.choice(self.cls_num, size=1, p=rate)[0]
+        cls_idxs = np.argwhere(self.predict_sub_labels==cls)
+
+        # check how many left
+        selected_idxs = np.argwhere(self.selected==1)
+        already_selected = np.intersect1d(cls_idxs, selected_idxs)
+        not_selected = np.setdiff1d(cls_idxs, already_selected)
+
+        # select one
+        s_idx = np.random.choice(not_selected, size=1)[0]
+
+        # update parameters
+        self.selected[s_idx] = 1
+        if len(not_selected) ==1:
+            self.sample_rate[cls] = 0.
+        return s_idx
+    
+    def sample_normal_batch(self, budget):
+        selected_idxs = list()
+        for _ in range(budget):
+            selected_idxs.append(self.sample_normal_one())
+        return np.array(selected_idxs)
+    
+
 
 
 class FeedbackTrajectoryManager(TrajectoryManager):
