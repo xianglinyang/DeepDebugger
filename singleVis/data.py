@@ -707,6 +707,9 @@ class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
         super().__init__(content_path, model, base_epoch_start, split, device, classes, verbose)
         self.mode = "dense_al"
         self.epoch_num = epoch_num
+        self.s = 1
+        self.p = 1
+        self.e = epoch_num
 
     def representation_dim(self):
         train_data_loc = os.path.join(self.model_path, "Iteration_{}".format(self.s), "Epoch_{:d}".format(self.epoch_num), "train_data.npy")

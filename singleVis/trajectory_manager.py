@@ -171,7 +171,8 @@ class FeedbackTrajectoryManager(TrajectoryManager):
         return s_idxs
     
     def update_belief(self, interested_idxs):
-        self.user_interested[interested_idxs]=1
+        if len(interested_idxs)>0:
+            self.user_interested[interested_idxs]=1
         for cls in range(self.cls_num):
             cls_idxs = np.argwhere(self.predict_sub_labels==cls)
             interested_num = np.sum(self.user_interested[cls_idxs])

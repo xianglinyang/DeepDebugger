@@ -20,7 +20,7 @@ class visualizer:
         '''
         Initialises matplotlib artists and plots. from DeepView and DVI
         '''
-        plt.ion()
+        # plt.ion()
         self.fig, self.ax = plt.subplots(1, 1, figsize=(8, 8))
 
         if not only_img:
@@ -264,7 +264,7 @@ class visualizer:
         '''
         Initialises matplotlib artists and plots. from DeepView and DVI
         '''
-        plt.ion()
+        # plt.ion()
         px = 1/plt.rcParams['figure.dpi']  # pixel in inches
         fig, ax = plt.subplots(1, 1, figsize=(200*px, 200*px))
         ax.set_axis_off()
@@ -445,7 +445,7 @@ class DenseALvisualizer(visualizer):
         '''
         Initialises matplotlib artists and plots. from DeepView and DVI
         '''
-        plt.ion()
+        # plt.ion()
         px = 1/plt.rcParams['figure.dpi']  # pixel in inches
         fig, ax = plt.subplots(1, 1, figsize=(200*px, 200*px))
         ax.set_axis_off()
