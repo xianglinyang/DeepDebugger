@@ -97,6 +97,14 @@ class TrajectoryManager:
             selected_idxs.append(self.sample_normal_one())
         return np.array(selected_idxs)
     
+    def manual_select(self, idxs):
+        self.selected[idxs] = 1.
+        for cls in range(self.cls_num):
+            cls_idxs = np.argwhere(self.predict_sub_labels==cls).squeeze()
+            remain_num = len(cls_idxs) - np.sum(self.selected[cls_idxs])
+            if remain_num==0:
+                self.sample_rate[cls] = 0.
+    
 
 
 
@@ -112,7 +120,7 @@ class FeedbackTrajectoryManager(TrajectoryManager):
         self.user_interested = np.zeros(self.train_num)
         self.success_rate = np.ones(self.cls_num)
     
-    def sample_one(self):
+    def sample_one(self, return_scores=False):
         interested_idxs = np.argwhere(self.user_interested==1).squeeze()
         # scores of success rate
         cls_rate = self.sample_rate*self.success_rate
@@ -132,9 +140,11 @@ class FeedbackTrajectoryManager(TrajectoryManager):
         norm_rate = rate[not_selected]/np.sum(rate[not_selected])
         s_idx = np.random.choice(not_selected, p=norm_rate, size=1)[0]
         self.selected[s_idx]=1
+        if return_scores:
+            return s_idx, rate[s_idx]
         return s_idx
     
-    def sample_batch(self, budget):
+    def sample_batch(self, budget, return_scores=False):
         interested_idxs = np.argwhere(self.user_interested==1).squeeze()
         # scores of success rate
         cls_rate = self.sample_rate*self.success_rate
@@ -155,6 +165,9 @@ class FeedbackTrajectoryManager(TrajectoryManager):
         norm_rate = rate[not_selected]/np.sum(rate[not_selected])
         s_idxs = np.random.choice(not_selected, p=norm_rate, size=budget, replace=False)
         self.selected[s_idxs]=1
+        if return_scores:
+            scores = rate[s_idxs]
+            return s_idxs, scores
         return s_idxs
     
     def update_belief(self, interested_idxs):
