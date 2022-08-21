@@ -1,9 +1,8 @@
 import numpy as np
 from sklearn.cluster import Birch
-from pynndescent import NNDescent
 
 class TrajectoryManager:
-    def __init__(self, samples, embeddings_2d, cls_num, period=100, metric="v"):
+    def __init__(self, samples, embeddings_2d, cls_num, period=100, metric="a"):
         """ trajectory manager with no feedback
         Parameters
         ----------
@@ -44,72 +43,32 @@ class TrajectoryManager:
         self.sample_rate[self.suspect_clean] = 0.
         self.selected = np.zeros(self.train_num)
     
-    def sample_one(self):
-        # sample class
-        rate = self.sample_rate/np.sum(self.sample_rate)
-        cls = np.random.choice(self.cls_num, size=1, p=rate)[0]
-        cls_idxs = np.argwhere(self.predict_sub_labels==cls)
-
-        # check how many left
-        selected_idxs = np.argwhere(self.selected==1)
-        already_selected = np.intersect1d(cls_idxs, selected_idxs)
-        not_selected = np.setdiff1d(cls_idxs, already_selected)
-
-        # select one
-        s_idx = np.random.choice(not_selected, size=1)[0]
-
-        # update parameters
-        self.selected[s_idx] = 1
-        if len(not_selected) ==1:
-            self.sample_rate[cls] = 0.
-        return s_idx
-
     def sample_batch(self, budget):
-        selected_idxs = list()
-        for _ in range(budget):
-            selected_idxs.append(self.sample_one())
-        return np.array(selected_idxs)
+        not_selected = np.argwhere(self.selected==0).squeeze()
+        s_idxs = np.random.choice(not_selected, size=budget)
+        # update parameters
+        self.selected[s_idxs] = 1
+        return s_idxs
     
-    def sample_normal_one(self):
+    def sample_normal(self, budget):
         # sample class
         normal_rate = 1 - self.sample_rate
-        rate = normal_rate/np.sum(normal_rate)
-        cls = np.random.choice(self.cls_num, size=1, p=rate)[0]
-        cls_idxs = np.argwhere(self.predict_sub_labels==cls)
-
+        sample_rate = normal_rate[self.predict_sub_labels]
         # check how many left
-        selected_idxs = np.argwhere(self.selected==1)
-        already_selected = np.intersect1d(cls_idxs, selected_idxs)
-        not_selected = np.setdiff1d(cls_idxs, already_selected)
-
+        not_selected = np.argwhere(self.selected==0)
         # select one
-        s_idx = np.random.choice(not_selected, size=1)[0]
-
+        normed_rate = sample_rate[not_selected]/np.sum(sample_rate[not_selected])
+        s_idxs = np.random.choice(not_selected, p=normed_rate,size=budget)
         # update parameters
-        self.selected[s_idx] = 1
-        if len(not_selected) ==1:
-            self.sample_rate[cls] = 0.
-        return s_idx
-    
-    def sample_normal_batch(self, budget):
-        selected_idxs = list()
-        for _ in range(budget):
-            selected_idxs.append(self.sample_normal_one())
-        return np.array(selected_idxs)
+        self.selected[s_idxs] = 1
+        return s_idxs
     
     def manual_select(self, idxs):
-        self.selected[idxs] = 1.
-        for cls in range(self.cls_num):
-            cls_idxs = np.argwhere(self.predict_sub_labels==cls).squeeze()
-            remain_num = len(cls_idxs) - np.sum(self.selected[cls_idxs])
-            if remain_num==0:
-                self.sample_rate[cls] = 0.
+        self.selected[idxs] = 1
     
 
-
-
 class FeedbackTrajectoryManager(TrajectoryManager):
-    def __init__(self, samples, embeddings_2d, cls_num, period=100, metric="v"):
+    def __init__(self, samples, embeddings_2d, cls_num, period=100, metric="a"):
         super().__init__(samples, embeddings_2d, cls_num, period, metric)
     
     def clustered(self):
@@ -117,68 +76,107 @@ class FeedbackTrajectoryManager(TrajectoryManager):
         # to be updated
         # self.selected
         # self.sample_rate
-        self.user_interested = np.zeros(self.train_num)
-        self.success_rate = np.ones(self.cls_num)
-    
-    def sample_one(self, return_scores=False):
-        interested_idxs = np.argwhere(self.user_interested==1).squeeze()
-        # scores of success rate
-        cls_rate = self.sample_rate*self.success_rate
-        success_rate = cls_rate[self.predict_sub_labels]
-
-        # similarity scores
-        sim_rate = np.zeros(self.train_num)+0.5
-        if len(interested_idxs)>0:
-            interested_embedding = self.samples[interested_idxs,:]
-            nd = NNDescent(self.samples)
-            indices, _ = nd.query(interested_embedding, k=3)
-            indices = np.unique(indices.reshape(-1))
-            sim_rate[indices] = 1
-
-        rate = sim_rate*success_rate
-        not_selected = np.argwhere(self.selected==0).squeeze()
-        norm_rate = rate[not_selected]/np.sum(rate[not_selected])
-        s_idx = np.random.choice(not_selected, p=norm_rate, size=1)[0]
-        self.selected[s_idx]=1
-        if return_scores:
-            return s_idx, rate[s_idx]
-        return s_idx
+        self.user_acc = np.zeros(self.train_num)
+        self.user_rej = np.zeros(self.train_num)
     
     def sample_batch(self, budget, return_scores=False):
-        interested_idxs = np.argwhere(self.user_interested==1).squeeze()
-        # scores of success rate
-        cls_rate = self.sample_rate*self.success_rate
-        success_rate = cls_rate[self.predict_sub_labels]
+        acc_idxs = np.argwhere(self.user_acc==1).squeeze()
+        rej_idxs = np.argwhere(self.user_rej==1).squeeze() 
 
-        # similarity scores
-        sim_rate = np.zeros(self.train_num)+0.5
-        if len(interested_idxs)>0:
-            interested_embedding = self.samples[interested_idxs,:]
-            nd = NNDescent(self.samples)
-            indices, _ = nd.query(interested_embedding, k=3)
-            indices = np.unique(indices.reshape(-1))
-            sim_rate[indices] = 1
+        acc_rate = np.zeros(self.train_num)
+        rej_rate = np.zeros(self.train_num)
+        acc_rate[acc_idxs]=1.
+        rej_rate[rej_idxs]=1.
+        if len(np.intersect1d(acc_idxs, rej_idxs))>0:
+            raise Exception("Intersection between acc idxs and rej idxs!")
 
-        rate = sim_rate*success_rate
-        # rate = success_rate
+        exploit_rate = np.zeros(self.cls_num)
+        explore_rate = np.zeros(self.cls_num)
+        for cls in range(self.cls_num):
+            cls_idxs = np.argwhere(self.predict_sub_labels==cls)
+            acc_num = np.sum(acc_rate[cls_idxs])
+            rej_num = np.sum(rej_rate[cls_idxs])
+            query_sum = acc_num + rej_num
+            exploit_rate[cls] = acc_num/query_sum
+            explore_rate[cls] = 1 - query_sum/len(cls_idxs)
+        
+        # remove clean cls
+        rate = (explore_rate + exploit_rate)* self.sample_rate
+        sample_rate = rate[self.predict_sub_labels]
         not_selected = np.argwhere(self.selected==0).squeeze()
-        norm_rate = rate[not_selected]/np.sum(rate[not_selected])
+        norm_rate = sample_rate[not_selected]/np.sum(sample_rate[not_selected])
         s_idxs = np.random.choice(not_selected, p=norm_rate, size=budget, replace=False)
-        self.selected[s_idxs]=1
+
         if return_scores:
-            scores = rate[s_idxs]
+            scores = sample_rate[s_idxs]
             return s_idxs, scores
         return s_idxs
     
-    def update_belief(self, interested_idxs):
-        if len(interested_idxs)>0:
-            self.user_interested[interested_idxs]=1
+    def update_belief(self, acc_idxs, rej_idxs):
+        if len(acc_idxs)>0:
+            self.user_acc[acc_idxs]=1
+        if len(rej_idxs)>0:
+            self.user_rej[rej_idxs]=1
+        # update parameters
+        self.selected[acc_idxs] = 1
+        self.selected[rej_idxs] = 1
+    
+
+class TBSampling(TrajectoryManager):
+    """with no memory, for user study"""
+    def __init__(self, samples, embeddings_2d, cls_num, period=100, metric="a"):
+        super().__init__(samples, embeddings_2d, cls_num, period, metric)
+
+    def sample_batch(self, acc_idxs, rej_idxs, budget, return_scores=True):
+        selected = np.zeros(self.train_num)
+        selected[acc_idxs] = 1.
+        selected[rej_idxs] = 1.
+        if len(np.intersect1d(acc_idxs, rej_idxs))>0:
+            raise Error("Intersection between acc idxs and rej idxs!")
+        
+        sample_rate = self.sample_rate[self.predict_sub_labels]
+        not_selected = np.argwhere(selected==0).squeeze()
+        norm_rate = sample_rate[not_selected]/np.sum(sample_rate[not_selected])
+        s_idxs = np.random.choice(not_selected, p=norm_rate, size=budget, replace=False)
+        if return_scores:
+            scores = sample_rate[s_idxs]
+            return s_idxs, scores
+        return s_idxs
+
+
+class FeedbackSampling(TrajectoryManager):
+    """with no memory, for user study"""
+    def __init__(self, samples, embeddings_2d, cls_num, period=100, metric="a"):
+        super().__init__(samples, embeddings_2d, cls_num, period, metric)
+
+    def sample_batch(self, acc_idxs, rej_idxs, budget, return_scores=True):
+        acc_rate = np.zeros(self.train_num)
+        rej_rate = np.zeros(self.train_num)
+        acc_rate[acc_idxs]=1.
+        rej_rate[rej_idxs]=1.
+        selected = np.zeros(self.train_num)
+        selected[acc_idxs] = 1.
+        selected[rej_idxs] = 1.
+        if len(np.intersect1d(acc_idxs, rej_idxs))>0:
+            raise Error("Intersection between acc idxs and rej idxs!")
+
+        exploit_rate = np.zeros(self.cls_num)
+        explore_rate = np.zeros(self.cls_num)
         for cls in range(self.cls_num):
             cls_idxs = np.argwhere(self.predict_sub_labels==cls)
-            interested_num = np.sum(self.user_interested[cls_idxs])
-            query_sum = np.sum(self.selected[cls_idxs])
-            if query_sum == 0:
-                self.success_rate[cls] = 1
-            else:
-                self.success_rate[cls] = interested_num/query_sum
-    
+            acc_num = np.sum(acc_rate[cls_idxs])
+            rej_num = np.sum(rej_rate[cls_idxs])
+            query_sum = acc_num + rej_num
+            exploit_rate[cls] = acc_num/query_sum
+            explore_rate[cls] = 1 - query_sum/len(cls_idxs)
+        
+        # remove clean cls
+        rate = (explore_rate + exploit_rate)* self.sample_rate
+        sample_rate = rate[self.predict_sub_labels]
+        not_selected = np.argwhere(selected==0).squeeze()
+        norm_rate = sample_rate[not_selected]/np.sum(sample_rate[not_selected])
+        s_idxs = np.random.choice(not_selected, p=norm_rate, size=budget, replace=False)
+        if return_scores:
+            scores = sample_rate[s_idxs]
+            return s_idxs, scores
+        return s_idxs
