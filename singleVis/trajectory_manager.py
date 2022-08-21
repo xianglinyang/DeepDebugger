@@ -8,7 +8,7 @@ class TrajectoryManager:
         Parameters
         ----------
         samples: ndarray, shape(train_num, repr_dim)
-        embeddings_2d : ndarray, shape (epoch_num, train_num, 2)
+        embeddings_2d : ndarray, shape (train_num, epoch_num, 2)
             all 2d embeddings of representations by timevis
         cls_num: int 
             the number of classes to cluster
