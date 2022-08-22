@@ -1,5 +1,6 @@
 import numpy as np
 from sklearn.cluster import Birch
+# TODO random ignore
 
 class TrajectoryManager:
     def __init__(self, samples, embeddings_2d, cls_num, period=100, metric="a"):
@@ -46,10 +47,8 @@ class TrajectoryManager:
     def sample_batch(self, budget):
         not_selected = np.argwhere(self.selected==0).squeeze()
         s_idxs = np.random.choice(not_selected, size=budget)
-        # update parameters
-        self.selected[s_idxs] = 1
         return s_idxs
-    
+        
     def sample_normal(self, budget):
         # sample class
         normal_rate = 1 - self.sample_rate
@@ -59,12 +58,12 @@ class TrajectoryManager:
         # select one
         normed_rate = sample_rate[not_selected]/np.sum(sample_rate[not_selected])
         s_idxs = np.random.choice(not_selected, p=normed_rate,size=budget)
-        # update parameters
-        self.selected[s_idxs] = 1
         return s_idxs
     
-    def manual_select(self, idxs):
-        self.selected[idxs] = 1
+    def update_belief(self, idxs):
+        # update parameters
+        if len(idxs)>0:
+            self.selected[idxs] = 1
     
 
 class FeedbackTrajectoryManager(TrajectoryManager):
@@ -97,7 +96,8 @@ class FeedbackTrajectoryManager(TrajectoryManager):
             acc_num = np.sum(acc_rate[cls_idxs])
             rej_num = np.sum(rej_rate[cls_idxs])
             query_sum = acc_num + rej_num
-            exploit_rate[cls] = acc_num/query_sum
+            if query_sum > 0:
+                exploit_rate[cls] = acc_num/query_sum
             explore_rate[cls] = 1 - query_sum/len(cls_idxs)
         
         # remove clean cls
@@ -132,7 +132,7 @@ class TBSampling(TrajectoryManager):
         selected[acc_idxs] = 1.
         selected[rej_idxs] = 1.
         if len(np.intersect1d(acc_idxs, rej_idxs))>0:
-            raise Error("Intersection between acc idxs and rej idxs!")
+            raise Exception("Intersection between acc idxs and rej idxs!")
         
         sample_rate = self.sample_rate[self.predict_sub_labels]
         not_selected = np.argwhere(selected==0).squeeze()
@@ -158,7 +158,7 @@ class FeedbackSampling(TrajectoryManager):
         selected[acc_idxs] = 1.
         selected[rej_idxs] = 1.
         if len(np.intersect1d(acc_idxs, rej_idxs))>0:
-            raise Error("Intersection between acc idxs and rej idxs!")
+            raise Exception("Intersection between acc idxs and rej idxs!")
 
         exploit_rate = np.zeros(self.cls_num)
         explore_rate = np.zeros(self.cls_num)
@@ -167,7 +167,8 @@ class FeedbackSampling(TrajectoryManager):
             acc_num = np.sum(acc_rate[cls_idxs])
             rej_num = np.sum(rej_rate[cls_idxs])
             query_sum = acc_num + rej_num
-            exploit_rate[cls] = acc_num/query_sum
+            if query_sum > 0:
+                exploit_rate[cls] = acc_num/query_sum
             explore_rate[cls] = 1 - query_sum/len(cls_idxs)
         
         # remove clean cls
