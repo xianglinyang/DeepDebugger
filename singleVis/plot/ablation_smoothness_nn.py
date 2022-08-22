@@ -11,7 +11,7 @@ import seaborn as sns
 def main():
     # hyperparameters
     datasets = ["mnist", "fmnist", "cifar10"]
-    selected_epochs_dict = {"mnist":[4,5,6,10],"fmnist":[2,4,6,11], "cifar10":[3,9,18,41]}
+    selected_epochs_dict = {"mnist":[5],"fmnist":[2,6,11], "cifar10":[3,9,18,41]}
     k_neighbors = [15]
 
     col = np.array(["dataset", "method", "type", "hue", "k", "period", "eval"])

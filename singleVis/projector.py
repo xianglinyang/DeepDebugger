@@ -13,17 +13,17 @@ class Projector:
         self.current_range = (-1,-1)
 
     def load(self, iteration):
-        # (s,e]
-        init_s = self.segments[0][0]
-        if (iteration > self.current_range[0] and iteration <=self.current_range[1]) or (iteration == init_s and self.current_range[0] == init_s):
+        # [s,e)
+        init_e = self.segments[-1][1]
+        if (iteration >= self.current_range[0] and iteration <self.current_range[1]) or (iteration == init_e and self.current_range[1] == init_e):
             print("Same range as current visualization model...")
             return 
         # else
         for i in range(len(self.segments)):
             s = self.segments[i][0]
             e = self.segments[i][1]
-            # range (s,e]
-            if (iteration > s and iteration <= e) or (iteration == init_s and s == init_s):
+            # range [s,e)
+            if (iteration >= s and iteration < e) or (iteration == init_e and e == init_e):
                 idx = i
                 break
         file_path = os.path.join(self.content_path, "Model", "tnn_hybrid_{}.pth".format(idx))
@@ -79,22 +79,23 @@ class DenseALProjector(Projector):
         self.vis_model_name = vis_model_name
 
     def load(self, iteration, epoch):
+        # [s,e)
         curr_iteration, curr_s, curr_e = self.current_range
         segment_path = os.path.join(self.content_path, "Model", "Iteration_{}".format(iteration), "segments.json")
         with open(segment_path, "r") as f:
             segments = json.load(f)
-        init_s = segments[0][0]
-        # (s, e]
+        init_e = segments[-1][2]
+        # [s,e)
         if iteration == curr_iteration:
-            if (curr_s==init_s and epoch == curr_s) or (epoch > curr_s and epoch <= curr_e):
+            if (curr_e==init_e and epoch == curr_e) or (epoch >= curr_s and epoch < curr_e):
                 print("Same range as current visualization model...")
                 return
         
         for i in range(len(segments)):
             s = segments[i][0]
             e = segments[i][1]
-            # range (s, e]
-            if (epoch > s and epoch <= e) or (s == init_s and epoch == s):
+            # range [s, e)
+            if (epoch >= s and epoch < e) or (e == init_e and epoch == e):
                 idx = i
                 break
         file_path = os.path.join(self.content_path, "Model","Iteration_{}".format(iteration), "{}_{}.pth".format(self.vis_model_name, idx))
