@@ -12,6 +12,7 @@ def main():
     # hyperparameters
     datasets = ["mnist", "fmnist", "cifar10"]
     selected_epochs_dict = {"mnist":[4, 12, 20],"fmnist":[10,30,50], "cifar10":[40, 120,200]}
+    selected_epochs_dict = {"mnist":[5],"fmnist":[2,6,11], "cifar10":[3,9,18,41]}
 
     col = np.array(["dataset", "method", "type", "hue","period", "eval"])
     df = pd.DataFrame({}, columns=col)
@@ -25,7 +26,7 @@ def main():
         eval_path = "/home/xianglin/projects/DVI_data/resnet18_{}/Model/test_evaluation_hybrid.json".format(dataset)
         with open(eval_path, "r") as f:
                 eval = json.load(f)
-        for epoch_id in range(3):
+        for epoch_id in range(len(selected_epochs)):
             epoch = selected_epochs[epoch_id]
             nn_train = round(eval["ppr_train"][str(epoch)], 3)
             nn_test = round(eval["ppr_test"][str(epoch)], 3)
@@ -40,7 +41,7 @@ def main():
         eval_path = "/home/xianglin/projects/DVI_data/resnet18_{}/Model/without_smoothness/test_evaluation_hybrid.json".format(dataset)
         with open(eval_path, "r") as f:
                 eval = json.load(f)
-        for epoch_id in range(3):
+        for epoch_id in range(len(selected_epochs)):
             epoch = selected_epochs[epoch_id]
             nn_train = round(eval["ppr_train"][str(epoch)], 3)
             nn_test = round(eval["ppr_test"][str(epoch)], 3)
@@ -52,7 +53,7 @@ def main():
         eval_path = "/home/xianglin/projects/DVI_data/resnet18_{}/Model/without_tl/test_evaluation_hybrid.json".format(dataset)
         with open(eval_path, "r") as f:
                 eval = json.load(f)
-        for epoch_id in range(3):
+        for epoch_id in range(len(selected_epochs)):
             epoch = selected_epochs[epoch_id]
             nn_train = round(eval["ppr_train"][str(epoch)], 3)
             nn_test = round(eval["ppr_test"][str(epoch)], 3)
@@ -108,15 +109,15 @@ def main():
     mpl.pyplot.setp(fg._legend.get_texts(), fontsize='10')
 
     axs = fg.axes[0]
-    max_ = df["eval"].max()
+    # max_ = df["eval"].max()
     # min_ = df["eval"].min()
-    axs[0].set_ylim(0., max_*1.1)
+    # axs[0].set_ylim(0., max_*1.1)
     axs[0].set_title("MNIST")
     axs[1].set_title("FMNIST")
     axs[2].set_title("CIFAR-10")
 
     (fg.despine(bottom=False, right=False, left=False, top=False)
-        .set_xticklabels(['Begin', 'Mid', 'End'])
+        # .set_xticklabels(['Begin', 'Mid', 'End'])
         .set_axis_labels("Period", "")
         )
     # fg.fig.suptitle("NN preserving property")
