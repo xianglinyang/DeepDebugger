@@ -3,7 +3,7 @@ from sklearn.cluster import Birch
 # TODO random ignore
 
 class TrajectoryManager:
-    def __init__(self, samples, embeddings_2d, cls_num, period=100, metric="a"):
+    def __init__(self, embeddings_2d, cls_num, period=100, metric="a"):
         """ trajectory manager with no feedback
         Parameters
         ----------
@@ -15,7 +15,6 @@ class TrajectoryManager:
         period: int
             We only look at the last *period* epochs of trajectory
         """
-        self.samples = samples
         self.embeddings_2d = embeddings_2d
         train_num,time_steps, _ = embeddings_2d.shape
         self.train_num = train_num
@@ -67,8 +66,8 @@ class TrajectoryManager:
     
 
 class FeedbackTrajectoryManager(TrajectoryManager):
-    def __init__(self, samples, embeddings_2d, cls_num, period=100, metric="a"):
-        super().__init__(samples, embeddings_2d, cls_num, period, metric)
+    def __init__(self, embeddings_2d, cls_num, period=100, metric="a"):
+        super().__init__(embeddings_2d, cls_num, period, metric)
     
     def clustered(self):
         super().clustered()
@@ -124,8 +123,8 @@ class FeedbackTrajectoryManager(TrajectoryManager):
 
 class TBSampling(TrajectoryManager):
     """with no memory, for user study"""
-    def __init__(self, samples, embeddings_2d, cls_num, period=100, metric="a"):
-        super().__init__(samples, embeddings_2d, cls_num, period, metric)
+    def __init__(self, embeddings_2d, cls_num, period=100, metric="a"):
+        super().__init__(embeddings_2d, cls_num, period, metric)
 
     def sample_batch(self, acc_idxs, rej_idxs, budget, return_scores=True):
         selected = np.zeros(self.train_num)
@@ -146,8 +145,8 @@ class TBSampling(TrajectoryManager):
 
 class FeedbackSampling(TrajectoryManager):
     """with no memory, for user study"""
-    def __init__(self, samples, embeddings_2d, cls_num, period=100, metric="a"):
-        super().__init__(samples, embeddings_2d, cls_num, period, metric)
+    def __init__(self, embeddings_2d, cls_num, period=100, metric="a"):
+        super().__init__(embeddings_2d, cls_num, period, metric)
 
     def sample_batch(self, acc_idxs, rej_idxs, budget, return_scores=True):
         acc_rate = np.zeros(self.train_num)
