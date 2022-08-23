@@ -54,7 +54,7 @@ class TrajectoryManager:
         normal_rate = 1 - self.sample_rate
         sample_rate = normal_rate[self.predict_sub_labels]
         # check how many left
-        not_selected = np.argwhere(self.selected==0)
+        not_selected = np.argwhere(self.selected==0).squeeze()
         # select one
         normed_rate = sample_rate[not_selected]/np.sum(sample_rate[not_selected])
         s_idxs = np.random.choice(not_selected, p=normed_rate,size=budget)
@@ -84,15 +84,18 @@ class FeedbackTrajectoryManager(TrajectoryManager):
 
         acc_rate = np.zeros(self.train_num)
         rej_rate = np.zeros(self.train_num)
-        acc_rate[acc_idxs]=1.
-        rej_rate[rej_idxs]=1.
+        if len(acc_idxs)>0:
+            acc_rate[acc_idxs]=1.
+        if len(rej_idxs)>0:
+            rej_rate[rej_idxs]=1.
+
         if len(np.intersect1d(acc_idxs, rej_idxs))>0:
             raise Exception("Intersection between acc idxs and rej idxs!")
 
         exploit_rate = np.zeros(self.cls_num)
         explore_rate = np.zeros(self.cls_num)
         for cls in range(self.cls_num):
-            cls_idxs = np.argwhere(self.predict_sub_labels==cls)
+            cls_idxs = np.argwhere(self.predict_sub_labels==cls).squeeze()
             acc_num = np.sum(acc_rate[cls_idxs])
             rej_num = np.sum(rej_rate[cls_idxs])
             query_sum = acc_num + rej_num
@@ -115,11 +118,10 @@ class FeedbackTrajectoryManager(TrajectoryManager):
     def update_belief(self, acc_idxs, rej_idxs):
         if len(acc_idxs)>0:
             self.user_acc[acc_idxs]=1
+            self.selected[acc_idxs] = 1
         if len(rej_idxs)>0:
             self.user_rej[rej_idxs]=1
-        # update parameters
-        self.selected[acc_idxs] = 1
-        self.selected[rej_idxs] = 1
+            self.selected[rej_idxs] = 1
     
 
 class TBSampling(TrajectoryManager):
@@ -129,8 +131,10 @@ class TBSampling(TrajectoryManager):
 
     def sample_batch(self, acc_idxs, rej_idxs, budget, return_scores=True):
         selected = np.zeros(self.train_num)
-        selected[acc_idxs] = 1.
-        selected[rej_idxs] = 1.
+        if len(acc_idxs)>0:
+            selected[acc_idxs] = 1.
+        if len(rej_idxs)>0:
+            selected[rej_idxs] = 1.
         if len(np.intersect1d(acc_idxs, rej_idxs))>0:
             raise Exception("Intersection between acc idxs and rej idxs!")
         
@@ -152,18 +156,20 @@ class FeedbackSampling(TrajectoryManager):
     def sample_batch(self, acc_idxs, rej_idxs, budget, return_scores=True):
         acc_rate = np.zeros(self.train_num)
         rej_rate = np.zeros(self.train_num)
-        acc_rate[acc_idxs]=1.
-        rej_rate[rej_idxs]=1.
         selected = np.zeros(self.train_num)
-        selected[acc_idxs] = 1.
-        selected[rej_idxs] = 1.
+        if len(acc_idxs)>0:
+            acc_rate[acc_idxs]=1.
+            selected[acc_idxs] = 1.
+        if len(rej_idxs)>0:
+            rej_rate[rej_idxs]=1.
+            selected[rej_idxs] = 1.
         if len(np.intersect1d(acc_idxs, rej_idxs))>0:
             raise Exception("Intersection between acc idxs and rej idxs!")
 
         exploit_rate = np.zeros(self.cls_num)
         explore_rate = np.zeros(self.cls_num)
         for cls in range(self.cls_num):
-            cls_idxs = np.argwhere(self.predict_sub_labels==cls)
+            cls_idxs = np.argwhere(self.predict_sub_labels==cls).squeeze()
             acc_num = np.sum(acc_rate[cls_idxs])
             rej_num = np.sum(rej_rate[cls_idxs])
             query_sum = acc_num + rej_num
