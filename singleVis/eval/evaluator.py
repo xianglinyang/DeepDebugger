@@ -289,6 +289,8 @@ class Evaluator:
 
             high_dists = np.linalg.norm(high_embeddings - high_embeddings[(epoch - start) //  period], axis=1)
             low_dists = np.linalg.norm(low_embeddings - low_embeddings[(epoch - start) //  period], axis=1)
+            # high_r = np.argsort(high_dists)
+            # low_r = np.argsort(low_dists)
             corr, p = stats.spearmanr(high_dists, low_dists)
             corrs[i] = corr
             ps[i] = p
@@ -318,6 +320,8 @@ class Evaluator:
             low_embeddings = low_repr[:,i,:].squeeze()
             high_dists = np.linalg.norm(high_embeddings - high_embeddings[e], axis=1)
             low_dists = np.linalg.norm(low_embeddings - low_embeddings[e], axis=1)
+            # high_r = np.argsort(high_dists)
+            # low_r = np.argsort(low_dists)
             corr, p = stats.spearmanr(high_dists, low_dists)
             corrs[i] = corr
             ps[i] = p
@@ -619,10 +623,10 @@ class Evaluator:
         #     evaluation["b_train"] = dict()
         # if "b_test" not in evaluation:
         #     evaluation["b_test"] = dict()
-        # if "ppr_train" not in evaluation.keys():
-        #     evaluation["ppr_train"] = dict()
-        # if "ppr_test" not in evaluation.keys():
-        #     evaluation["ppr_test"] = dict()
+        if "ppr_train" not in evaluation.keys():
+            evaluation["ppr_train"] = dict()
+        if "ppr_test" not in evaluation.keys():
+            evaluation["ppr_test"] = dict()
         # if "tnn_train" not in evaluation.keys():
         #     evaluation["tnn_train"] = dict()
         # if "tnn_test" not in evaluation.keys():
@@ -632,20 +636,20 @@ class Evaluator:
         # if "tr_test" not in evaluation.keys():
         #     evaluation["tr_test"] = dict()   
         epoch_key = str(n_epoch)
-        # if epoch_key not in evaluation["nn_train"]:
-        #     evaluation["nn_train"][epoch_key] = dict()
-        # evaluation["nn_train"][epoch_key][n_key] = self.eval_nn_train(n_epoch, n_neighbors)
-        # if epoch_key not in evaluation["nn_test"]:
-        #     evaluation["nn_test"][epoch_key] = dict()
-        # evaluation["nn_test"][epoch_key][n_key] = self.eval_nn_test(n_epoch, n_neighbors)
+        if epoch_key not in evaluation["nn_train"]:
+            evaluation["nn_train"][epoch_key] = dict()
+        evaluation["nn_train"][epoch_key][n_key] = self.eval_nn_train(n_epoch, n_neighbors)
+        if epoch_key not in evaluation["nn_test"]:
+            evaluation["nn_test"][epoch_key] = dict()
+        evaluation["nn_test"][epoch_key][n_key] = self.eval_nn_test(n_epoch, n_neighbors)
         # if epoch_key not in evaluation["b_train"]:
         #     evaluation["b_train"][epoch_key] = dict()
         # evaluation["b_train"][epoch_key][n_key] = self.eval_b_train(n_epoch, n_neighbors)
         # if epoch_key not in evaluation["b_test"]:
         #     evaluation["b_test"][epoch_key] = dict()
         # evaluation["b_test"][epoch_key][n_key] = self.eval_b_test(n_epoch, n_neighbors)
-        # evaluation["ppr_train"][epoch_key] = self.eval_inv_train(n_epoch)
-        # evaluation["ppr_test"][epoch_key] = self.eval_inv_test(n_epoch)
+        evaluation["ppr_train"][epoch_key] = self.eval_inv_train(n_epoch)
+        evaluation["ppr_test"][epoch_key] = self.eval_inv_test(n_epoch)
 
         evaluation["train_acc"][epoch_key] = self.train_acc(n_epoch)
         evaluation["test_acc"][epoch_key] = self.test_acc(n_epoch)
@@ -713,10 +717,10 @@ class SegEvaluator(Evaluator):
         #     evaluation["b_train"] = dict()
         # if "b_test" not in evaluation:
         #     evaluation["b_test"] = dict()
-        # if "ppr_train" not in evaluation.keys():
-        #     evaluation["ppr_train"] = dict()
-        # if "ppr_test" not in evaluation.keys():
-        #     evaluation["ppr_test"] = dict()
+        if "ppr_train" not in evaluation.keys():
+            evaluation["ppr_train"] = dict()
+        if "ppr_test" not in evaluation.keys():
+            evaluation["ppr_test"] = dict()
         # if "tnn_train" not in evaluation.keys():
         #     evaluation["tnn_train"] = dict()
         # if "tnn_test" not in evaluation.keys():
@@ -727,20 +731,20 @@ class SegEvaluator(Evaluator):
             evaluation["tr_test"] = dict()  
 
         epoch_key = str(n_epoch)
-        # if epoch_key not in evaluation["nn_train"]:
-        #     evaluation["nn_train"][epoch_key] = dict()
-        # evaluation["nn_train"][epoch_key][n_key] = self.eval_nn_train(n_epoch, n_neighbors)
-        # if epoch_key not in evaluation["nn_test"]:
-        #     evaluation["nn_test"][epoch_key] = dict()
-        # evaluation["nn_test"][epoch_key][n_key] = self.eval_nn_test(n_epoch, n_neighbors)
+        if epoch_key not in evaluation["nn_train"]:
+            evaluation["nn_train"][epoch_key] = dict()
+        evaluation["nn_train"][epoch_key][n_key] = self.eval_nn_train(n_epoch, n_neighbors)
+        if epoch_key not in evaluation["nn_test"]:
+            evaluation["nn_test"][epoch_key] = dict()
+        evaluation["nn_test"][epoch_key][n_key] = self.eval_nn_test(n_epoch, n_neighbors)
         # if epoch_key not in evaluation["b_train"]:
         #     evaluation["b_train"][epoch_key] = dict()
         # evaluation["b_train"][epoch_key][n_key] = self.eval_b_train(n_epoch, n_neighbors)
         # if epoch_key not in evaluation["b_test"]:
         #     evaluation["b_test"][epoch_key] = dict()
         # evaluation["b_test"][epoch_key][n_key] = self.eval_b_test(n_epoch, n_neighbors)
-        # evaluation["ppr_train"][epoch_key] = self.eval_inv_train(n_epoch)
-        # evaluation["ppr_test"][epoch_key] = self.eval_inv_test(n_epoch)
+        evaluation["ppr_train"][epoch_key] = self.eval_inv_train(n_epoch)
+        evaluation["ppr_test"][epoch_key] = self.eval_inv_test(n_epoch)
 
         # local temporal
         # if epoch_key not in evaluation["tnn_train"].keys():
@@ -777,44 +781,6 @@ class SegEvaluator(Evaluator):
         f.close()
         return evaluation
 
-class ALEvaluator(Evaluator):
-    def __init__(self, data_provider, projector, verbose=1):
-        super().__init__(data_provider, projector, verbose)
-
-    def train_acc(self, epoch):
-        data = self.data_provider.train_representation_lb(epoch)
-        labels = self.data_provider.train_labels_lb(epoch)
-        pred = self.data_provider.get_pred(epoch, data).argmax(1)
-        return np.sum(labels==pred)/len(labels)
-
-    #################################### helper functions #############################################
-
-    def save_epoch_eval(self, n_epoch, file_name="evaluation"):
-        # save result
-        save_dir = os.path.join(self.data_provider.model_path)
-        save_file = os.path.join(save_dir, file_name + ".json")
-        if not os.path.exists(save_file):
-            evaluation = dict()
-        else:
-            f = open(save_file, "r")
-            evaluation = json.load(f)
-            f.close()
-        if "train_acc" not in evaluation.keys():
-            evaluation["train_acc"] = dict()
-        if "test_acc" not in evaluation.keys():
-            evaluation["test_acc"] = dict()
-        epoch_key = str(n_epoch)
-
-        evaluation["train_acc"][epoch_key] = self.train_acc(n_epoch)
-        evaluation["test_acc"][epoch_key] = self.test_acc(n_epoch)
-
-        with open(save_file, "w") as f:
-            json.dump(evaluation, f)
-        if self.verbose:
-            print("Successfully save evaluation for Iteration {}".format(epoch_key))
 
 
-class DenseALEvaluator(Evaluator):
-    # TODO
-    def __init__(self, data_provider, projector, verbose=1):
-        super().__init__(data_provider, projector, verbose)
+
