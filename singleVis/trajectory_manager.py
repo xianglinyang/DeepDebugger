@@ -231,15 +231,16 @@ class AnormalyDetector:
             self.cls_score[cls] = 1 - np.sum(self.predict_sub_labels==cls)/self.train_num
     
     def sample_batch_init(self, budget):
-        scores = (self.uncertainty + self.cls_scores[self.predict_sub_labels])/2
+        scores = (self.uncertainty + self.cls_score[self.predict_sub_labels])/2
         norm_rate = scores/np.sum(scores)
         s_idxs = np.random.choice(self.train_num, p=norm_rate, size=budget, replace=False)
         return s_idxs, scores
     
     def sample_batch(self, acc_idxs, rej_idxs, budget):
         s1 = self.uncertainty
-        s2 = self.cls_scores[self.predict_sub_labels]
-        X = np.concatenate((s1, s2), axis=1)
+        s2 = self.cls_score[self.predict_sub_labels]
+        X = np.concatenate((s1, s2), axis=0)
+        
 
         exp_idxs = np.concatenate((acc_idxs, rej_idxs), axis=0)
         target_X = X[exp_idxs]
@@ -254,5 +255,3 @@ class AnormalyDetector:
         args = np.argsort(remain_scores)[-budget:]
         selected_idxs = not_selected[args]
         return selected_idxs, scores[selected_idxs]
-
-
