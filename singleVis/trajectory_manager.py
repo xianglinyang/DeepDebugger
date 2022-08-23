@@ -188,7 +188,7 @@ class FeedbackSampling(TrajectoryManager):
             return s_idxs, scores
         return s_idxs
 
-class AnormalyDetector:
+class Recommender:
     def __init__(self, uncertainty, embeddings_2d, cls_num, period=100, metric="a"):
         """ trajectory manager with no feedback
         Parameters
@@ -230,18 +230,27 @@ class AnormalyDetector:
         for cls in range(self.cls_num):
             self.cls_scores[cls] = 1 - np.sum(self.predict_sub_labels==cls)/self.train_num
     
-    def sample_batch_init(self, budget):
+    def sample_batch_init(self, acc_idxs, rej_idxs, budget):
         scores = (self.uncertainty + self.cls_scores[self.predict_sub_labels])/2
-        norm_rate = scores/np.sum(scores)
-        s_idxs = np.random.choice(self.train_num, p=norm_rate, size=budget, replace=False)
-        return s_idxs, scores
+        selected = np.zeros(self.train_num)
+        if len(acc_idxs)>0:
+            selected[acc_idxs] = 1.
+        if len(rej_idxs)>0:
+            selected[rej_idxs] = 1.
+        if len(np.intersect1d(acc_idxs, rej_idxs))>0:
+            raise Exception("Intersection between acc idxs and rej idxs!")
+        not_selected_idxs = np.argwhere(selected==0).squeeze()
+        norm_rate = scores[not_selected_idxs]/np.sum(scores[not_selected_idxs])
+        s_idxs = np.random.choice(not_selected_idxs, p=norm_rate, size=budget, replace=False)
+        return s_idxs, scores[s_idxs]
     
     def sample_batch(self, acc_idxs, rej_idxs, budget):
+        if len(np.intersect1d(acc_idxs, rej_idxs))>0:
+            raise Exception("Intersection between acc idxs and rej idxs!")
+            
         s1 = self.uncertainty
         s2 = self.cls_scores[self.predict_sub_labels]
-        # X = np.concatenate((s1, s2), axis=1)
         X = np.vstack((s1,s2)).transpose([1,0])
-
 
         exp_idxs = np.concatenate((acc_idxs, rej_idxs), axis=0)
         target_X = X[exp_idxs]
@@ -254,5 +263,42 @@ class AnormalyDetector:
         not_selected = np.setdiff1d(np.arange(self.train_num), exp_idxs)
         remain_scores = scores[not_selected]
         args = np.argsort(remain_scores)[-budget:]
+        selected_idxs = not_selected[args]
+        return selected_idxs, scores[selected_idxs]
+    
+    def sample_batch_normal_init(self, acc_idxs, rej_idxs, budget):
+        scores = (self.uncertainty + self.cls_scores[self.predict_sub_labels])/2
+        selected = np.zeros(self.train_num)
+        if len(acc_idxs)>0:
+            selected[acc_idxs] = 1.
+        if len(rej_idxs)>0:
+            selected[rej_idxs] = 1.
+        if len(np.intersect1d(acc_idxs, rej_idxs))>0:
+            raise Exception("Intersection between acc idxs and rej idxs!")
+        not_selected_idxs = np.argwhere(selected==0).squeeze()
+
+        norm_rate = (1 - scores[not_selected_idxs])/np.sum((1 - scores[not_selected_idxs]))
+        s_idxs = np.random.choice(not_selected_idxs, p=norm_rate, size=budget, replace=False)
+        return s_idxs, scores[s_idxs]
+    
+    def sample_batch_normal(self, acc_idxs, rej_idxs, budget):
+        if len(np.intersect1d(acc_idxs, rej_idxs))>0:
+            raise Exception("Intersection between acc idxs and rej idxs!")
+            
+        s1 = self.uncertainty
+        s2 = self.cls_scores[self.predict_sub_labels]
+        X = np.vstack((s1,s2)).transpose([1,0])
+
+        exp_idxs = np.concatenate((acc_idxs, rej_idxs), axis=0)
+        target_X = X[exp_idxs]
+        target_Y = np.zeros(len(exp_idxs))
+        target_Y[:len(acc_idxs)] = 1
+        krr = KernelRidge(alpha=1.0)
+        krr.fit(target_X, target_Y)
+        scores = krr.predict(X)
+
+        not_selected = np.setdiff1d(np.arange(self.train_num), exp_idxs)
+        remain_scores = scores[not_selected]
+        args = np.argsort(remain_scores)[:budget]
         selected_idxs = not_selected[args]
         return selected_idxs, scores[selected_idxs]

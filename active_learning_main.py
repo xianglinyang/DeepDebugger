@@ -16,14 +16,14 @@ from singleVis.losses import SingleVisLoss, UmapLoss, ReconstructionLoss
 from singleVis.edge_dataset import DataHandler
 from singleVis.trainer import SingleVisTrainer
 from singleVis.data import ActiveLearningDataProvider
-from singleVis.eval.evaluator import Evaluator
+from singleVis.eval.evaluator import ALEvaluator
 from singleVis.spatial_edge_constructor import SingleEpochSpatialEdgeConstructor
 from singleVis.projector import ALProjector
 ########################################################################################################################
 #                                                     LOAD PARAMETERS                                                  #
 ########################################################################################################################
 parser = argparse.ArgumentParser(description='Process hyperparameters...')
-parser.add_argument('--content_path', type=str, default="/home/xianglin/projects/DVI_data/active_learning/base/resnet18/CIFAR10/")
+parser.add_argument('--content_path', type=str, default="/home/xianglin/DVI_data/active_learning/random/resnet18/CIFAR10")
 parser.add_argument('-g',"--gpu_id", type=int, choices=[0,1], default=0)
 parser.add_argument('-i',"--iteration", type=int)
 
@@ -86,8 +86,7 @@ criterion = SingleVisLoss(umap_loss_fn, recon_loss_fn, lambd=LAMBDA)
 
 optimizer = torch.optim.Adam(model.parameters(), lr=.01, weight_decay=1e-5)
 lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=4, gamma=.1)
-projector = ALProjector(vis_model=model, content_path=CONTENT_PATH, vis_model_name="al.pth", device=DEVICE)
-
+projector = ALProjector(vis_model=model, content_path=CONTENT_PATH, vis_model_name=VIS_MODEL_NAME, device=DEVICE)
 
 t0 = time.time()
 spatial_cons = SingleEpochSpatialEdgeConstructor(data_provider, iteration, 5, 0, 15)
@@ -148,13 +147,13 @@ with open(save_dir, 'w') as f:
     json.dump(evaluation, f)
 save_dir = os.path.join(data_provider.model_path, "Iteration_{}".format(iteration))
 os.system("mkdir -p {}".format(save_dir))
-trainer.save(save_dir=save_dir, file_name="al")
+trainer.save(save_dir=save_dir, file_name=VIS_MODEL_NAME)
     
 # ########################################################################################################################
 # #                                                       EVALUATION                                                     #
 # ########################################################################################################################
-# evaluator = Evaluator(data_provider, projector)
-# evaluator.save_epoch_eval(iteration, 15, temporal_k=5, file_name="test_evaluation_al")
+evaluator = ALEvaluator(data_provider, projector)
+evaluator.save_epoch_eval(iteration, file_name=EVALUATION_NAME)
 
 ########################################################################################################################
 #                                                      VISUALIZATION                                                   #
