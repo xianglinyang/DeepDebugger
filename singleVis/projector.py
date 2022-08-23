@@ -84,7 +84,7 @@ class DenseALProjector(Projector):
         segment_path = os.path.join(self.content_path, "Model", "Iteration_{}".format(iteration), "segments.json")
         with open(segment_path, "r") as f:
             segments = json.load(f)
-        init_e = segments[-1][2]
+        init_e = segments[-1][1]
         # [s,e)
         if iteration == curr_iteration:
             if (curr_e==init_e and epoch == curr_e) or (epoch >= curr_s and epoch < curr_e):
