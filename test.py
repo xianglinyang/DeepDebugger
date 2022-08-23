@@ -124,15 +124,16 @@ EVAL_EPOCH_DICT = {
     "cifar10":[40,120,200]
 }
 EVAL_EPOCH_DICT = {
-    "cifar10": [3,9,18,41],
-    "fmnist": [2,4,6,11],
-    "mnist":[4,5,6]
-}
-EVAL_EPOCH_DICT = {
     "mnist":[1,2,3,10,15, 20],
     "fmnist":[1,2,3,4,5,15,20,25,40,45,50],
     "cifar10":[1,5,10,20,30,100, 150, 190,200]
 }
+EVAL_EPOCH_DICT = {
+    "mnist":[1,4,5,12,20],
+    "fmnist":[1,2,6,10,11,30,50],
+    "cifar10":[1,3,9,18,40,41,100,120,200]
+}
+# EVAL_EPOCH_DICT = {"mnist":[5],"fmnist":[2,6,11], "cifar10":[3,9,18,41]}
 eval_epochs = EVAL_EPOCH_DICT[DATASET]
 
 evaluator = Evaluator(data_provider, projector)
