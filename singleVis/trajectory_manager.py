@@ -238,9 +238,10 @@ class AnormalyDetector:
     
     def sample_batch(self, acc_idxs, rej_idxs, budget):
         s1 = self.uncertainty
-        s2 = self.cls_score[self.predict_sub_labels]
-        X = np.concatenate((s1, s2), axis=0)
-        
+        s2 = self.cls_scores[self.predict_sub_labels]
+        # X = np.concatenate((s1, s2), axis=1)
+        X = np.hstack((s1,s2)).transpose([1,0])
+
 
         exp_idxs = np.concatenate((acc_idxs, rej_idxs), axis=0)
         target_X = X[exp_idxs]
