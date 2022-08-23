@@ -39,6 +39,15 @@ class SingleVisTrainer:
         del self.edge_loader
         gc.collect()
         self.edge_loader = edge_loader
+    
+    def update_vis_model(self, model):
+        self.model.load_state_dict(model.state_dict())
+    
+    def update_optimizer(self, optimizer):
+        self.optimizer = optimizer
+    
+    def update_lr_scheduler(self, lr_scheduler):
+        self.lr_scheduler = lr_scheduler
 
     def train_step(self):
         self.model.to(device=self.DEVICE)
