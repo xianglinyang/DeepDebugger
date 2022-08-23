@@ -65,7 +65,7 @@ class ALProjector(Projector):
     def load(self, iteration):
         file_path=os.path.join(self.content_path, "Model", "Iteration_{}".format(iteration), self.vis_model_name+".pth")
 
-        save_model = torch.load(file_path, map_location=self.DEVICE)
+        save_model = torch.load(file_path, map_location=torch.device("cpu"))
         self.vis_model.load_state_dict(save_model["state_dict"])
         self.vis_model.to(self.DEVICE)
         self.vis_model.eval()
