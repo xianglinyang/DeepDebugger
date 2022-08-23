@@ -226,12 +226,12 @@ class AnormalyDetector:
         self.suspect_clean = np.argsort(np.bincount(self.predict_sub_labels))[-3:]
 
         # to be updated each time
-        self.cls_score = np.zeros(self.cls_num)
+        self.cls_scores = np.zeros(self.cls_num)
         for cls in range(self.cls_num):
-            self.cls_score[cls] = 1 - np.sum(self.predict_sub_labels==cls)/self.train_num
+            self.cls_scores[cls] = 1 - np.sum(self.predict_sub_labels==cls)/self.train_num
     
     def sample_batch_init(self, budget):
-        scores = (self.uncertainty + self.cls_score[self.predict_sub_labels])/2
+        scores = (self.uncertainty + self.cls_scores[self.predict_sub_labels])/2
         norm_rate = scores/np.sum(scores)
         s_idxs = np.random.choice(self.train_num, p=norm_rate, size=budget, replace=False)
         return s_idxs, scores
@@ -240,7 +240,7 @@ class AnormalyDetector:
         s1 = self.uncertainty
         s2 = self.cls_scores[self.predict_sub_labels]
         # X = np.concatenate((s1, s2), axis=1)
-        X = np.hstack((s1,s2)).transpose([1,0])
+        X = np.vstack((s1,s2)).transpose([1,0])
 
 
         exp_idxs = np.concatenate((acc_idxs, rej_idxs), axis=0)
