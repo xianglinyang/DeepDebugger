@@ -70,6 +70,9 @@ MAX_EPOCH = VISUALIZATION_PARAMETER["MAX_EPOCH"]
 # SEGMENTS = VISUALIZATION_PARAMETER["SEGMENTS"]
 # RESUME_SEG = VISUALIZATION_PARAMETER["RESUME_SEG"]
 
+VIS_MODEL_NAME = VISUALIZATION_PARAMETER["VIS_MODEL_NAME"]
+EVALUATION_NAME = VISUALIZATION_PARAMETER["EVALUATION_NAME"]
+
 # define hyperparameters
 DEVICE = torch.device("cuda:{}".format(GPU_ID) if torch.cuda.is_available() else "cpu")
 
@@ -96,7 +99,7 @@ criterion = HybridLoss(umap_loss_fn, recon_loss_fn, smooth_loss_fn, lambd1=LAMBD
 segmenter = Segmenter(data_provider=data_provider, threshold=78.5, range_s=EPOCH_START, range_e=EPOCH_END, range_p=EPOCH_PERIOD)
 
 
-# segment epoch
+# # segment epoch
 t0 = time.time()
 SEGMENTS = segmenter.segment()
 t1 = time.time()
@@ -105,7 +108,7 @@ print(SEGMENTS)
 projector = Projector(vis_model=model, content_path=CONTENT_PATH, segments=SEGMENTS, device=DEVICE)
 
 # save time result
-save_dir = os.path.join(data_provider.model_path, "SV_time_tnn_hybrid.json")
+save_dir = os.path.join(data_provider.model_path, "SV_time_{}.json".format(VIS_MODEL_NAME))
 if not os.path.exists(save_dir):
     evaluation = dict()
 else:
@@ -125,7 +128,7 @@ if RESUME_SEG in range(len(SEGMENTS)):
         prev_selected = json.load(f)
     with open(os.path.join(data_provider.content_path, "selected_idxs", "baseline.json".format(prev_epoch)), "r") as f:
         c0, d0 = json.load(f)
-    save_model_path = os.path.join(data_provider.model_path, "tnn_hybrid_{}.pth".format(RESUME_SEG))
+    save_model_path = os.path.join(data_provider.model_path, "{}_{}.pth".format(VIS_MODEL_NAME, RESUME_SEG))
     save_model = torch.load(save_model_path, map_location=torch.device("cpu"))
     model.load_state_dict(save_model["state_dict"])
     prev_data = torch.from_numpy(data_provider.train_representation(prev_epoch)[prev_selected]).to(dtype=torch.float32)
@@ -165,7 +168,7 @@ for seg in range(start_point,-1,-1):
     probs = probs[eliminate_zeros]
 
     # save result
-    save_dir = os.path.join(data_provider.model_path, "SV_time_tnn_hybrid.json")
+    save_dir = os.path.join(data_provider.model_path, "SV_time_{}.json".format(VIS_MODEL_NAME))
     if not os.path.exists(save_dir):
         evaluation = dict()
     else:
@@ -199,7 +202,7 @@ for seg in range(start_point,-1,-1):
     trainer.train(PATIENT, MAX_EPOCH)
     t3 = time.time()
     # save result
-    save_dir = os.path.join(data_provider.model_path, "SV_time_tnn_hybrid.json")
+    save_dir = os.path.join(data_provider.model_path, "SV_time_{}.json".format(VIS_MODEL_NAME))
     if not os.path.exists(save_dir):
         evaluation = dict()
     else:
@@ -212,7 +215,7 @@ for seg in range(start_point,-1,-1):
     evaluation["training"][str(seg)] = round(t3-t2, 3)
     with open(save_dir, 'w') as f:
         json.dump(evaluation, f)
-    trainer.save(save_dir=data_provider.model_path, file_name="tnn_hybrid_{}".format(seg))
+    trainer.save(save_dir=data_provider.model_path, file_name="{}_{}".format(VIS_MODEL_NAME, seg))
     model = trainer.model
 
     # update prev_idxs and prev_embedding
