@@ -4,6 +4,7 @@ import os
 import json
 import time
 import numpy as np
+import argparse
 
 from torch.utils.data import DataLoader
 from torch.utils.data import WeightedRandomSampler
@@ -20,15 +21,21 @@ from singleVis.temporal_edge_constructor import GlobalTemporalEdgeConstructor
 from singleVis.projector import DenseALProjector
 from singleVis.segmenter import DenseALSegmenter
 
-CONTENT_PATH = "/home/xianglin/DVI_data/active_learning/random/resnet18/CIFAR10"
-GPU_ID = "1"
-epoch_num = 200
-iteration = 1
+parser = argparse.ArgumentParser(description='Process hyperparameters...')
+parser.add_argument('--content_path', type=str)
+parser.add_argument('-g', type=str)
+parser.add_argument('-i', type=int)
+parser.add_argument('--epoch_num', type=int)
+args = parser.parse_args()
+
+CONTENT_PATH = args.content_path
+GPU_ID = args.g
+epoch_num = args.epoch_num
+iteration = args.i 
 
 sys.path.append(CONTENT_PATH)
 from config import config
 
-# %%
 SETTING = config["SETTING"]
 CLASSES = config["CLASSES"]
 DATASET = config["DATASET"]
