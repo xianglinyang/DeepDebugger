@@ -33,6 +33,10 @@ GPU_ID = args.g
 epoch_num = args.epoch_num
 iteration = args.i 
 
+# record output information
+now = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime(time.time())) 
+sys.stdout = open(os.path.join(CONTENT_PATH, "Model", "Iteration_{}".format(iteration), now+".txt"), "w")
+
 sys.path.append(CONTENT_PATH)
 from config import config
 
@@ -47,6 +51,7 @@ BASE_ITERATION =config["BASE_ITERATION"]
 
 # Training parameter (visualization model)
 VISUALIZATION_PARAMETER = config["VISUALIZATION"]
+PREPROCESS = VISUALIZATION_PARAMETER["PREPROCESS"]
 LAMBDA = VISUALIZATION_PARAMETER["LAMBDA"]
 S_LAMBDA = VISUALIZATION_PARAMETER["S_LAMBDA"]
 B_N_EPOCHS = VISUALIZATION_PARAMETER["BOUNDARY"]["B_N_EPOCHS"]
@@ -69,7 +74,8 @@ import Model.model as subject_model
 net = eval("subject_model.{}()".format(NET))
 
 data_provider = DenseActiveLearningDataProvider(CONTENT_PATH, net, BASE_ITERATION, epoch_num, split=-1, device=DEVICE, classes=CLASSES,verbose=1)
-data_provider._meta_data(iteration)
+if PREPROCESS:
+    data_provider._meta_data(iteration)
 
 model = SingleVisualizationModel(input_dims=512, output_dims=2, units=256, hidden_layer=HIDDEN_LAYER)
 negative_sample_rate = 5
