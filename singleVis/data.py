@@ -526,7 +526,7 @@ class ActiveLearningDataProvider(DataProvider):
         # load train data
         training_data_loc = os.path.join(self.content_path, "Training_data", "training_dataset_label.pth")
         try:
-            training_labels = torch.load(training_data_loc, map_location=self.DEVICE)
+            training_labels = torch.load(training_data_loc, map_location="cpu")
         except Exception as e:
             print("no train labels saved for Iteration {}".format(epoch))
             training_labels = None
@@ -576,6 +576,7 @@ class ActiveLearningDataProvider(DataProvider):
     
     def train_labels_ulb(self, epoch):
         # load train data
+        print("ULB TRAIN DATA")
         training_data_loc = os.path.join(self.content_path, "Training_data", "training_dataset_label.pth")
         index_file = os.path.join(self.model_path, "Iteration_{:d}".format(epoch), "index.json")
         lb_idxs = np.array(load_labelled_data_index(index_file))
@@ -606,15 +607,15 @@ class ActiveLearningDataProvider(DataProvider):
         # load train data
         testing_data_loc = os.path.join(self.content_path, "Testing_data", "testing_dataset_label.pth")
         try:
-            testing_labels = torch.load(testing_data_loc).to(device=self.DEVICE)
+            testing_labels = torch.load(testing_data_loc, map_location="cpu").numpy()
             index_file = os.path.join(self.model_path, "Iteration_{:d}".format(epoch), "test_index.json")
             if os.path.exists(index_file):
                 idxs = load_labelled_data_index(index_file)
                 testing_labels = testing_labels[idxs]
         except Exception as e:
-            print("no train labels saved for Iteration {}".format(epoch))
+            print("no test labels saved for Iteration {}".format(epoch))
             testing_labels = None
-        return testing_labels.cpu().numpy()
+        return testing_labels
 
     def border_representation(self, epoch):
         border_centers_loc = os.path.join(self.model_path, "Iteration_{:d}".format(epoch),
