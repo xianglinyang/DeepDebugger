@@ -27,7 +27,7 @@ class Projector:
                 idx = i
                 break
         file_path = os.path.join(self.content_path, "Model", "tnn_hybrid_{}.pth".format(idx))
-        save_model = torch.load(file_path, map_location=self.DEVICE)
+        save_model = torch.load(file_path, map_location="cpu")
         self.vis_model.load_state_dict(save_model["state_dict"])
         self.vis_model.to(self.DEVICE)
         self.vis_model.eval()
@@ -52,7 +52,7 @@ class Projector:
     
     def individual_inverse(self, iteration, embedding):
         self.load(iteration)
-        data = self.vis_model.decoder(torch.from_numpy(np.expand_dims(embedding, axis=0)).to(dtype=torch.float32, device=self.DEVICE)).cpu().detach().numpy()
+        data = self.vis_model.decoder(torch.from_numpy(np.expand_dims(embedding, axis=0)).to(dtype=torch.float32, device="cpu")).cpu().detach().numpy()
         return data.squeeze(axis=0)
 
 
@@ -98,7 +98,7 @@ class DenseALProjector(Projector):
             if (epoch >= s and epoch < e) or (e == init_e and epoch == e):
                 idx = i
                 break
-        file_path = os.path.join(self.content_path, "Model","Iteration_{}".format(iteration), "{}_{}.pth".format(self.vis_model_name, idx))
+        file_path = os.path.join(self.content_path, "Model", "Iteration_{}".format(iteration), "{}_{}.pth".format(self.vis_model_name, idx))
         save_model = torch.load(file_path, map_location=self.DEVICE)
         self.vis_model.load_state_dict(save_model["state_dict"])
         self.vis_model.to(self.DEVICE)
@@ -151,7 +151,7 @@ class EvalProjector(Projector):
                 idx = i
                 break
         file_path = os.path.join(self.content_path, "Model", "{}".format(self.exp), "tnn_hybrid_{}.pth".format(idx))
-        save_model = torch.load(file_path, map_location=self.DEVICE)
+        save_model = torch.load(file_path, map_location="cpu")
         self.vis_model.load_state_dict(save_model["state_dict"])
         self.vis_model.to(self.DEVICE)
         self.vis_model.eval()

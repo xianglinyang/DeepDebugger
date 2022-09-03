@@ -805,10 +805,10 @@ class SegEvaluator(Evaluator):
         #     evaluation["tr_train"] = dict()
         # if "tr_test" not in evaluation.keys():
         #     evaluation["tr_test"] = dict()  
-        # if "tlr_train" not in evaluation.keys():
-        #     evaluation["tlr_train"] = dict()
-        # if "tlr_test" not in evaluation.keys():
-        #     evaluation["tlr_test"] = dict()  
+        if "tlr_train" not in evaluation.keys():
+            evaluation["tlr_train"] = dict()
+        if "tlr_test" not in evaluation.keys():
+            evaluation["tlr_test"] = dict()  
 
         epoch_key = str(n_epoch)
         if epoch_key not in evaluation["nn_train"]:
@@ -839,8 +839,8 @@ class SegEvaluator(Evaluator):
         # evaluation["tr_test"][epoch_key] = self.eval_temporal_global_corr_test(n_epoch)
 
         # local ranking temporal
-        # evaluation["tlr_train"][epoch_key] = self.eval_temporal_local_corr_train(n_epoch, 3)
-        # evaluation["tlr_test"][epoch_key] = self.eval_temporal_local_corr_test(n_epoch, 3)
+        evaluation["tlr_train"][epoch_key] = self.eval_temporal_local_corr_train(n_epoch, 3)
+        evaluation["tlr_test"][epoch_key] = self.eval_temporal_local_corr_test(n_epoch, 3)
 
         # evaluation["train_acc"][epoch_key] = self.train_acc(n_epoch)
         # evaluation["test_acc"][epoch_key] = self.test_acc(n_epoch)
