@@ -35,7 +35,7 @@ CLASSES = config["CLASSES"]
 DATASET = config["DATASET"]
 PREPROCESS = config["VISUALIZATION"]["PREPROCESS"]
 GPU_ID = config["GPU"]
-GPU_ID = "1"
+GPU_ID = "0"
 EPOCH_START = config["EPOCH_START"]
 EPOCH_END = config["EPOCH_END"]
 EPOCH_PERIOD = config["EPOCH_PERIOD"]
@@ -66,7 +66,7 @@ RESUME_SEG = VISUALIZATION_PARAMETER["RESUME_SEG"]
 
 # define hyperparameters
 DEVICE = torch.device("cuda:{}".format(GPU_ID) if torch.cuda.is_available() else "cpu")
-
+DEVICE = torch.device("cpu")
 import Model.model as subject_model
 # net = resnet18()
 net = eval("subject_model.{}()".format(NET))
@@ -119,25 +119,14 @@ projector = Projector(vis_model=model, content_path=CONTENT_PATH, segments=SEGME
 #                                                       EVALUATION                                                     #
 ########################################################################################################################
 EVAL_EPOCH_DICT = {
-    "mnist":[4, 12, 20],
-    "fmnist":[10, 30, 50],
-    "cifar10":[40,120,200]
+    "mnist":[1,2,5,10,13,16,20],
+    "fmnist":[1,2,6,11,25,30,36,50],
+    "cifar10":[1,3,9,18,24,41,70,100,160,200]
 }
-EVAL_EPOCH_DICT = {
-    "mnist":[1,2,3,10,15, 20],
-    "fmnist":[1,2,3,4,5,15,20,25,40,45,50],
-    "cifar10":[1,5,10,20,30,100, 150, 190,200]
-}
-EVAL_EPOCH_DICT = {
-    "mnist":[1,4,5,12,20],
-    "fmnist":[1,2,6,10,11,30,50],
-    "cifar10":[1,3,9,18,40,41,100,120,200]
-}
-# EVAL_EPOCH_DICT = {"mnist":[5],"fmnist":[2,6,11], "cifar10":[3,9,18,41]}
 eval_epochs = EVAL_EPOCH_DICT[DATASET]
 
 evaluator = Evaluator(data_provider, projector)
 for eval_epoch in eval_epochs:
-    # evaluator.save_epoch_eval(eval_epoch, 10, temporal_k=3, file_name="test_evaluation_hybrid")
+    evaluator.save_epoch_eval(eval_epoch, 10, temporal_k=3, file_name="test_evaluation_hybrid")
     evaluator.save_epoch_eval(eval_epoch, 15, temporal_k=5, file_name="test_evaluation_hybrid")
-    # evaluator.save_epoch_eval(eval_epoch, 20, temporal_k=7,file_name="test_evaluation_hybrid")
+    evaluator.save_epoch_eval(eval_epoch, 20, temporal_k=7,file_name="test_evaluation_hybrid")
