@@ -31,7 +31,7 @@ class DataProvider:
     def train_num(self):
         training_data_path = os.path.join(self.content_path, "Training_data")
         training_data = torch.load(os.path.join(training_data_path, "training_dataset_data.pth"),
-                                   map_location=self.DEVICE)
+                                   map_location="cpu")
         train_num = len(training_data)
         del training_data
         gc.collect()
@@ -41,7 +41,7 @@ class DataProvider:
     def test_num(self):
         testing_data_path = os.path.join(self.content_path, "Testing_data")
         testing_data = torch.load(os.path.join(testing_data_path, "testing_dataset_data.pth"),
-                                  map_location=self.DEVICE)
+                                  map_location="cpu")
         test_num = len(testing_data)
         del testing_data
         gc.collect()
