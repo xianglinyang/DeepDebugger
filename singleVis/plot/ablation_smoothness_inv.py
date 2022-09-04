@@ -30,10 +30,10 @@ def main():
             nn_test = round(eval["ppr_test"][str(epoch)], 3)
 
             if len(data) == 0:
-                data = np.array([[dataset, "DeepDebugger", "Train", "DeepDebugger(Train)", "{}".format(str(epoch_id)), nn_train]])
+                data = np.array([[dataset, "DeepDebugger", "Train", "DeepDebugger(Train)", "{}".format(str(epoch)), nn_train]])
             else:
-                data = np.concatenate((data, np.array([[dataset, "DeepDebugger", "Train", "DeepDebugger(Train)",  "{}".format(str(epoch_id)), nn_train]])), axis=0)
-            data = np.concatenate((data, np.array([[dataset, "DeepDebugger", "Test", "DeepDebugger(Test)", "{}".format(str(epoch_id)), nn_test]])), axis=0)
+                data = np.concatenate((data, np.array([[dataset, "DeepDebugger", "Train", "DeepDebugger(Train)",  "{}".format(str(epoch)), nn_train]])), axis=0)
+            data = np.concatenate((data, np.array([[dataset, "DeepDebugger", "Test", "DeepDebugger(Test)", "{}".format(str(epoch)), nn_test]])), axis=0)
         
         # DeepDebugger without smoothness
         eval_path = "/home/xianglin/projects/DVI_data/resnet18_{}/Model/without_smoothness/test_evaluation_hybrid.json".format(dataset)
@@ -44,8 +44,8 @@ def main():
             nn_train = round(eval["ppr_train"][str(epoch)], 3)
             nn_test = round(eval["ppr_test"][str(epoch)], 3)
 
-            data = np.concatenate((data, np.array([[dataset, "no_Smoothness", "Train", "-SS(Train)", "{}".format(str(epoch_id)), nn_train]])), axis=0)
-            data = np.concatenate((data, np.array([[dataset, "no_Smoothness", "Test", "-SS(Test)", "{}".format(str(epoch_id)), nn_test]])), axis=0)
+            data = np.concatenate((data, np.array([[dataset, "no_Smoothness", "Train", "-SS(Train)", "{}".format(str(epoch)), nn_train]])), axis=0)
+            data = np.concatenate((data, np.array([[dataset, "no_Smoothness", "Test", "-SS(Test)", "{}".format(str(epoch)), nn_test]])), axis=0)
         
         # DeepDebugger without tl
         eval_path = "/home/xianglin/projects/DVI_data/resnet18_{}/Model/without_tl/test_evaluation_hybrid.json".format(dataset)
@@ -56,8 +56,8 @@ def main():
             nn_train = round(eval["ppr_train"][str(epoch)], 3)
             nn_test = round(eval["ppr_test"][str(epoch)], 3)
 
-            data = np.concatenate((data, np.array([[dataset, "no_TL", "Train", "-TL(Train)","{}".format(str(epoch_id)), nn_train]])), axis=0)
-            data = np.concatenate((data, np.array([[dataset, "no_TL", "Test", "-TL(Test)", "{}".format(str(epoch_id)), nn_test]])), axis=0)
+            data = np.concatenate((data, np.array([[dataset, "no_TL", "Train", "-TL(Train)","{}".format(str(epoch)), nn_train]])), axis=0)
+            data = np.concatenate((data, np.array([[dataset, "no_TL", "Test", "-TL(Test)", "{}".format(str(epoch)), nn_test]])), axis=0)
 
         df_tmp = pd.DataFrame(data, columns=col)
         df = df.append(df_tmp, ignore_index=True)
