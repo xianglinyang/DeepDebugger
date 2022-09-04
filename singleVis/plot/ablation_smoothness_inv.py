@@ -11,9 +11,7 @@ import seaborn as sns
 def main():
     # hyperparameters
     datasets = ["mnist", "fmnist", "cifar10"]
-    selected_epochs_dict = {"mnist":[4, 12, 20],"fmnist":[10,30,50], "cifar10":[40, 120,200]}
     selected_epochs_dict = {"mnist":[5],"fmnist":[2,6,11], "cifar10":[3,9,18,41]}
-
     col = np.array(["dataset", "method", "type", "hue","period", "eval"])
     df = pd.DataFrame({}, columns=col)
 
@@ -32,10 +30,10 @@ def main():
             nn_test = round(eval["ppr_test"][str(epoch)], 3)
 
             if len(data) == 0:
-                data = np.array([[dataset, "DeepDebugger", "Train", "DeepDebugger-Train", "{}".format(str(epoch_id)), nn_train]])
+                data = np.array([[dataset, "DeepDebugger", "Train", "DeepDebugger(Train)", "{}".format(str(epoch_id)), nn_train]])
             else:
-                data = np.concatenate((data, np.array([[dataset, "DeepDebugger", "Train", "DeepDebugger-Train",  "{}".format(str(epoch_id)), nn_train]])), axis=0)
-            data = np.concatenate((data, np.array([[dataset, "DeepDebugger", "Test", "DeepDebugger-Test", "{}".format(str(epoch_id)), nn_test]])), axis=0)
+                data = np.concatenate((data, np.array([[dataset, "DeepDebugger", "Train", "DeepDebugger(Train)",  "{}".format(str(epoch_id)), nn_train]])), axis=0)
+            data = np.concatenate((data, np.array([[dataset, "DeepDebugger", "Test", "DeepDebugger(Test)", "{}".format(str(epoch_id)), nn_test]])), axis=0)
         
         # DeepDebugger without smoothness
         eval_path = "/home/xianglin/projects/DVI_data/resnet18_{}/Model/without_smoothness/test_evaluation_hybrid.json".format(dataset)
@@ -46,8 +44,8 @@ def main():
             nn_train = round(eval["ppr_train"][str(epoch)], 3)
             nn_test = round(eval["ppr_test"][str(epoch)], 3)
 
-            data = np.concatenate((data, np.array([[dataset, "no_Smoothness", "Train", "no_Smoothness-Train", "{}".format(str(epoch_id)), nn_train]])), axis=0)
-            data = np.concatenate((data, np.array([[dataset, "no_Smoothness", "Test", "no_Smoothness-Test", "{}".format(str(epoch_id)), nn_test]])), axis=0)
+            data = np.concatenate((data, np.array([[dataset, "no_Smoothness", "Train", "-SS(Train)", "{}".format(str(epoch_id)), nn_train]])), axis=0)
+            data = np.concatenate((data, np.array([[dataset, "no_Smoothness", "Test", "-SS(Test)", "{}".format(str(epoch_id)), nn_test]])), axis=0)
         
         # DeepDebugger without tl
         eval_path = "/home/xianglin/projects/DVI_data/resnet18_{}/Model/without_tl/test_evaluation_hybrid.json".format(dataset)
@@ -58,8 +56,8 @@ def main():
             nn_train = round(eval["ppr_train"][str(epoch)], 3)
             nn_test = round(eval["ppr_test"][str(epoch)], 3)
 
-            data = np.concatenate((data, np.array([[dataset, "no_TL", "Train", "no_TL-Train","{}".format(str(epoch_id)), nn_train]])), axis=0)
-            data = np.concatenate((data, np.array([[dataset, "no_TL", "Test", "no_TL-Test", "{}".format(str(epoch_id)), nn_test]])), axis=0)
+            data = np.concatenate((data, np.array([[dataset, "no_TL", "Train", "-TL(Train)","{}".format(str(epoch_id)), nn_train]])), axis=0)
+            data = np.concatenate((data, np.array([[dataset, "no_TL", "Test", "-TL(Test)", "{}".format(str(epoch_id)), nn_test]])), axis=0)
 
         df_tmp = pd.DataFrame(data, columns=col)
         df = df.append(df_tmp, ignore_index=True)
@@ -68,16 +66,16 @@ def main():
 
     df.to_excel("./plot_results/ablation_smoothness_ppr.xlsx")
 
-    pal20c = sns.color_palette('tab20c', 20)
+    pal20c = sns.color_palette('tab20', 20)
     sns.set_theme(style="whitegrid", palette=pal20c)
     hue_dict = {
-        "no_TL-Train": pal20c[0],
-        "no_Smoothness-Train": pal20c[4],
-        "DeepDebugger-Train": pal20c[8],
+        "-TL(Train)": pal20c[10],
+        "-SS(Train)": pal20c[12],
+        "DeepDebugger(Train)": pal20c[18],
 
-        "no_TL-Test": pal20c[3],
-        "no_Smoothness-Test": pal20c[7],
-        "DeepDebugger-Test": pal20c[11],
+        "-TL(Test)": pal20c[11],
+        "-SS(Test)": pal20c[13],
+        "DeepDebugger(Test)": pal20c[19],
     }
     sns.palplot([hue_dict[i] for i in hue_dict.keys()])
 
@@ -87,7 +85,7 @@ def main():
     mpl.rcParams['xtick.labelsize'] = 10
 
 
-    hue_list = ["no_TL-Train", "no_TL-Test", "no_Smoothness-Train", "no_Smoothness-Test", "DeepDebugger-Train", "DeepDebugger-Test"]
+    hue_list = ["-TL(Train)", "-TL(Test)", "-SS(Train)", "-SS(Test)", "DeepDebugger(Train)", "DeepDebugger(Test)"]
 
     fg = sns.catplot(
         x="period",
@@ -102,6 +100,7 @@ def main():
         aspect=1.0,#3,
         data=df,
         kind="bar",
+        sharex=False,
         palette=[hue_dict[i] for i in hue_list],
         legend=True
     )
@@ -117,8 +116,8 @@ def main():
     axs[2].set_title("CIFAR-10")
 
     (fg.despine(bottom=False, right=False, left=False, top=False)
-        # .set_xticklabels(['Begin', 'Mid', 'End'])
-        .set_axis_labels("Period", "")
+        # .set_xticklabels(['Early', 'Mid', 'Late'])
+        .set_axis_labels("", "")
         )
     # fg.fig.suptitle("NN preserving property")
 

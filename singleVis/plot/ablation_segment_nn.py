@@ -10,11 +10,11 @@ import seaborn as sns
 
 def main():
     # hyperparameters
-    datasets = ["mnist", "fmnist", "cifar10"]
+    datasets = ["mnist","fmnist",  "cifar10"]
     EXP_NUM = 20
-    # selected_epochs_dict = {"mnist":[4, 12, 20],"fmnist":[10,30,50], "cifar10":[40, 120,200]}
-    selected_epochs_dict = {"mnist":[1, 10, 20],"fmnist":[1,25,50], "cifar10":[1, 100,200]}
-    k_neighbors = [15]
+    selected_epochs_dict = {"mnist":[[1,2], [10,13], [16,20]],"fmnist":[[1,6],[25,30],[36,50]], "cifar10":[[1,24], [70,100],[160,200]]}
+    selected_epochs_dict = {"mnist":[[2], [10], [20]],"fmnist":[[6],[25],[50]], "cifar10":[[24], [100],[200]]}
+    k_neighbors = [10,15,20]
 
 
     exps = list(range(EXP_NUM))
@@ -32,46 +32,47 @@ def main():
             with open(eval_path, "r") as f:
                     eval = json.load(f)
             for epoch_id in range(3):
-                epoch = selected_epochs[epoch_id]
-                nn_train = round(eval["nn_train"][str(epoch)][str(k)], 3)
-                nn_test = round(eval["nn_test"][str(epoch)][str(k)], 3)
+                
+                stage_epochs = selected_epochs[epoch_id]
+                nn_train_list = list()
+                nn_test_list = list()
+                for epoch in stage_epochs:
+                    nn_train = round(eval["nn_train"][str(epoch)][str(k)], 3)
+                    nn_test = round(eval["nn_test"][str(epoch)][str(k)], 3)
+
+                    nn_train_list.append(nn_train)
+                    nn_test_list.append(nn_test)
+                nn_train = sum(nn_train_list)/len(nn_train_list)
+                nn_test = sum(nn_test_list)/len(nn_test_list)
 
                 if len(data) == 0:
-                    data = np.array([[dataset, "DeepDebugger", "Train", "DeepDebugger-Train", "{}".format(k), "{}".format(str(epoch_id)), nn_train]])
+                    data = np.array([[dataset, "DeepDebugger", "Train", "DeepDebugger(Train)", "{}".format(k), "{}".format(str(epoch_id)), nn_train]])
                 else:
-                    data = np.concatenate((data, np.array([[dataset, "DeepDebugger", "Train", "DeepDebugger-Train", "{}".format(k), "{}".format(str(epoch_id)), nn_train]])), axis=0)
-                data = np.concatenate((data, np.array([[dataset, "DeepDebugger", "Test", "DeepDebugger-Test", "{}".format(k), "{}".format(str(epoch_id)), nn_test]])), axis=0)
+                    data = np.concatenate((data, np.array([[dataset, "DeepDebugger", "Train", "DeepDebugger(Train)", "{}".format(k), "{}".format(str(epoch_id)), nn_train]])), axis=0)
+                data = np.concatenate((data, np.array([[dataset, "DeepDebugger", "Test", "DeepDebugger(Test)", "{}".format(k), "{}".format(str(epoch_id)), nn_test]])), axis=0)
             
-            # DeepDebugger Random segments
-            # for epoch_id in range(3):
-            #     nn_train_list = list()
-            #     nn_test_list = list()
-            #     for exp in exps:
-            #         eval_path = "/home/xianglin/projects/DVI_data/resnet18_{}/Model/exp_{}/test_evaluation_hybrid.json".format(dataset, str(exp))
-            #         with open(eval_path, "r") as f:
-            #                 eval = json.load(f)
-            #         epoch = selected_epochs[epoch_id]
-            #         nn_train = round(eval["nn_train"][str(epoch)][str(k)], 3)
-            #         nn_test = round(eval["nn_test"][str(epoch)][str(k)], 3)
-            #         nn_train_list.append(nn_train)
-            #         nn_test_list.append(nn_test)
-                
-            #     nn_train = sum(nn_train_list)/EXP_NUM
-            #     nn_test = sum(nn_test_list)/EXP_NUM
-
-            #     data = np.concatenate((data, np.array([[dataset, "Random", "Train", "Random-Train", "{}".format(k), "{}".format(str(epoch_id)), nn_train]])), axis=0)
-            #     data = np.concatenate((data, np.array([[dataset, "Random", "Test", "Random-Test", "{}".format(k), "{}".format(str(epoch_id)), nn_test]])), axis=0)
             for epoch_id in range(3):
                 for exp in exps:
                     eval_path = "/home/xianglin/projects/DVI_data/resnet18_{}/Model/exp_{}/test_evaluation_hybrid.json".format(dataset, str(exp))
                     with open(eval_path, "r") as f:
                             eval = json.load(f)
-                    epoch = selected_epochs[epoch_id]
-                    nn_train = round(eval["nn_train"][str(epoch)][str(k)], 3)
-                    nn_test = round(eval["nn_test"][str(epoch)][str(k)], 3)
+                    stage_epochs = selected_epochs[epoch_id]
+                    nn_train_list = list()
+                    nn_test_list = list()
+                    for epoch in stage_epochs:
+                        nn_train = round(eval["nn_train"][str(epoch)][str(k)], 3)
+                        nn_test = round(eval["nn_test"][str(epoch)][str(k)], 3)
+                        nn_train_list.append(nn_train)
+                        nn_test_list.append(nn_test)
 
-                    data = np.concatenate((data, np.array([[dataset, "Random", "Train", "Random-Train", "{}".format(k), "{}".format(str(epoch_id)), nn_train]])), axis=0)
-                    data = np.concatenate((data, np.array([[dataset, "Random", "Test", "Random-Test", "{}".format(k), "{}".format(str(epoch_id)), nn_test]])), axis=0)
+                    nn_train = sum(nn_train_list)/len(nn_train_list)
+                    nn_test = sum(nn_test_list)/len(nn_test_list)
+
+                    if len(data) == 0:
+                        data = np.array([[dataset, "Random", "Train", "-OS(Train)", "{}".format(k), "{}".format(str(epoch_id)), nn_train]])
+                    else:
+                        data = np.concatenate((data, np.array([[dataset, "Random", "Train", "-OS(Train)", "{}".format(k), "{}".format(str(epoch_id)), nn_train]])), axis=0)
+                    data = np.concatenate((data, np.array([[dataset, "Random", "Test", "-OS(Test)", "{}".format(k), "{}".format(str(epoch_id)), nn_test]])), axis=0)
 
             df_tmp = pd.DataFrame(data, columns=col)
             df = df.append(df_tmp, ignore_index=True)
@@ -79,19 +80,18 @@ def main():
             df[["k"]] = df[["k"]].astype(int)
             df[["eval"]] = df[["eval"]].astype(float)
 
-    # df.to_excel("./plot_results/ablation_segment_nn.xlsx")
+    df.to_excel("./plot_results/ablation_segment_nn.xlsx")
 
     for k in k_neighbors:
         df_tmp = df[df["k"] == k]
         pal20c = sns.color_palette('tab20c', 20)
-        # sns.palplot(pal20c)
         sns.set_theme(style="whitegrid", palette=pal20c)
         hue_dict = {
-            "Random-Train": pal20c[0],
-            "DeepDebugger-Train": pal20c[8],
+            "-OS(Train)": pal20c[0],
+            "DeepDebugger(Train)": pal20c[8],
 
-            "Random-Test": pal20c[3],
-            "DeepDebugger-Test": pal20c[11],
+            "-OS(Test)": pal20c[3],
+            "DeepDebugger(Test)": pal20c[11],
         }
         sns.palplot([hue_dict[i] for i in hue_dict.keys()])
 
@@ -100,10 +100,7 @@ def main():
         mpl.rc('axes', **axes)
         mpl.rcParams['xtick.labelsize'] = 10
 
-        # mpl.rcParams['font.sans-serif'] = "sans-serif"
-        # mpl.rcParams['font.family'] = "sans-serif"
-
-        hue_list = ["Random-Train", "Random-Test", "DeepDebugger-Train", "DeepDebugger-Test"]
+        hue_list = ["-OS(Train)", "-OS(Test)", "DeepDebugger(Train)", "DeepDebugger(Test)"]
 
         fg = sns.catplot(
             x="period",
@@ -125,15 +122,15 @@ def main():
         mpl.pyplot.setp(fg._legend.get_texts(), fontsize='10')
 
         axs = fg.axes[0]
-        max_ = df_tmp["eval"].max()
+        # max_ = df_tmp["eval"].max()
         # min_ = df["eval"].min()
-        axs[0].set_ylim(0., max_*1.1)
+        # axs[0].set_ylim(0., max_*1.1)
         axs[0].set_title("MNIST")
         axs[1].set_title("FMNIST")
         axs[2].set_title("CIFAR-10")
 
         (fg.despine(bottom=False, right=False, left=False, top=False)
-         .set_xticklabels(['Begin', 'Mid', 'End'])
+         .set_xticklabels(['Early', 'Mid', 'Late'])
          .set_axis_labels("Period", "")
          )
         # fg.fig.suptitle("NN preserving property")

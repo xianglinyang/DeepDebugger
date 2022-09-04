@@ -12,7 +12,7 @@ def main():
     # hyperparameters
     datasets = ["mnist", "fmnist", "cifar10"]
     selected_epochs_dict = {"mnist":[5],"fmnist":[2,6,11], "cifar10":[3,9,18,41]}
-    k_neighbors = [15]
+    k_neighbors = [10,15,20]
 
     col = np.array(["dataset", "method", "type", "hue", "k", "period", "eval"])
     df = pd.DataFrame({}, columns=col)
@@ -33,10 +33,10 @@ def main():
                 nn_test = round(eval["nn_test"][str(epoch)][str(k)], 3)
 
                 if len(data) == 0:
-                    data = np.array([[dataset, "DeepDebugger", "Train", "DeepDebugger-Train", "{}".format(k), "{}".format(str(epoch_id)), nn_train]])
+                    data = np.array([[dataset, "DeepDebugger", "Train", "DeepDebugger(Train)", "{}".format(k), "{}".format(str(epoch_id)), nn_train]])
                 else:
-                    data = np.concatenate((data, np.array([[dataset, "DeepDebugger", "Train", "DeepDebugger-Train", "{}".format(k), "{}".format(str(epoch_id)), nn_train]])), axis=0)
-                data = np.concatenate((data, np.array([[dataset, "DeepDebugger", "Test", "DeepDebugger-Test", "{}".format(k), "{}".format(str(epoch_id)), nn_test]])), axis=0)
+                    data = np.concatenate((data, np.array([[dataset, "DeepDebugger", "Train", "DeepDebugger(Train)", "{}".format(k), "{}".format(str(epoch_id)), nn_train]])), axis=0)
+                data = np.concatenate((data, np.array([[dataset, "DeepDebugger", "Test", "DeepDebugger(Test)", "{}".format(k), "{}".format(str(epoch_id)), nn_test]])), axis=0)
             
             # DeepDebugger without smoothness
             eval_path = "/home/xianglin/projects/DVI_data/resnet18_{}/Model/without_smoothness/test_evaluation_hybrid.json".format(dataset)
@@ -47,8 +47,8 @@ def main():
                 nn_train = round(eval["nn_train"][str(epoch)][str(k)], 3)
                 nn_test = round(eval["nn_test"][str(epoch)][str(k)], 3)
 
-                data = np.concatenate((data, np.array([[dataset, "no_Smoothness", "Train", "no_Smoothness-Train", "{}".format(k), "{}".format(str(epoch_id)), nn_train]])), axis=0)
-                data = np.concatenate((data, np.array([[dataset, "no_Smoothness", "Test", "no_Smoothness-Test", "{}".format(k), "{}".format(str(epoch_id)), nn_test]])), axis=0)
+                data = np.concatenate((data, np.array([[dataset, "no_Smoothness", "Train", "-SS(Train)", "{}".format(k), "{}".format(str(epoch_id)), nn_train]])), axis=0)
+                data = np.concatenate((data, np.array([[dataset, "no_Smoothness", "Test", "-SS(Test)", "{}".format(k), "{}".format(str(epoch_id)), nn_test]])), axis=0)
             
             # DeepDebugger without tl
             eval_path = "/home/xianglin/projects/DVI_data/resnet18_{}/Model/without_tl/test_evaluation_hybrid.json".format(dataset)
@@ -59,8 +59,8 @@ def main():
                 nn_train = round(eval["nn_train"][str(epoch)][str(k)], 3)
                 nn_test = round(eval["nn_test"][str(epoch)][str(k)], 3)
 
-                data = np.concatenate((data, np.array([[dataset, "no_TL", "Train", "no_TL-Train", "{}".format(k), "{}".format(str(epoch_id)), nn_train]])), axis=0)
-                data = np.concatenate((data, np.array([[dataset, "no_TL", "Test", "no_TL-Test", "{}".format(k), "{}".format(str(epoch_id)), nn_test]])), axis=0)
+                data = np.concatenate((data, np.array([[dataset, "no_TL", "Train", "-TL(Train)", "{}".format(k), "{}".format(str(epoch_id)), nn_train]])), axis=0)
+                data = np.concatenate((data, np.array([[dataset, "no_TL", "Test", "-TL(Test)", "{}".format(k), "{}".format(str(epoch_id)), nn_test]])), axis=0)
 
             df_tmp = pd.DataFrame(data, columns=col)
             df = df.append(df_tmp, ignore_index=True)
@@ -72,16 +72,16 @@ def main():
 
     for k in k_neighbors:
         df_tmp = df[df["k"] == k]
-        pal20c = sns.color_palette('tab20c', 20)
+        pal20c = sns.color_palette('tab20', 20)
         sns.set_theme(style="whitegrid", palette=pal20c)
         hue_dict = {
-            "no_TL-Train": pal20c[0],
-            "no_Smoothness-Train": pal20c[4],
-            "DeepDebugger-Train": pal20c[8],
+            "-TL(Train)": pal20c[10],
+            "-SS(Train)": pal20c[12],
+            "DeepDebugger(Train)": pal20c[18],
 
-            "no_TL-Test": pal20c[3],
-            "no_Smoothness-Test": pal20c[7],
-            "DeepDebugger-Test": pal20c[11],
+            "-TL(Test)": pal20c[11],
+            "-SS(Test)": pal20c[13],
+            "DeepDebugger(Test)": pal20c[19],
         }
         sns.palplot([hue_dict[i] for i in hue_dict.keys()])
 
@@ -91,7 +91,7 @@ def main():
         mpl.rcParams['xtick.labelsize'] = 10
 
 
-        hue_list = ["no_TL-Train", "no_TL-Test", "no_Smoothness-Train", "no_Smoothness-Test", "DeepDebugger-Train", "DeepDebugger-Test"]
+        hue_list = ["-TL(Train)", "-TL(Test)", "-SS(Train)", "-SS(Test)", "DeepDebugger(Train)", "DeepDebugger(Test)"]
 
         fg = sns.catplot(
             x="period",
@@ -106,23 +106,24 @@ def main():
             aspect=1.0,#3,
             data=df_tmp,
             kind="bar",
+            sharex=False,
             palette=[hue_dict[i] for i in hue_list],
             legend=True
         )
-        sns.move_legend(fg, "lower center", bbox_to_anchor=(.42, 0.92), ncol=2, title=None, frameon=False)
+        sns.move_legend(fg, "lower center", bbox_to_anchor=(.42, 0.92), ncol=3, title=None, frameon=False)
         mpl.pyplot.setp(fg._legend.get_texts(), fontsize='10')
 
         axs = fg.axes[0]
-        max_ = df_tmp["eval"].max()
+        # max_ = df_tmp["eval"].max()
         # min_ = df["eval"].min()
-        axs[0].set_ylim(0., max_*1.1)
+        # axs[0].set_ylim(0., max_*1.1)
         axs[0].set_title("MNIST")
         axs[1].set_title("FMNIST")
         axs[2].set_title("CIFAR-10")
 
         (fg.despine(bottom=False, right=False, left=False, top=False)
-        #  .set_xticklabels(['Begin', 'Mid', 'End'])
-         .set_axis_labels("Period", "")
+        #  .set_xticklabels(['Early', 'Mid', 'Late'])
+         .set_axis_labels("", "")
          )
         # fg.fig.suptitle("NN preserving property")
 
