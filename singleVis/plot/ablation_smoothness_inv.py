@@ -104,7 +104,7 @@ def main():
         palette=[hue_dict[i] for i in hue_list],
         legend=True
     )
-    sns.move_legend(fg, "lower center", bbox_to_anchor=(.42, 0.92), ncol=2, title=None, frameon=False)
+    sns.move_legend(fg, "lower center", bbox_to_anchor=(.42, 0.92), ncol=3, title=None, frameon=False)
     mpl.pyplot.setp(fg._legend.get_texts(), fontsize='10')
 
     axs = fg.axes[0]
