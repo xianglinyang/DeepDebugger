@@ -19,6 +19,11 @@ from singleVis.data import NormalDataProvider
 from singleVis.spatial_edge_constructor import kcSpatialEdgeConstructor
 from singleVis.temporal_edge_constructor import GlobalTemporalEdgeConstructor
 from singleVis.projector import Projector
+from singleVis.eval.evaluator import Evaluator
+########################################################################################################################
+#                                                    VISUALIZATION SETTING                                             #
+########################################################################################################################
+VIS_METHOD= "TimeVis"
 ########################################################################################################################
 #                                                     LOAD PARAMETERS                                                  #
 ########################################################################################################################
@@ -67,6 +72,8 @@ MAX_EPOCH = VISUALIZATION_PARAMETER["MAX_EPOCH"]
 VIS_MODEL_NAME = VISUALIZATION_PARAMETER["VIS_MODEL_NAME"]
 EVALUATION_NAME = VISUALIZATION_PARAMETER["EVALUATION_NAME"]
 
+SEGMENTS = [(EPOCH_START, EPOCH_END)]
+
 # define hyperparameters
 DEVICE = torch.device("cuda:{}".format(GPU_ID) if torch.cuda.is_available() else "cpu")
 
@@ -81,7 +88,7 @@ if PREPROCESS:
     data_provider._meta_data()
     if B_N_EPOCHS >0:
         data_provider._estimate_boundary(LEN//10, l_bound=L_BOUND)
-        
+
 model = SingleVisualizationModel(input_dims=512, output_dims=2, units=256, hidden_layer=HIDDEN_LAYER)
 negative_sample_rate = 5
 min_dist = .1
@@ -89,7 +96,6 @@ _a, _b = find_ab_params(1.0, min_dist)
 umap_loss_fn = UmapLoss(negative_sample_rate, DEVICE, _a, _b, repulsion_strength=1.0)
 recon_loss_fn = ReconstructionLoss(beta=1.0)
 criterion = SingleVisLoss(umap_loss_fn, recon_loss_fn, lambd=LAMBDA)
-
 projector = Projector(vis_model=model, content_path=CONTENT_PATH, segments=SEGMENTS, device=DEVICE)
 
 optimizer = torch.optim.Adam(model.parameters(), lr=.01, weight_decay=1e-5)
@@ -111,20 +117,7 @@ edge_to = edge_to[eliminate_zeros]
 edge_from = edge_from[eliminate_zeros]
 probs = probs[eliminate_zeros]
 
-# save result
-save_dir = os.path.join(data_provider.model_path, "SV_time_{}.json".format(VIS_MODEL_NAME))
-if not os.path.exists(save_dir):
-    evaluation = dict()
-else:
-    f = open(save_dir, "r")
-    evaluation = json.load(f)
-    f.close()
-if "complex_construction" not in evaluation.keys():
-    evaluation["complex_construction"] = dict()
-evaluation["complex_construction"][str(seg)] = round(t3-t2, 3)
-with open(save_dir, 'w') as f:
-    json.dump(evaluation, f)
-print("constructing timeVis complex for {}-th segment in {:.1f} seconds.".format(seg, t3-t2))
+trainer.record_time("{}_time_{}.json".format(VIS_METHOD, VIS_MODEL_NAME), "complex_construction", t1-t0)
 
 dataset = DataHandler(edge_to, edge_from, feature_vectors, attention)
 n_samples = int(np.sum(S_N_EPOCHS * probs) // 1)
@@ -144,34 +137,22 @@ trainer = SingleVisTrainer(model, criterion, optimizer, lr_scheduler,edge_loader
 t2=time.time()
 trainer.train(PATIENT, MAX_EPOCH)
 t3 = time.time()
-# save result
-save_dir = os.path.join(data_provider.model_path, "SV_time_{}.json".format(VIS_MODEL_NAME))
-if not os.path.exists(save_dir):
-    evaluation = dict()
-else:
-    f = open(save_dir, "r")
-    evaluation = json.load(f)
-    f.close()
 
-if "training" not in evaluation.keys():
-    evaluation["training"] = dict()
-evaluation["training"][str(seg)] = round(t3-t2, 3)
-with open(save_dir, 'w') as f:
-    json.dump(evaluation, f)
-trainer.save(save_dir=data_provider.model_path, file_name="{}_{}".format(VIS_MODEL_NAME, seg))
+trainer.record_time("{}_time_{}.json".format(VIS_METHOD, VIS_MODEL_NAME), "training", t3-t2)
+trainer.save(save_dir=data_provider.model_path, file_name="{}".format(VIS_MODEL_NAME))
 
 ########################################################################################################################
 #                                                      VISUALIZATION                                                   #
 ########################################################################################################################
 
-# from singleVis.visualizer import visualizer
+from singleVis.visualizer import visualizer
 
-# vis = visualizer(data_provider, trainer.model, 200, 10, classes)
-# save_dir = os.path.join(data_provider.content_path, "img")
-# if not os.path.exists(save_dir):
-#     os.mkdir(save_dir)
-# for i in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
-#     vis.savefig(i, path=os.path.join(save_dir, "{}_{}_tnn.png".format(DATASET, i)))
+vis = visualizer(data_provider, projector, 200, 10, CLASSES)
+save_dir = os.path.join(data_provider.content_path, "img")
+if not os.path.exists(save_dir):
+    os.mkdir(save_dir)
+for i in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
+    vis.savefig(i, path=os.path.join(save_dir, "{}_{}_{}.png".format(DATASET, i, VIS_METHOD)))
 
     
 ########################################################################################################################
@@ -185,7 +166,7 @@ EVAL_EPOCH_DICT = {
 }
 eval_epochs = EVAL_EPOCH_DICT[DATASET]
 
-evaluator = Evaluator(data_provider, trainer)
+evaluator = Evaluator(data_provider, projector)
 
 for eval_epoch in eval_epochs:
-    evaluator.save_epoch_eval(eval_epoch, 15, temporal_k=5, file_name="{}".format(EVAL_NAME))
+    evaluator.save_epoch_eval(eval_epoch, 15, temporal_k=5, file_name="{}".format(EVALUATION_NAME))
