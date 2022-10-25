@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 import os
 import json
 
@@ -8,11 +9,40 @@ from scipy.spatial.distance import cosine
 
 from singleVis.eval.evaluate import *
 from singleVis.backend import *
-from singleVis.utils import is_B, js_div, find_nearest
+from singleVis.utils import is_B, js_div
 from singleVis.visualizer import visualizer
 
+class EvaluatorAbstractClass(ABC):
+    def __init__(self, data_provider, projector, *args, **kwargs):
+        self.data_provider = data_provider
+        self.projector = projector
+    
+    @abstractmethod
+    def eval_nn_train(self, epoch, n_neighbors):
+        pass
 
-class Evaluator:
+    @abstractmethod
+    def eval_nn_test(self, epoch, n_neighbors):
+        pass
+
+    @abstractmethod
+    def eval_inv_train(self, epoch):
+        pass
+
+    @abstractmethod
+    def eval_inv_test(self, epoch):
+        pass
+    
+    @abstractmethod
+    def save_epoch_eval(self, n_epoch, file_name="evaluation"):
+        pass
+
+    @abstractmethod
+    def get_eval(self, file_name="evaluation"):
+        pass
+
+
+class Evaluator(EvaluatorAbstractClass):
     def __init__(self, data_provider, projector, verbose=1):
         self.data_provider = data_provider
         self.projector = projector

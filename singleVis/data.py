@@ -1,3 +1,6 @@
+"""The DataProvider class serve as a helper module for retriving subject model data"""
+from abc import ABC, abstractmethod
+
 import os
 import gc
 import time
@@ -11,8 +14,40 @@ DataContainder module
 2. estimate boundary
 3. provide data
 """
+class DataProviderAbstractClass(ABC):
+    
+    def __init__(self, content_path, model, epoch_start, epoch_end, epoch_period, split):
+        self.mode = "abstract"
+        self.content_path = content_path
+        self.model = model
+        self.s = epoch_start
+        self.e = epoch_end
+        self.p = epoch_period
+        self.split = split
+        
+    @property
+    @abstractmethod
+    def train_num(self):
+        pass
 
-class DataProvider:
+    @property
+    @abstractmethod
+    def test_num(self):
+        pass
+
+    @abstractmethod
+    def _meta_data(self):
+        pass
+
+    @abstractmethod
+    def _estimate_boundary(self):
+        pass
+    
+    def update_interval(self, epoch_s, epoch_e):
+        self.s = epoch_s
+        self.e = epoch_e
+
+class DataProvider(DataProviderAbstractClass):
     def __init__(self, content_path, model, epoch_start, epoch_end, epoch_period, split, device, classes, verbose=1):
         self.content_path = content_path
         self.model = model
@@ -47,10 +82,12 @@ class DataProvider:
         gc.collect()
         return test_num
     
-    def update_interval(self, epoch_s, epoch_e):
-        self.s = epoch_s
-        self.e = epoch_e
-    
+    def _meta_data(self):
+        raise NotImplementedError
+
+    def _estimate_boundary(self):
+        raise NotImplementedError
+
 
 class NormalDataProvider(DataProvider):
     def __init__(self, content_path, model, epoch_start, epoch_end, epoch_period, split, device, classes, verbose=1):

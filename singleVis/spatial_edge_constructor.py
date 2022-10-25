@@ -1,3 +1,5 @@
+from abc import ABC, abstractmethod
+
 import numpy as np
 import os
 import time
@@ -13,9 +15,19 @@ from singleVis.kcenter_greedy import kCenterGreedy
 from singleVis.intrinsic_dim import IntrinsicDim
 from singleVis.backend import get_graph_elements, get_attention
 
+class SpatialEdgeConstructorAbstractClass(ABC):
+    @abstractmethod
+    def __init__(self, data_provider) -> None:
+        pass
+
+    @abstractmethod
+    def construct(self, *args, **kwargs):
+        # return head, tail, weight, feature_vectors
+        pass
+
 
 '''Base class for Spatial Edge Constructor'''
-class SpatialEdgeConstructor:
+class SpatialEdgeConstructor(SpatialEdgeConstructorAbstractClass):
     '''Construct spatial complex
     '''
     def __init__(self, data_provider, init_num, s_n_epochs, b_n_epochs, n_neighbors) -> None:
@@ -525,7 +537,6 @@ class SingleEpochSpatialEdgeConstructor(SpatialEdgeConstructor):
             pred_model = self.data_provider.prediction_function(self.iteration)
             attention = get_attention(pred_model, feature_vectors, temperature=.01, device=self.data_provider.DEVICE, verbose=1)
         elif self.b_n_epochs == 0:
-
             complex, _, _, _ = self._construct_fuzzy_complex(train_data)
             edge_to, edge_from, weight = self._construct_step_edge_dataset(complex, None)
             feature_vectors = np.copy(train_data)
@@ -533,8 +544,7 @@ class SingleEpochSpatialEdgeConstructor(SpatialEdgeConstructor):
             attention = get_attention(pred_model, feature_vectors, temperature=.01, device=self.data_provider.DEVICE, verbose=1)            
         else: 
             raise Exception("Illegal border edges proposion!")
-
-
+            
         return edge_to, edge_from, weight, feature_vectors, attention
 
 

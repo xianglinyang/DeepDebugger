@@ -1,10 +1,37 @@
 """The Projector class for visualization, serve as a helper module for evaluator and visualizer"""
+from abc import ABC, abstractmethod
 import os
 import json
 import numpy as np
 import torch
 
-class Projector:
+class ProjectorAbstractClass(ABC):
+
+    @abstractmethod
+    def __init__(self, vis_model, content_path, *args, **kwargs):
+        pass
+
+    @abstractmethod
+    def load(self, *args, **kwargs):
+        pass
+
+    @abstractmethod
+    def batch_project(self, *args, **kwargs):
+        pass
+
+    @abstractmethod
+    def individual_project(self, *args, **kwargs):
+        pass
+
+    @abstractmethod
+    def batch_inverse(self, *args, **kwargs):
+        pass
+
+    @abstractmethod
+    def individual_inverse(self, *args, **kwargs):
+        pass
+
+class Projector(ProjectorAbstractClass):
     def __init__(self, vis_model, content_path, segments, device) -> None:
         self.content_path = content_path
         self.vis_model = vis_model
@@ -33,7 +60,6 @@ class Projector:
         self.vis_model.eval()
         self.current_range = (s, e)
         print("Successfully load the visualization model for range ({},{})...".format(s,e))
-
 
     def batch_project(self, iteration, data):
         self.load(iteration)
@@ -158,3 +184,16 @@ class EvalProjector(Projector):
         self.current_range = (s, e)
         print("Successfully load the visualization model for range ({},{})...".format(s,e))
         
+
+class DVIProjector(Projector):
+    def __init__(self, vis_model, content_path, vis_model_name, device) -> None:
+        super().__init__(vis_model, content_path, None, device)
+        self.vis_model_name = vis_model_name
+
+    def load(self, iteration):
+        file_path = os.path.join(self.content_path, "Model", "Epoch_{}".format(iteration), "{}.pth".format(self.vis_model_name))
+        save_model = torch.load(file_path, map_location="cpu")
+        self.vis_model.load_state_dict(save_model["state_dict"])
+        self.vis_model.to(self.DEVICE)
+        self.vis_model.eval()
+        print("Successfully load the DVI visualization model for iteration {}".format(iteration))

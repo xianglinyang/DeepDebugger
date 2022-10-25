@@ -1,4 +1,5 @@
-import os.path
+from abc import ABC, abstractmethod
+import os
 import time
 import gc 
 from tqdm import tqdm
@@ -15,8 +16,59 @@ Trainer should contains
 3. ...
 """
 
+class TrainerAbstractClass(ABC):
+    @abstractmethod
+    def __init__(self, *args, **kwargs):
+        pass
 
-class SingleVisTrainer:
+    @property
+    @abstractmethod
+    def loss(self):
+        pass
+
+    @abstractmethod
+    def reset_optim(self):
+        pass
+
+    @abstractmethod
+    def update_edge_loader(self):
+        pass
+
+    @abstractmethod
+    def update_vis_model(self):
+        pass
+
+    @abstractmethod
+    def update_optimizer(self):
+        pass
+
+    @abstractmethod
+    def update_lr_scheduler(self):
+        pass
+
+    @abstractmethod
+    def train_step(self):
+        pass
+
+    @abstractmethod
+    def train(self):
+       pass
+
+    @abstractmethod
+    def load(self):
+        pass
+
+    @abstractmethod
+    def save(self):
+        pass
+
+    @abstractmethod
+    def record_time(self):
+        pass
+
+
+
+class SingleVisTrainer(TrainerAbstractClass):
     def __init__(self, model, criterion, optimizer, lr_scheduler, edge_loader, DEVICE):
         self.model = model
         self.criterion = criterion
@@ -110,15 +162,13 @@ class SingleVisTrainer:
         :param name:
         :return:
         """
-        save_model = torch.load(file_path, map_location=self.DEVICE)
+        save_model = torch.load(file_path, map_location="cpu")
         self._loss = save_model["loss"]
         self.model.load_state_dict(save_model["state_dict"])
-        # self.optimizer.load_state_dict(save_model["optimizer"])
         self.model.to(self.DEVICE)
-        # self.optimizer.to(self.DEVICE)
         print("Successfully load visualization model...")
 
-    def save(self, save_dir, file_name="singleVisModel"):
+    def save(self, save_dir, file_name):
         """
         save all parameters...
         :param name:
@@ -131,6 +181,20 @@ class SingleVisTrainer:
         save_path = os.path.join(save_dir, file_name + '.pth')
         torch.save(save_model, save_path)
         print("Successfully save visualization model...")
+    
+    def record_time(self, file_name, key, t):
+        # save result
+        save_file = os.path.join(data_provider.model_path, file_name+".json")
+        if not os.path.exists(save_file):
+            evaluation = dict()
+        else:
+            f = open(save_file, "r")
+            evaluation = json.load(f)
+            f.close()
+        evaluation[key] = round(t, 3)
+        with open(save_file, 'w') as f:
+            json.dump(evaluation, f)
+
 
 class HybridVisTrainer(SingleVisTrainer):
     def __init__(self, model, criterion, optimizer, lr_scheduler, edge_loader, DEVICE):
@@ -173,3 +237,60 @@ class HybridVisTrainer(SingleVisTrainer):
                                                                 sum(smooth_losses) / len(smooth_losses),
                                                                 sum(all_loss) / len(all_loss)))
         return self.loss
+
+class DVITrainer(SingleVisTrainer):
+    def __init__(self, model, criterion, optimizer, lr_scheduler, edge_loader, DEVICE):
+        super().__init__(model, criterion, optimizer, lr_scheduler, edge_loader, DEVICE)
+    
+    def train_step(self):
+        self.model.to(device=self.DEVICE)
+        self.model.train()
+        all_loss = []
+        umap_losses = []
+        recon_losses = []
+        temporal_losses = []
+
+        t = tqdm(self.edge_loader, leave=True, total=len(self.edge_loader))
+        
+        for data in t:
+            edge_to, edge_from, a_to, a_from, w_prev = data
+
+            edge_to = edge_to.to(device=self.DEVICE, dtype=torch.float32)
+            edge_from = edge_from.to(device=self.DEVICE, dtype=torch.float32)
+            a_to = a_to.to(device=self.DEVICE, dtype=torch.float32)
+            a_from = a_from.to(device=self.DEVICE, dtype=torch.float32)
+            for param in w_prev.values():
+                param = param.to(device=self.DEVICE, dtype=torch.float32)
+
+            outputs = self.model(edge_to, edge_from)
+            umap_l, recon_l, temporal_l, loss = self.criterion(edge_to, edge_from, a_to, a_from, w_prev, outputs)
+            all_loss.append(loss.item())
+            umap_losses.append(umap_l.item())
+            recon_losses.append(recon_l.item())
+            temporal_losses.append(temporal_l.item())
+            # ===================backward====================
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
+        self._loss = sum(all_loss) / len(all_loss)
+        self.model.eval()
+        print('umap:{:.4f}\trecon_l:{:.4f}\ttemporal_l:{:.4f}\tloss:{:.4f}'.format(sum(umap_losses) / len(umap_losses),
+                                                                sum(recon_losses) / len(recon_losses),
+                                                                sum(temporal_losses) / len(temporal_losses),
+                                                                sum(all_loss) / len(all_loss)))
+        return self.loss
+    
+    def record_time(self, file_name, operation, iteration, t):
+        # save result
+        save_file = os.path.join(data_provider.model_path, file_name+".json")
+        if not os.path.exists(save_file):
+            evaluation = dict()
+        else:
+            f = open(save_file, "r")
+            evaluation = json.load(f)
+            f.close()
+        if operation not in evaluation.keys():
+            evaluation[operation] = dict()
+        evaluation[operation][iteration] = round(t, 3)
+        with open(save_file, 'w') as f:
+            json.dump(evaluation, f)

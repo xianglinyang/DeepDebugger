@@ -1,13 +1,39 @@
+from abc import ABC, abstractmethod
+
 import os
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import numpy as np
-import torch
-from io import BytesIO
 import base64
 
-class visualizer:
+class VisualizerAbstractClass(ABC):
+    @abstractmethod
+    def __init__(self, data_provider, projector, * args, **kawargs):
+        pass
+
+    @abstractmethod
+    def _init_plot(self, *args, **kwargs):
+        pass
+
+    @abstractmethod
+    def get_epoch_plot_measures(self, *args, **kwargs):
+        # return x_min, y_min, x_max, y_max
+        pass
+
+    @abstractmethod
+    def get_epoch_decision_view(self, *args, **kwargs):
+        pass
+
+    @abstractmethod
+    def savefig(self, *args, **kwargs):
+        pass
+
+    @abstractmethod
+    def get_background(self, *args, **kwargs):
+        pass
+
+class visualizer(VisualizerAbstractClass):
     def __init__(self, data_provider, projector, resolution, cmap='tab10'):
         self.data_provider = data_provider
         self.projector = projector

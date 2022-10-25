@@ -1,11 +1,18 @@
+from abc import ABC, abstractmethod
 import torch
 from torch import nn
-import torch.nn.functional as F
 from singleVis.backend import convert_distance_to_probability, compute_cross_entropy
 
 """Losses modules for preserving four propertes"""
 # https://github.com/ynjnpa/VocGAN/blob/5339ee1d46b8337205bec5e921897de30a9211a1/utils/stft_loss.py for losses module
 
+class Loss(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+    
+    @abstractmethod
+    def forward(self, *args, **kwargs):
+        pass
 
 class UmapLoss(nn.Module):
     def __init__(self, negative_sample_rate, device, _a=1.0, _b=1.0, repulsion_strength=1.0):
@@ -126,3 +133,38 @@ class HybridLoss(nn.Module):
 
         return umap_l, recon_l, smooth_l, loss
 
+
+class TemporalLoss(nn.Module):
+    def __init__(self) -> None:
+        super(TemporalLoss, self).__init__()
+    
+    def forward(self, w_prev, w_current):
+        loss = torch.tensor(0., requires_grad=True)
+        for name, curr_param in w_current.named_parameters():
+            prev_param = w_prev[name]
+            loss = loss + torch.norm(curr_param-prev_param, 2)
+        # in dvi paper, they dont have this normalization (optional)
+        loss = loss/len(w_current.parameters())
+        return loss
+
+
+class DVILoss(nn.Module):
+    def __init__(self, umap_loss, recon_loss, temporal_loss, lambd1, lambd2):
+        super(HybridLoss, self).__init__()
+        self.umap_loss = umap_loss
+        self.recon_loss = recon_loss
+        self.temporal_loss = temporal_loss
+        self.lambd1 = lambd1
+        self.lambd2 = lambd2
+
+    def forward(self, edge_to, edge_from, a_to, a_from, w_prev, w_curr,outputs):
+        embedding_to, embedding_from = outputs["umap"]
+        recon_to, recon_from = outputs["recon"]
+
+        recon_l = self.recon_loss(edge_to, edge_from, recon_to, recon_from, a_to, a_from)
+        umap_l = self.umap_loss(embedding_to, embedding_from)
+        temporal_l = self.temporal_loss(w_prev, w_curr)
+
+        loss = umap_l + self.lambd1 * recon_l + self.lambd2 * temporal_l
+
+        return umap_l, recon_l, temporal_l, loss

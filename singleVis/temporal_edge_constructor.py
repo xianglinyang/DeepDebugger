@@ -1,3 +1,6 @@
+
+from abc import ABC, abstractmethod
+
 from time import time
 import numpy as np
 import scipy
@@ -6,7 +9,6 @@ from umap.umap_ import compute_membership_strengths
 
 from singleVis.backend import get_graph_elements
 
-
 # helper functions
 def knn_dists(X, indices, knn_indices):
     data = X[indices][:,None,:]
@@ -14,8 +16,19 @@ def knn_dists(X, indices, knn_indices):
     knn_dists = np.linalg.norm(data-knn_data, axis=2)
     return knn_dists
 
+class TemporalEdgeConstructorAbstractClass(ABC):
+    @abstractmethod
+    def __init__(self) -> None:
+        pass
+
+    @abstractmethod
+    def construct(self, *args, **kwargs):
+        # return head, tail, weight, feature_vectors
+        pass
+
+
 '''Base class for complex edges constructor'''
-class TemporalEdgeConstructor:
+class TemporalEdgeConstructor(TemporalEdgeConstructorAbstractClass):
   
     def __init__(self, X, time_step_nums, sigmas, rhos, n_neighbors, n_epochs) -> None:
         """Init Parameters for Temporal Edge Constructor
