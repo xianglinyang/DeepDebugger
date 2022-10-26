@@ -1,10 +1,4 @@
 ########################################################################################################################
-#                                                     DVI PARAMETERS                                                   #
-########################################################################################################################
-"""This serve as an example of DeepVisualInsight implementation in pytorch."""
-VIS_METHOD = "DVI" # DeepVisualInsight
-
-########################################################################################################################
 #                                                          IMPORT                                                      #
 ########################################################################################################################
 import torch
@@ -29,6 +23,11 @@ from singleVis.data import NormalDataProvider
 from singleVis.spatial_edge_constructor import SingleEpochSpatialEdgeConstructor
 from singleVis.projector import DVIProjector
 from singleVis.eval.evaluator import Evaluator
+########################################################################################################################
+#                                                     DVI PARAMETERS                                                   #
+########################################################################################################################
+"""This serve as an example of DeepVisualInsight implementation in pytorch."""
+VIS_METHOD = "DVI" # DeepVisualInsight
 
 ########################################################################################################################
 #                                                     LOAD PARAMETERS                                                  #
@@ -78,7 +77,7 @@ MAX_EPOCH = VISUALIZATION_PARAMETER["MAX_EPOCH"]
 VIS_MODEL_NAME = VISUALIZATION_PARAMETER["VIS_MODEL_NAME"]
 EVALUATION_NAME = VISUALIZATION_PARAMETER["EVALUATION_NAME"]
 
-# define hyperparameters
+# Define hyperparameters
 DEVICE = torch.device("cuda:{}".format(GPU_ID) if torch.cuda.is_available() else "cpu")
 
 import Model.model as subject_model
