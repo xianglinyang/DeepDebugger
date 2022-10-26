@@ -183,9 +183,9 @@ class SingleVisTrainer(TrainerAbstractClass):
         torch.save(save_model, save_path)
         print("Successfully save visualization model...")
     
-    def record_time(self, file_name, key, t):
+    def record_time(self, save_dir, file_name, key, t):
         # save result
-        save_file = os.path.join(self.data_provider.model_path, file_name+".json")
+        save_file = os.path.join(save_dir, file_name+".json")
         if not os.path.exists(save_file):
             evaluation = dict()
         else:
@@ -239,9 +239,9 @@ class HybridVisTrainer(SingleVisTrainer):
                                                                 sum(all_loss) / len(all_loss)))
         return self.loss
     
-    def record_time(self, file_name, operation, seg, t):
+    def record_time(self, save_dir, file_name, operation, seg, t):
         # save result
-        save_file = os.path.join(self.data_provider.model_path, file_name+".json")
+        save_file = os.path.join(save_dir, file_name+".json")
         if not os.path.exists(save_file):
             evaluation = dict()
         else:
@@ -297,9 +297,9 @@ class DVITrainer(SingleVisTrainer):
                                                                 sum(all_loss) / len(all_loss)))
         return self.loss
     
-    def record_time(self, file_name, operation, iteration, t):
+    def record_time(self, save_dir, file_name, operation, iteration, t):
         # save result
-        save_file = os.path.join(self.data_provider.model_path, file_name+".json")
+        save_file = os.path.join(save_dir, file_name+".json")
         if not os.path.exists(save_file):
             evaluation = dict()
         else:

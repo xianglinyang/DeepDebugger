@@ -139,9 +139,10 @@ t2=time.time()
 trainer.train(PATIENT, MAX_EPOCH)
 t3 = time.time()
 
-trainer.record_time("time_{}_{}.json".format(VIS_METHOD, VIS_MODEL_NAME), "complex_construction", t1-t0)
-trainer.record_time("time_{}_{}.json".format(VIS_METHOD, VIS_MODEL_NAME), "training", t3-t2)
-trainer.save(save_dir=data_provider.model_path, file_name="{}".format(VIS_MODEL_NAME))
+save_dir = data_provider.model_path
+trainer.record_time(save_dir, "time_{}_{}.json".format(VIS_METHOD, VIS_MODEL_NAME), "complex_construction", t1-t0)
+trainer.record_time(save_dir, "time_{}_{}.json".format(VIS_METHOD, VIS_MODEL_NAME), "training", t3-t2)
+trainer.save(save_dir=save_dir, file_name="{}".format(VIS_MODEL_NAME))
 
 ########################################################################################################################
 #                                                      VISUALIZATION                                                   #
@@ -149,10 +150,10 @@ trainer.save(save_dir=data_provider.model_path, file_name="{}".format(VIS_MODEL_
 
 from singleVis.visualizer import visualizer
 
-vis = visualizer(data_provider, projector, 200, 10, CLASSES)
+vis = visualizer(data_provider, projector, 200, CLASSES)
 save_dir = os.path.join(data_provider.content_path, "img")
-if not os.path.exists(save_dir):
-    os.mkdir(save_dir)
+os.makedirs(save_dir)
+
 for i in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
     vis.savefig(i, path=os.path.join(save_dir, "{}_{}_{}.png".format(DATASET, i, VIS_METHOD)))
 
