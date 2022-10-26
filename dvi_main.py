@@ -157,8 +157,9 @@ for iteration in range(EPOCH_START, EPOCH_END, EPOCH_PERIOD):
     t3 = time.time()
 
     # save result
-    trainer.record_time("time_{}_{}.json".format(VIS_METHOD, VIS_MODEL_NAME), "complex_construction", str(iteration), t1-t0)
-    trainer.record_time("time_{}_{}.json".format(VIS_METHOD, VIS_MODEL_NAME), "training", str(iteration), t3-t2)
+    save_dir = data_provider.model_path
+    trainer.record_time(save_dir, "time_{}_{}.json".format(VIS_METHOD, VIS_MODEL_NAME), "complex_construction", str(iteration), t1-t0)
+    trainer.record_time(save_dir, "time_{}_{}.json".format(VIS_METHOD, VIS_MODEL_NAME), "training", str(iteration), t3-t2)
     save_dir = os.path.join(data_provider.model_path, "Epoch_{}".format(iteration))
     trainer.save(save_dir=save_dir, file_name="{}".format(VIS_MODEL_NAME))
 
