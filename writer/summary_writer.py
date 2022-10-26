@@ -6,7 +6,6 @@ from torch.utils.data import DataLoader
 import json
 
 
-
 class SummaryWriterAbstractClass(ABC):
     """Writes entries directly to event files in the log_dir to be
     consumed by TensorBoard.
@@ -43,13 +42,6 @@ class SummaryWriterAbstractClass(ABC):
     def add_checkpoint_data(self, relative_path, state_dict, idxs):
         pass
 
-    @abstractmethod
-    def add_config(self, *args, **kwargs):
-        pass
-
-    @abstractmethod
-    def add_iteration_structure(self, *args, **kwargs):
-        pass
 
 class SummaryWriter(SummaryWriterAbstractClass):
 
@@ -104,7 +96,7 @@ class SummaryWriter(SummaryWriterAbstractClass):
         torch.save(testset_data, os.path.join(testing_path, "testing_dataset_data.pth"))
         torch.save(testset_label, os.path.join(testing_path, "testing_dataset_label.pth"))
     
-    def add_checkpoint_data(self, state_dict, idxs):
+    def add_checkpoint_data(self, state_dict, idxs, prev_id):
         checkpoints_path = os.path.join(self.log_dir, "Model")
         dirs = os.listdir(checkpoint_path)
         C = 0
@@ -119,7 +111,27 @@ class SummaryWriter(SummaryWriterAbstractClass):
         
         with open(os.path.join(checkpoint_path, "index.json"), "w") as f:
             json.dump(idxs, f)
-    
+        
+        # update iteration structure
+        iteration_structure_path = os.path.join(self.log_dir, "iteration_structure.json")
+        if prev_id is None:
+            iter_s = [{"value": C, "name": "checkpoint", "pid": ""}]
+            with open(iteration_structure_path, "w") as f:
+                json.dump(iter_s, f)
+        else:
+            with open(iteration_structure_path,encoding='utf8')as fp:
+                json_data = json.load(fp)
+                json_data.append({'value': C, 'name': 'checkpoint', 'pid': "{}".format(prev_id)})
+            with open(iteration_structure_path,'w') as f:
+                json.dump(json_data, f)
+                f.close()
+
+                    
+
+
+                
+
+            
 
 
 
