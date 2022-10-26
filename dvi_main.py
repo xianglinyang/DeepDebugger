@@ -15,7 +15,7 @@ from torch.utils.data import WeightedRandomSampler
 from umap.umap_ import find_ab_params
 
 from singleVis.custom_weighted_random_sampler import CustomWeightedRandomSampler
-from singleVis.SingleVisualizationModel import SingleVisualizationModel
+from singleVis.SingleVisualizationModel import VisModel
 from singleVis.losses import UmapLoss, ReconstructionLoss, TemporalLoss, DVILoss
 from singleVis.edge_dataset import DVIDataHandler
 from singleVis.trainer import DVITrainer
@@ -67,7 +67,9 @@ INIT_NUM = VISUALIZATION_PARAMETER["INIT_NUM"]
 ALPHA = VISUALIZATION_PARAMETER["ALPHA"]
 BETA = VISUALIZATION_PARAMETER["BETA"]
 MAX_HAUSDORFF = VISUALIZATION_PARAMETER["MAX_HAUSDORFF"]
-HIDDEN_LAYER = VISUALIZATION_PARAMETER["HIDDEN_LAYER"]
+# HIDDEN_LAYER = VISUALIZATION_PARAMETER["HIDDEN_LAYER"]
+ENCODER_DIMS = VISUALIZATION_PARAMETER["ENCODER_DIMS"]
+DECODER_DIMS = VISUALIZATION_PARAMETER["DECODER_DIMS"]
 S_N_EPOCHS = VISUALIZATION_PARAMETER["S_N_EPOCHS"]
 T_N_EPOCHS = VISUALIZATION_PARAMETER["T_N_EPOCHS"]
 N_NEIGHBORS = VISUALIZATION_PARAMETER["N_NEIGHBORS"]
@@ -94,8 +96,9 @@ if PREPROCESS:
         data_provider._estimate_boundary(LEN//10, l_bound=L_BOUND)
 
 # Define visualization models
-# TODO make the structure a hyperparameter
-model = SingleVisualizationModel(input_dims=512, output_dims=2, units=256, hidden_layer=HIDDEN_LAYER)
+# model = SingleVisualizationModel(input_dims=512, output_dims=2, units=256, hidden_layer=HIDDEN_LAYER)
+model = VisModel(ENCODER_DIMS, DECODER_DIMS)
+
 # Define Losses
 negative_sample_rate = 5
 min_dist = .1
@@ -132,9 +135,7 @@ for iteration in range(EPOCH_START, EPOCH_END, EPOCH_PERIOD):
     edge_to = edge_to[eliminate_zeros]
     edge_from = edge_from[eliminate_zeros]
     probs = probs[eliminate_zeros]
-
-    # save result
-    trainer.record_time("{}_time_{}.json".format(VIS_METHOD, VIS_MODEL_NAME), "complex_construction", str(iteration), t1-t0)
+    
     dataset = DVIDataHandler(edge_to, edge_from, feature_vectors, attention, w_prev)
 
     n_samples = int(np.sum(S_N_EPOCHS * probs) // 1)
@@ -155,7 +156,9 @@ for iteration in range(EPOCH_START, EPOCH_END, EPOCH_PERIOD):
     trainer.train(PATIENT, MAX_EPOCH)
     t3 = time.time()
 
-    trainer.record_time("{}_time_{}.json".format(VIS_METHOD, VIS_MODEL_NAME), "training", str(iteration), t3-t2)
+    # save result
+    trainer.record_time("time_{}_{}.json".format(VIS_METHOD, VIS_MODEL_NAME), "complex_construction", str(iteration), t1-t0)
+    trainer.record_time("time_{}_{}.json".format(VIS_METHOD, VIS_MODEL_NAME), "training", str(iteration), t3-t2)
     save_dir = os.path.join(data_provider.model_path, "Epoch_{}".format(iteration))
     trainer.save(save_dir=save_dir, file_name="{}".format(VIS_MODEL_NAME))
 
@@ -191,4 +194,4 @@ eval_epochs = EVAL_EPOCH_DICT[DATASET]
 evaluator = Evaluator(data_provider, projector)
 
 for eval_epoch in eval_epochs:
-    evaluator.save_epoch_eval(eval_epoch, 15, temporal_k=5, file_name="{}".format(EVALUATION_NAME))
+    evaluator.save_epoch_eval(eval_epoch, 15, temporal_k=5, file_name="{}_{}".format(VIS_METHOD, EVALUATION_NAME))

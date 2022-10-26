@@ -1,37 +1,47 @@
+"""This serve as an template of Visualization in pytorch."""
+
+########################################################################################################################
+#                                                       IMPORT                                                         #
+########################################################################################################################
+
 import torch
 import sys
 import os
+import json
 import time
 import numpy as np
 import argparse
 
 from torch.utils.data import DataLoader
 from torch.utils.data import WeightedRandomSampler
-from umap.umap_ import find_ab_params
-
 from singleVis.custom_weighted_random_sampler import CustomWeightedRandomSampler
+
+# >>>>>>>>>> Define different visualization components in the following file and import them
 from singleVis.SingleVisualizationModel import VisModel
-from singleVis.losses import UmapLoss, ReconstructionLoss, SingleVisLoss
-from singleVis.edge_dataset import DataHandler
-from singleVis.trainer import SingleVisTrainer
-from singleVis.data import NormalDataProvider
-from singleVis.spatial_edge_constructor import kcSpatialEdgeConstructor
-from singleVis.temporal_edge_constructor import GlobalTemporalEdgeConstructor
-from singleVis.projector import Projector
-from singleVis.eval.evaluator import Evaluator
+from singleVis.losses import Loss # and other Losses 
+from singleVis.edge_dataset import DataHandlerAbstractClass
+from singleVis.trainer import TrainerAbstractClass
+from singleVis.data import DataProviderAbstractClass
+from singleVis.spatial_edge_constructor import SpatialEdgeConstructorAbstractClass
+from singleVis.projector import ProjectorAbstractClass
+from singleVis.eval.evaluator import EvaluatorAbstractClass
+# <<<<<<<<<< Define different visualization components in the following file and import them
+
 ########################################################################################################################
-#                                                    VISUALIZATION SETTING                                             #
+#                                                HYPERPARAMETERS                                                       #
 ########################################################################################################################
-VIS_METHOD= "TimeVis"
-########################################################################################################################
-#                                                     LOAD PARAMETERS                                                  #
-########################################################################################################################
+# >>>>>>>>>>
+VIS_METHOD = "your visualization name"
+# <<<<<<<<<<
+
 parser = argparse.ArgumentParser(description='Process hyperparameters...')
 parser.add_argument('--content_path', type=str)
 args = parser.parse_args()
 
 CONTENT_PATH = args.content_path
 sys.path.append(CONTENT_PATH)
+
+# Define your dataset hyperparameters in config
 from config import config
 
 # record output information
@@ -61,9 +71,7 @@ INIT_NUM = VISUALIZATION_PARAMETER["INIT_NUM"]
 ALPHA = VISUALIZATION_PARAMETER["ALPHA"]
 BETA = VISUALIZATION_PARAMETER["BETA"]
 MAX_HAUSDORFF = VISUALIZATION_PARAMETER["MAX_HAUSDORFF"]
-# HIDDEN_LAYER = VISUALIZATION_PARAMETER["HIDDEN_LAYER"]
-ENCODER_DIMS = VISUALIZATION_PARAMETER["ENCODER_DIMS"]
-DECODER_DIMS = VISUALIZATION_PARAMETER["DECODER_DIMS"]
+HIDDEN_LAYER = VISUALIZATION_PARAMETER["HIDDEN_LAYER"]
 S_N_EPOCHS = VISUALIZATION_PARAMETER["S_N_EPOCHS"]
 T_N_EPOCHS = VISUALIZATION_PARAMETER["T_N_EPOCHS"]
 N_NEIGHBORS = VISUALIZATION_PARAMETER["N_NEIGHBORS"]
@@ -73,54 +81,60 @@ MAX_EPOCH = VISUALIZATION_PARAMETER["MAX_EPOCH"]
 VIS_MODEL_NAME = VISUALIZATION_PARAMETER["VIS_MODEL_NAME"]
 EVALUATION_NAME = VISUALIZATION_PARAMETER["EVALUATION_NAME"]
 
-SEGMENTS = [(EPOCH_START, EPOCH_END)]
-
-# define hyperparameters
 DEVICE = torch.device("cuda:{}".format(GPU_ID) if torch.cuda.is_available() else "cpu")
 
 import Model.model as subject_model
 net = eval("subject_model.{}()".format(NET))
 
 ########################################################################################################################
-#                                                    TRAINING SETTING                                                  #
+#                                                   TRAINING                                                           #
 ########################################################################################################################
-data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, split=-1, device=DEVICE, classes=CLASSES,verbose=1)
+# >>>>>>>>>> Define data_provider
+data_provider = DataProviderAbstractClass(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, split=-1)
 if PREPROCESS:
     data_provider._meta_data()
     if B_N_EPOCHS >0:
         data_provider._estimate_boundary(LEN//10, l_bound=L_BOUND)
+# <<<<<<<<<< Define data_provider
 
-# model = SingleVisualizationModel(input_dims=512, output_dims=2, units=256, hidden_layer=HIDDEN_LAYER)
-model = VisModel(ENCODER_DIMS, DECODER_DIMS)
+# >>>>>>>>>> Define your own visualization models
+model = VisModel(encoder_dims=[100,20,2], decoder_dims=[2,50,100])  # placeholder
+# <<<<<<<<<< Define your own visualization models
 
-negative_sample_rate = 5
-min_dist = .1
-_a, _b = find_ab_params(1.0, min_dist)
-umap_loss_fn = UmapLoss(negative_sample_rate, DEVICE, _a, _b, repulsion_strength=1.0)
-recon_loss_fn = ReconstructionLoss(beta=1.0)
-criterion = SingleVisLoss(umap_loss_fn, recon_loss_fn, lambd=LAMBDA)
-projector = Projector(vis_model=model, content_path=CONTENT_PATH, segments=SEGMENTS, device=DEVICE)
+# >>>>>>>>>> Define your own Losses
+criterion = Loss()
+# <<<<<<<<<< Define your own Losses
 
+
+# >>>>>>>>>> Define your own Projector
+projector = ProjectorAbstractClass()
+# <<<<<<<<<< Define your own Projector
+
+
+# >>>>>>>>>> Define your own training parameters
 optimizer = torch.optim.Adam(model.parameters(), lr=.01, weight_decay=1e-5)
 lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=4, gamma=.1)
+# <<<<<<<<<< Define your own training parameters
 
+
+# >>>>>>>>>> Define your own Edge dataset
 t0 = time.time()
-spatial_cons = kcSpatialEdgeConstructor(data_provider=data_provider, init_num=INIT_NUM, s_n_epochs=S_N_EPOCHS, b_n_epochs=B_N_EPOCHS, n_neighbors=N_NEIGHBORS, MAX_HAUSDORFF=MAX_HAUSDORFF, ALPHA=ALPHA, BETA=BETA)
-s_edge_to, s_edge_from, s_probs, feature_vectors, time_step_nums, time_step_idxs_list, knn_indices, sigmas, rhos, attention = spatial_cons.construct()
-temporal_cons = GlobalTemporalEdgeConstructor(X=feature_vectors, time_step_nums=time_step_nums, sigmas=sigmas, rhos=rhos, n_neighbors=N_NEIGHBORS, n_epochs=T_N_EPOCHS)
-t_edge_to, t_edge_from, t_probs = temporal_cons.construct()
+spatial_cons = SpatialEdgeConstructorAbstractClass(data_provider)
+edge_to, edge_from, probs, feature_vectors = spatial_cons.construct()
 t1 = time.time()
+# <<<<<<<<<< Define your own Edge dataset
 
-edge_to = np.concatenate((s_edge_to, t_edge_to),axis=0)
-edge_from = np.concatenate((s_edge_from, t_edge_from), axis=0)
-probs = np.concatenate((s_probs, t_probs), axis=0)
+# remove edges with low weight (optional) 
 probs = probs / (probs.max()+1e-3)
 eliminate_zeros = probs>1e-3
 edge_to = edge_to[eliminate_zeros]
 edge_from = edge_from[eliminate_zeros]
 probs = probs[eliminate_zeros]
 
-dataset = DataHandler(edge_to, edge_from, feature_vectors, attention)
+# >>>>>>>>>> Define your own dataset
+dataset = DataHandlerAbstractClass(edge_to, edge_from, feature_vectors)
+# <<<<<<<<<< Define your own dataset
+
 n_samples = int(np.sum(S_N_EPOCHS * probs) // 1)
 # chose sampler based on the number of dataset
 if len(edge_to) > 2^24:
@@ -132,42 +146,36 @@ edge_loader = DataLoader(dataset, batch_size=1000, sampler=sampler)
 ########################################################################################################################
 #                                                       TRAIN                                                          #
 ########################################################################################################################
-
-trainer = SingleVisTrainer(model, criterion, optimizer, lr_scheduler, edge_loader=edge_loader, DEVICE=DEVICE)
-
+# >>>>>>>>>> Define your own trainer
+trainer = TrainerAbstractClass(model, criterion, optimizer, lr_scheduler, edge_loader, DEVICE)
+# <<<<<<<<<< Define your own trainer
 t2=time.time()
 trainer.train(PATIENT, MAX_EPOCH)
 t3 = time.time()
 
 trainer.record_time("time_{}_{}.json".format(VIS_METHOD, VIS_MODEL_NAME), "complex_construction", t1-t0)
 trainer.record_time("time_{}_{}.json".format(VIS_METHOD, VIS_MODEL_NAME), "training", t3-t2)
-trainer.save(save_dir=data_provider.model_path, file_name="{}".format(VIS_MODEL_NAME))
+save_dir = "path/to/model"
+trainer.save(save_dir=save_dir, file_name="{}".format(VIS_MODEL_NAME))
 
 ########################################################################################################################
 #                                                      VISUALIZATION                                                   #
 ########################################################################################################################
-
-from singleVis.visualizer import visualizer
-
-vis = visualizer(data_provider, projector, 200, 10, CLASSES)
-save_dir = os.path.join(data_provider.content_path, "img")
-if not os.path.exists(save_dir):
-    os.mkdir(save_dir)
-for i in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
-    vis.savefig(i, path=os.path.join(save_dir, "{}_{}_{}.png".format(DATASET, i, VIS_METHOD)))
-
+# >>>>>>>>>> Define your Visualizer
+from singleVis.visualizer import VisualizerAbstractClass
+vis = VisualizerAbstractClass(data_provider, projector)
+save_dir = "path/to/generated/imgs"
+os.makedirs(save_dir)
+for epoch in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
+    vis.savefig(epoch, path=os.path.join(save_dir, "{}_{}_{}.png".format(DATASET, epoch, VIS_METHOD)))
+# <<<<<<<<<< Define your Visualizer
+    
 ########################################################################################################################
 #                                                       EVALUATION                                                     #
 ########################################################################################################################
-
-EVAL_EPOCH_DICT = {
-    "mnist_full":[1,2,5,10,13,16,20],
-    "fmnist_full":[1,2,6,11,25,30,36,50],
-    "cifar10_full":[1,3,9,18,24,41,70,100,160,200]
-}
-eval_epochs = EVAL_EPOCH_DICT[DATASET]
-
-evaluator = Evaluator(data_provider, projector)
-
+eval_epochs = range(EPOCH_START, EPOCH_END, EPOCH_PERIOD)
+# >>>>>>>>>> Define your evaluator
+evaluator = EvaluatorAbstractClass(data_provider, projector)
 for eval_epoch in eval_epochs:
     evaluator.save_epoch_eval(eval_epoch, 15, temporal_k=5, file_name="{}_{}".format(VIS_METHOD, EVALUATION_NAME))
+# <<<<<<<<<< Define your evaluator
