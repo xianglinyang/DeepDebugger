@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 import os
 import time
 import gc 
+import json
 from tqdm import tqdm
 import torch
 
@@ -184,7 +185,7 @@ class SingleVisTrainer(TrainerAbstractClass):
     
     def record_time(self, file_name, key, t):
         # save result
-        save_file = os.path.join(data_provider.model_path, file_name+".json")
+        save_file = os.path.join(self.data_provider.model_path, file_name+".json")
         if not os.path.exists(save_file):
             evaluation = dict()
         else:
@@ -237,6 +238,22 @@ class HybridVisTrainer(SingleVisTrainer):
                                                                 sum(smooth_losses) / len(smooth_losses),
                                                                 sum(all_loss) / len(all_loss)))
         return self.loss
+    
+    def record_time(self, file_name, operation, seg, t):
+        # save result
+        save_file = os.path.join(self.data_provider.model_path, file_name+".json")
+        if not os.path.exists(save_file):
+            evaluation = dict()
+        else:
+            f = open(save_file, "r")
+            evaluation = json.load(f)
+            f.close()
+        if operation not in evaluation.keys():
+            evaluation[operation] = dict()
+        evaluation[operation][str(seg)] = round(t, 3)
+        with open(save_file, 'w') as f:
+            json.dump(evaluation, f)
+        
 
 class DVITrainer(SingleVisTrainer):
     def __init__(self, model, criterion, optimizer, lr_scheduler, edge_loader, DEVICE):
@@ -282,7 +299,7 @@ class DVITrainer(SingleVisTrainer):
     
     def record_time(self, file_name, operation, iteration, t):
         # save result
-        save_file = os.path.join(data_provider.model_path, file_name+".json")
+        save_file = os.path.join(self.data_provider.model_path, file_name+".json")
         if not os.path.exists(save_file):
             evaluation = dict()
         else:

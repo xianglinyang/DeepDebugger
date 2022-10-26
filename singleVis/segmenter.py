@@ -60,6 +60,7 @@ class Segmenter:
                 count = dists[i]
         dists_segs.insert(0, (0, base))
         segs = [(self.s+i*self.p, self.s+(j+1)*self.p) for i, j in dists_segs]
+        self.segments = segs
         return segs
     
 
