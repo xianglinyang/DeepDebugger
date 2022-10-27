@@ -1,3 +1,4 @@
+from audioop import mul
 import numpy as np
 from pynndescent import NNDescent
 from sklearn.linear_model import LinearRegression
@@ -6,7 +7,8 @@ from tqdm import tqdm
 
 class IntrinsicDim:
     def __init__(self, data, metric="euclidean"):
-        self.data = data
+        # if redundant
+        self.data = np.unique(data, axis=0)
         self.metric = metric
         self.name = "Intrinsic Dimension"
 
@@ -24,7 +26,7 @@ class IntrinsicDim:
             metric=self.metric,
             n_trees=n_trees,
             n_iters=n_iters,
-            max_candidates=60,
+            max_candidates=10,
             verbose=False
         )
         _, knn_dists = nnd.neighbor_graph
