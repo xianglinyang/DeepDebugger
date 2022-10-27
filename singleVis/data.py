@@ -129,7 +129,8 @@ class NormalDataProvider(DataProvider):
             self.model = self.model.to(self.DEVICE)
             self.model.eval()
 
-            repr_model = torch.nn.Sequential(*(list(self.model.children())[:self.split]))
+            repr_model = self.feature_function(n_epoch)
+            # repr_model = torch.nn.Sequential(*(list(self.model.children())[:self.split]))
 
             # training data clustering
             data_pool_representation = batch_run(repr_model, training_data)
@@ -184,7 +185,8 @@ class NormalDataProvider(DataProvider):
             self.model = self.model.to(self.DEVICE)
             self.model.eval()
 
-            repr_model = torch.nn.Sequential(*(list(self.model.children())[:self.split]))
+            repr_model = self.feature_function(n_epoch)
+            # repr_model = torch.nn.Sequential(*(list(self.model.children())[:self.split]))
 
             t0 = time.time()
             confs = batch_run(self.model, training_data)
@@ -389,8 +391,8 @@ class NormalDataProvider(DataProvider):
         preds = self.get_pred(epoch, data)
         border = is_B(preds)
         return border
-    
 
+    
 class ActiveLearningDataProvider(DataProvider):
     def __init__(self, content_path, model, base_epoch_start, split, device, classes, verbose=1):
         # dummy input as epoch_end and epoch_period
@@ -1051,5 +1053,26 @@ class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
         preds = self.get_pred(iteration, epoch, data)
         border = is_B(preds)
         return border
-    
 
+
+class TimeVisDataProvider(NormalDataProvider):
+
+    def prediction_function(self, epoch):
+        model_location = os.path.join(self.model_path, "Epoch_{:d}".format(epoch), "subject_model.pth")
+        self.model.load_state_dict(torch.load(model_location, map_location=torch.device("cpu")))
+        self.model.to(self.DEVICE)
+        self.model.eval()
+
+        pred_fn = self.model.prediction
+        return pred_fn
+
+
+    def feature_function(self, epoch):
+        model_location = os.path.join(self.model_path, "Epoch_{:d}".format(epoch), "subject_model.pth")
+        self.model.load_state_dict(torch.load(model_location, map_location=torch.device("cpu")))
+        self.model = self.model.to(self.DEVICE)
+        self.model.eval()
+
+        fea_fn = self.model.feature
+        return fea_fn
+    

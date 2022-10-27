@@ -53,6 +53,7 @@ class Projector(ProjectorAbstractClass):
             if (iteration >= s and iteration < e) or (iteration == init_e and e == init_e):
                 idx = i
                 break
+        # TODO vis model name as a hyperparameter
         file_path = os.path.join(self.content_path, "Model", "tnn_hybrid_{}.pth".format(idx))
         save_model = torch.load(file_path, map_location="cpu")
         self.vis_model.load_state_dict(save_model["state_dict"])
@@ -197,3 +198,16 @@ class DVIProjector(Projector):
         self.vis_model.to(self.DEVICE)
         self.vis_model.eval()
         print("Successfully load the DVI visualization model for iteration {}".format(iteration))
+
+class TimeVisProjector(Projector):
+    def __init__(self, vis_model, content_path, vis_model_name, device) -> None:
+        super().__init__(vis_model, content_path, None, device)
+        self.vis_model_name = vis_model_name
+
+    def load(self, iteration):
+        file_path = os.path.join(self.content_path, "Model", "{}.pth".format(self.vis_model_name))
+        save_model = torch.load(file_path, map_location="cpu")
+        self.vis_model.load_state_dict(save_model["state_dict"])
+        self.vis_model.to(self.DEVICE)
+        self.vis_model.eval()
+        print("Successfully load the TimeVis visualization model for iteration {}".format(iteration))
