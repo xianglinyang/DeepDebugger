@@ -1075,4 +1075,50 @@ class TimeVisDataProvider(NormalDataProvider):
 
         fea_fn = self.model.feature
         return fea_fn
+
+    def train_representation(self, epoch):
+        # load train data
+        train_data_loc = os.path.join(self.model_path, "Epoch_{:d}".format(epoch), "train_data.npy")
+        index_file = os.path.join(self.model_path, "Epoch_{:d}".format(epoch), "index.json")
+        index = load_labelled_data_index(index_file)
+        try:
+            train_data = np.load(train_data_loc)
+            train_data = train_data[index]
+        except Exception as e:
+            print("no train data saved for Epoch {}".format(epoch))
+            train_data = None
+        return train_data
     
+    def test_representation(self, epoch):
+        data_loc = os.path.join(self.model_path, "Epoch_{:d}".format(epoch), "test_data.npy")
+        try:
+            test_data = np.load(data_loc)
+            index_file = os.path.join(self.model_path, "Epoch_{:d}".format(epoch), "test_index.json")
+            if os.path.exists(index_file):
+                index = load_labelled_data_index(index_file)
+                test_data = test_data[index]
+        except Exception as e:
+            print("no test data saved for Epoch {}".format(epoch))
+            test_data = None
+        return test_data
+    
+    def border_representation(self, epoch):
+        border_centers_loc = os.path.join(self.model_path, "Epoch_{:d}".format(epoch),
+                                          "border_centers.npy")
+        try:
+            border_centers = np.load(border_centers_loc)
+        except Exception as e:
+            print("no border points saved for Epoch {}".format(epoch))
+            border_centers = np.array([])
+        return border_centers
+    
+    def test_border_representation(self, epoch):
+        border_centers_loc = os.path.join(self.model_path, "Epoch_{:d}".format(epoch),
+                                          "test_border_centers.npy")
+        try:
+            border_centers = np.load(border_centers_loc)
+        except Exception as e:
+            print("no border points saved for Epoch {}".format(epoch))
+            border_centers = np.array([])
+        return border_centers
+
