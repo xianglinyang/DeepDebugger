@@ -7,8 +7,9 @@ from tqdm import tqdm
 
 class IntrinsicDim:
     def __init__(self, data, metric="euclidean"):
-        # if redundant
-        self.data = np.unique(data, axis=0)
+        # normalize and if redundant
+        self.data = np.unique(data.reshape(len(data), -1), axis=0)
+
         self.metric = metric
         self.name = "Intrinsic Dimension"
 
