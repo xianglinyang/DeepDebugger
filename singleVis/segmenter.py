@@ -1,4 +1,6 @@
 import numpy as np
+import json
+import os
 from pynndescent import NNDescent
 
 # helper function
@@ -43,6 +45,10 @@ class Segmenter:
         for curr_epoch in range(self.s, self.e, self.p):
             next_data = self.data_provider.train_representation(curr_epoch+ self.p)
             curr_data = self.data_provider.train_representation(curr_epoch)
+            l = next_data.shape[0]
+            next_data = next_data.reshape(l, - 1)
+            curr_data = curr_data.reshape(l, -1)
+            # reshape representation
             dists[(curr_epoch-self.s)//self.p] = hausdorff_d(curr_data=next_data, prev_data=curr_data)
         
         # self.dists = np.copy(dists)
@@ -63,6 +69,19 @@ class Segmenter:
         self.segments = segs
         return segs
     
+    def record_time(self, save_dir, file_name, t):
+        # save result
+        save_file = os.path.join(save_dir, file_name+".json")
+        if not os.path.exists(save_file):
+            evaluation = dict()
+        else:
+            f = open(save_file, "r")
+            evaluation = json.load(f)
+            f.close()
+        evaluation["segmentation"] = round(t, 3)
+        with open(save_file, 'w') as f:
+            json.dump(evaluation, f)
+
 
 class DenseALSegmenter(Segmenter):
     def __init__(self, data_provider, threshold, epoch_num):
