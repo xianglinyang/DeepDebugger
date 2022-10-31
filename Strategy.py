@@ -28,10 +28,33 @@ class StrategyAbstractClass(ABC):
     def __init__(self, CONTENT_PATH, config):
         self.config = config
         self.CONTENT_PATH = CONTENT_PATH
+    
+    @abstractmethod
+    def _init(self):
+        pass
 
     @abstractmethod
-    def visualize_embedding(self):
+    def _preprocess(self):
         pass
+
+    @abstractmethod
+    def _train(self):
+        pass
+
+    @abstractmethod
+    def _evaluate(self):
+        pass
+
+    @abstractmethod
+    def _visualize(self):
+        pass
+
+    def visualize_embedding(self):
+        self._init()
+        self._preprocess()
+        self._train()
+        self._evaluate()
+        self._visualize()
 
 class DeepVisualInsight(StrategyAbstractClass):
     def __init__(self, CONTENT_PATH, config):
