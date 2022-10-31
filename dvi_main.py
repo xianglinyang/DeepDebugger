@@ -6,7 +6,6 @@ import sys
 import os
 import json
 import time
-import copy
 import numpy as np
 import argparse
 
@@ -19,10 +18,11 @@ from singleVis.SingleVisualizationModel import VisModel
 from singleVis.losses import UmapLoss, ReconstructionLoss, TemporalLoss, DVILoss
 from singleVis.edge_dataset import DVIDataHandler
 from singleVis.trainer import DVITrainer
-from singleVis.data import NormalDataProvider
+from singleVis.data import TimeVisDataProvider
 from singleVis.spatial_edge_constructor import SingleEpochSpatialEdgeConstructor
 from singleVis.projector import DVIProjector
 from singleVis.eval.evaluator import Evaluator
+from singleVis.utils import find_neighbor_preserving_rate
 ########################################################################################################################
 #                                                     DVI PARAMETERS                                                   #
 ########################################################################################################################
@@ -38,7 +38,9 @@ args = parser.parse_args()
 
 CONTENT_PATH = args.content_path
 sys.path.append(CONTENT_PATH)
-from config import config
+with open(os.path.join(CONTENT_PATH, "config.json"), "r") as f:
+    config = json.load(f)
+config = config[VIS_METHOD]
 
 # record output information
 now = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime(time.time())) 
@@ -60,18 +62,13 @@ LEN = TRAINING_PARAMETER["train_num"]
 
 # Training parameter (visualization model)
 VISUALIZATION_PARAMETER = config["VISUALIZATION"]
-LAMBDA = VISUALIZATION_PARAMETER["LAMBDA"]
+LAMBDA1 = VISUALIZATION_PARAMETER["LAMBDA1"]
+LAMBDA2 = VISUALIZATION_PARAMETER["LAMBDA2"]
 B_N_EPOCHS = VISUALIZATION_PARAMETER["BOUNDARY"]["B_N_EPOCHS"]
 L_BOUND = VISUALIZATION_PARAMETER["BOUNDARY"]["L_BOUND"]
-INIT_NUM = VISUALIZATION_PARAMETER["INIT_NUM"]
-ALPHA = VISUALIZATION_PARAMETER["ALPHA"]
-BETA = VISUALIZATION_PARAMETER["BETA"]
-MAX_HAUSDORFF = VISUALIZATION_PARAMETER["MAX_HAUSDORFF"]
-# HIDDEN_LAYER = VISUALIZATION_PARAMETER["HIDDEN_LAYER"]
 ENCODER_DIMS = VISUALIZATION_PARAMETER["ENCODER_DIMS"]
 DECODER_DIMS = VISUALIZATION_PARAMETER["DECODER_DIMS"]
 S_N_EPOCHS = VISUALIZATION_PARAMETER["S_N_EPOCHS"]
-T_N_EPOCHS = VISUALIZATION_PARAMETER["T_N_EPOCHS"]
 N_NEIGHBORS = VISUALIZATION_PARAMETER["N_NEIGHBORS"]
 PATIENT = VISUALIZATION_PARAMETER["PATIENT"]
 MAX_EPOCH = VISUALIZATION_PARAMETER["MAX_EPOCH"]
@@ -89,14 +86,13 @@ net = eval("subject_model.{}()".format(NET))
 #                                                    TRAINING SETTING                                                  #
 ########################################################################################################################
 # Define data_provider
-data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, split=-1, device=DEVICE, classes=CLASSES,verbose=1)
+data_provider = TimeVisDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, split=-1, device=DEVICE, classes=CLASSES,verbose=1)
 if PREPROCESS:
     data_provider._meta_data()
     if B_N_EPOCHS >0:
         data_provider._estimate_boundary(LEN//10, l_bound=L_BOUND)
 
 # Define visualization models
-# model = SingleVisualizationModel(input_dims=512, output_dims=2, units=256, hidden_layer=HIDDEN_LAYER)
 model = VisModel(ENCODER_DIMS, DECODER_DIMS)
 
 # Define Losses
@@ -110,17 +106,23 @@ temporal_loss_fn = TemporalLoss()
 projector = DVIProjector(vis_model=model, content_path=CONTENT_PATH, vis_model_name=VIS_MODEL_NAME, device=DEVICE)
 
 start_flag = 1
+prev_model = VisModel(ENCODER_DIMS, DECODER_DIMS)
+prev_model.load_state_dict(model.state_dict())
+for param in prev_model.parameters():
+    param.requires_grad = False
 w_prev = dict(model.named_parameters())
-for param in w_prev.values():
-    param.requires_grad=False
 
-for iteration in range(EPOCH_START, EPOCH_END, EPOCH_PERIOD):
+for iteration in range(EPOCH_START, EPOCH_END+EPOCH_PERIOD, EPOCH_PERIOD):
     # Define DVI Loss
     if start_flag:
-        criterion = DVILoss(umap_loss_fn, recon_loss_fn, temporal_loss_fn, lambd1=1.0, lambd2=0.0)
+        criterion = DVILoss(umap_loss_fn, recon_loss_fn, temporal_loss_fn, lambd1=LAMBDA1, lambd2=0.0)
         start_flag = 0
     else:
-        criterion = DVILoss(umap_loss_fn, recon_loss_fn, temporal_loss_fn, lambd1=1.0, lambd2=1.0)
+        # TODO AL mode, redefine train_representation
+        prev_data = data_provider.train_representation(iteration-EPOCH_PERIOD)
+        curr_data = data_provider.train_representation(iteration)
+        npr = find_neighbor_preserving_rate(prev_data, curr_data, N_NEIGHBORS)
+        criterion = DVILoss(umap_loss_fn, recon_loss_fn, temporal_loss_fn, lambd1=LAMBDA1, lambd2=LAMBDA2*npr)
     # Define training parameters
     optimizer = torch.optim.Adam(model.parameters(), lr=.01, weight_decay=1e-5)
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=4, gamma=.1)
@@ -158,14 +160,16 @@ for iteration in range(EPOCH_START, EPOCH_END, EPOCH_PERIOD):
 
     # save result
     save_dir = data_provider.model_path
-    trainer.record_time(save_dir, "time_{}_{}.json".format(VIS_METHOD, VIS_MODEL_NAME), "complex_construction", str(iteration), t1-t0)
-    trainer.record_time(save_dir, "time_{}_{}.json".format(VIS_METHOD, VIS_MODEL_NAME), "training", str(iteration), t3-t2)
+    trainer.record_time(save_dir, "time_{}.json".format(VIS_MODEL_NAME), "complex_construction", str(iteration), t1-t0)
+    trainer.record_time(save_dir, "time_{}.json".format(VIS_MODEL_NAME), "training", str(iteration), t3-t2)
     save_dir = os.path.join(data_provider.model_path, "Epoch_{}".format(iteration))
     trainer.save(save_dir=save_dir, file_name="{}".format(VIS_MODEL_NAME))
 
-    w_prev = dict(model.named_parameters())
-    for param in w_prev.values():
-        param.requires_grad=False
+    prev_model.load_state_dict(model.state_dict())
+    for param in prev_model.parameters():
+        param.requires_grad = False
+    w_prev = dict(prev_model.named_parameters())
+    
 
 ########################################################################################################################
 #                                                      VISUALIZATION                                                   #
@@ -173,7 +177,7 @@ for iteration in range(EPOCH_START, EPOCH_END, EPOCH_PERIOD):
 
 from singleVis.visualizer import visualizer
 
-vis = visualizer(data_provider, projector, 200, 10, CLASSES)
+vis = visualizer(data_provider, projector, 200, "plasma")
 save_dir = os.path.join(data_provider.content_path, "img")
 if not os.path.exists(save_dir):
     os.mkdir(save_dir)
@@ -184,15 +188,8 @@ for i in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
 ########################################################################################################################
 #                                                       EVALUATION                                                     #
 ########################################################################################################################
-
-EVAL_EPOCH_DICT = {
-    "mnist_full":[1,2,5,10,13,16,20],
-    "fmnist_full":[1,2,6,11,25,30,36,50],
-    "cifar10_full":[1,3,9,18,24,41,70,100,160,200]
-}
-eval_epochs = EVAL_EPOCH_DICT[DATASET]
-
+eval_epochs = range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD)
 evaluator = Evaluator(data_provider, projector)
 
 for eval_epoch in eval_epochs:
-    evaluator.save_epoch_eval(eval_epoch, 15, temporal_k=5, file_name="{}_{}".format(VIS_METHOD, EVALUATION_NAME))
+    evaluator.save_epoch_eval(eval_epoch, 15, temporal_k=5, file_name="{}".format(EVALUATION_NAME))

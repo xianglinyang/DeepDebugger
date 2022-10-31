@@ -202,7 +202,7 @@ class HybridVisTrainer(SingleVisTrainer):
         super().__init__(model, criterion, optimizer, lr_scheduler, edge_loader, DEVICE)
 
     def train_step(self):
-        self.model.to(device=self.DEVICE)
+        self.model = self.model.to(device=self.DEVICE)
         self.model.train()
         all_loss = []
         umap_losses = []
@@ -260,7 +260,7 @@ class DVITrainer(SingleVisTrainer):
         super().__init__(model, criterion, optimizer, lr_scheduler, edge_loader, DEVICE)
     
     def train_step(self):
-        self.model.to(device=self.DEVICE)
+        self.model = self.model.to(device=self.DEVICE)
         self.model.train()
         all_loss = []
         umap_losses = []
@@ -276,11 +276,15 @@ class DVITrainer(SingleVisTrainer):
             edge_from = edge_from.to(device=self.DEVICE, dtype=torch.float32)
             a_to = a_to.to(device=self.DEVICE, dtype=torch.float32)
             a_from = a_from.to(device=self.DEVICE, dtype=torch.float32)
-            for param in w_prev.values():
-                param = param.to(device=self.DEVICE, dtype=torch.float32)
+
+            for param_name in w_prev.keys():
+                w_prev[param_name] = w_prev[param_name].to(device=self.DEVICE, dtype=torch.float32)
+
+            # for param in w_prev.values():
+            #     param = param.to(device=self.DEVICE, dtype=torch.float32)
 
             outputs = self.model(edge_to, edge_from)
-            umap_l, recon_l, temporal_l, loss = self.criterion(edge_to, edge_from, a_to, a_from, w_prev, outputs)
+            umap_l, recon_l, temporal_l, loss = self.criterion(edge_to, edge_from, a_to, a_from, w_prev, self.model, outputs)
             all_loss.append(loss.item())
             umap_losses.append(umap_l.item())
             recon_losses.append(recon_l.item())

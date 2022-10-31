@@ -150,7 +150,7 @@ class NormalDataProvider(DataProvider):
             "Average time for inferencing data: {:.4f}".format(sum(time_inference) / len(time_inference)))
 
         # save result
-        save_dir = os.path.join(self.model_path, "SV_time.json")
+        save_dir = os.path.join(self.model_path, "time.json")
         if not os.path.exists(save_dir):
             evaluation = dict()
         else:
@@ -224,7 +224,7 @@ class NormalDataProvider(DataProvider):
             "Average time for generate border points: {:.4f}".format(sum(time_borders_gen) / len(time_borders_gen)))
 
         # save result
-        save_dir = os.path.join(self.model_path, "SV_time.json")
+        save_dir = os.path.join(self.model_path, "time.json")
         if not os.path.exists(save_dir):
             evaluation = dict()
         else:
@@ -1121,4 +1121,3 @@ class TimeVisDataProvider(NormalDataProvider):
             print("no border points saved for Epoch {}".format(epoch))
             border_centers = np.array([])
         return border_centers
-
