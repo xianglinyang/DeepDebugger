@@ -1,5 +1,4 @@
 '''Train CIFAR10 with PyTorch.'''
-from distutils.command.config import config
 import torch
 import torch.nn as nn
 import torch.optim as optim

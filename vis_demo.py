@@ -7,7 +7,6 @@
 import torch
 import sys
 import os
-import json
 import time
 import numpy as np
 import argparse
