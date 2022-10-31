@@ -37,7 +37,7 @@ from sklearn.metrics import pairwise_distances
 class kCenterGreedy(object):
 
   def __init__(self, X, metric='euclidean'):
-    self.features = X
+    self.features = X.reshape(len(X), -1)
     self.name = 'kcenter'
     self.metric = metric
     self.min_distances = None
