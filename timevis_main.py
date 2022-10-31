@@ -92,15 +92,19 @@ if PREPROCESS:
     if B_N_EPOCHS >0:
         data_provider._estimate_boundary(LEN//10, l_bound=L_BOUND)
 
-model = VisModel(ENCODER_DIMS, DECODER_DIMS)
 
+model = VisModel(ENCODER_DIMS, DECODER_DIMS)
+projector = TimeVisProjector(vis_model=model, content_path=CONTENT_PATH, vis_model_name=VIS_MODEL_NAME, device=DEVICE)
+
+########################################################################################################################
+#                                                  EDGE DATASET                                                        #
+########################################################################################################################
 negative_sample_rate = 5
 min_dist = .1
 _a, _b = find_ab_params(1.0, min_dist)
 umap_loss_fn = UmapLoss(negative_sample_rate, DEVICE, _a, _b, repulsion_strength=1.0)
 recon_loss_fn = ReconstructionLoss(beta=1.0)
 criterion = SingleVisLoss(umap_loss_fn, recon_loss_fn, lambd=LAMBDA)
-projector = TimeVisProjector(vis_model=model, content_path=CONTENT_PATH, vis_model_name=VIS_MODEL_NAME, device=DEVICE)
 
 optimizer = torch.optim.Adam(model.parameters(), lr=.01, weight_decay=1e-5)
 lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=4, gamma=.1)

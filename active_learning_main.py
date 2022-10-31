@@ -65,9 +65,9 @@ NET = TRAINING_PARAMETERS["NET"]
 import Model.model as subject_model
 net = eval("subject_model.{}()".format(NET))
 
-# ########################################################################################################################
-# #                                                    TRAINING SETTING                                                  #
-# ########################################################################################################################
+########################################################################################################################
+#                                                    TRAINING SETTING                                                  #
+########################################################################################################################
 
 data_provider = ActiveLearningDataProvider(content_path, net, BASE_ITERATION, device=DEVICE, classes=CLASSES, verbose=1)
 if PREPROCESS:
@@ -100,7 +100,7 @@ edge_from = edge_from[eliminate_zeros]
 probs = probs[eliminate_zeros]
 
 # save result
-save_dir = os.path.join(data_provider.model_path, "SV_time_al.json")
+save_dir = os.path.join(data_provider.model_path, "time_al.json")
 if not os.path.exists(save_dir):
     evaluation = dict()
 else:
@@ -133,7 +133,7 @@ t2=time.time()
 trainer.train(PATIENT, MAX_EPOCH)
 t3 = time.time()
 # save result
-save_dir = os.path.join(data_provider.model_path, "SV_time_al.json")
+save_dir = os.path.join(data_provider.model_path, "time_al.json")
 if not os.path.exists(save_dir):
     evaluation = dict()
 else:
@@ -146,7 +146,7 @@ evaluation["training"][str(iteration)] = round(t3-t2, 3)
 with open(save_dir, 'w') as f:
     json.dump(evaluation, f)
 save_dir = os.path.join(data_provider.model_path, "Iteration_{}".format(iteration))
-os.system("mkdir -p {}".format(save_dir))
+os.makedirs(save_dir, exist_ok=True)
 trainer.save(save_dir=save_dir, file_name=VIS_MODEL_NAME)
     
 # ########################################################################################################################
@@ -159,12 +159,12 @@ evaluator.save_epoch_eval(iteration, file_name=EVALUATION_NAME)
 #                                                      VISUALIZATION                                                   #
 ########################################################################################################################
 
-# from singleVis.visualizer import visualizer
+from singleVis.visualizer import visualizer
 
-# vis = visualizer(data_provider, projector, 200)
-# save_dir = os.path.join(data_provider.content_path, "img")
-# os.system("mkdir -p {}".format(save_dir))
-# data = data_provider.train_representation_lb(iteration)
-# pred = data_provider.get_pred(iteration, data).argmax(1)
-# labels = data_provider.train_labels_lb(iteration)
-# vis.savefig_cus(iteration, data, pred, labels, path=os.path.join(save_dir, "{}_{}_al.png".format(DATASET, iteration)))
+vis = visualizer(data_provider, projector, 200)
+save_dir = os.path.join(data_provider.content_path, "img")
+os.makedirs(save_dir, exist_ok=True)
+data = data_provider.train_representation(iteration)
+pred = data_provider.get_pred(iteration, data).argmax(1)
+labels = data_provider.train_labels(iteration)
+vis.savefig_cus(iteration, data, pred, labels, path=os.path.join(save_dir, "{}_{}_al.png".format(DATASET, iteration)))
