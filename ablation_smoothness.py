@@ -83,7 +83,7 @@ net = eval("subject_model.{}()".format(NET))
 ########################################################################################################################
 #                                                    TRAINING SETTING                                                  #
 ########################################################################################################################
-data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, split=-1, device=DEVICE, classes=CLASSES,verbose=1)
+data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=DEVICE, classes=CLASSES,verbose=1)
 if PREPROCESS:
     data_provider.initialize(LEN//10, l_bound=L_BOUND)
 model = SingleVisualizationModel(input_dims=512, output_dims=2, units=256, hidden_layer=HIDDEN_LAYER)

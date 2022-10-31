@@ -86,7 +86,7 @@ net = eval("subject_model.{}()".format(NET))
 ########################################################################################################################
 #                                                    TRAINING SETTING                                                  #
 ########################################################################################################################
-data_provider = TimeVisDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, split=-1, device=DEVICE, classes=CLASSES,verbose=1)
+data_provider = TimeVisDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=DEVICE, classes=CLASSES,verbose=1)
 if PREPROCESS:
     data_provider._meta_data()
     if B_N_EPOCHS >0:

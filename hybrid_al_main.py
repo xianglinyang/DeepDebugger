@@ -73,7 +73,7 @@ DEVICE = torch.device("cuda:{}".format(GPU_ID) if torch.cuda.is_available() else
 import Model.model as subject_model
 net = eval("subject_model.{}()".format(NET))
 
-data_provider = DenseActiveLearningDataProvider(CONTENT_PATH, net, BASE_ITERATION, epoch_num, split=-1, device=DEVICE, classes=CLASSES,verbose=1)
+data_provider = DenseActiveLearningDataProvider(CONTENT_PATH, net, BASE_ITERATION, epoch_num, device=DEVICE, classes=CLASSES,verbose=1)
 if PREPROCESS:
     data_provider._meta_data(iteration)
 

@@ -32,36 +32,15 @@ class ProjectorAbstractClass(ABC):
         pass
 
 class Projector(ProjectorAbstractClass):
-    def __init__(self, vis_model, content_path, segments, device) -> None:
-        self.content_path = content_path
+    def __init__(self, vis_model, content_path, vis_model_name, device):
         self.vis_model = vis_model
-        self.segments = segments    #[(1,6),(6, 15),(15,42),(42,200)]
+        self.content_path = content_path
+        self.vis_model_name = vis_model_name
         self.DEVICE = device
-        self.current_range = (-1,-1)
-
+    
     def load(self, iteration):
-        # [s,e)
-        init_e = self.segments[-1][1]
-        if (iteration >= self.current_range[0] and iteration <self.current_range[1]) or (iteration == init_e and self.current_range[1] == init_e):
-            print("Same range as current visualization model...")
-            return 
-        # else
-        for i in range(len(self.segments)):
-            s = self.segments[i][0]
-            e = self.segments[i][1]
-            # range [s,e)
-            if (iteration >= s and iteration < e) or (iteration == init_e and e == init_e):
-                idx = i
-                break
-        # TODO vis model name as a hyperparameter
-        file_path = os.path.join(self.content_path, "Model", "tnn_hybrid_{}.pth".format(idx))
-        save_model = torch.load(file_path, map_location="cpu")
-        self.vis_model.load_state_dict(save_model["state_dict"])
-        self.vis_model.to(self.DEVICE)
-        self.vis_model.eval()
-        self.current_range = (s, e)
-        print("Successfully load the visualization model for range ({},{})...".format(s,e))
-
+        raise NotImplementedError
+    
     def batch_project(self, iteration, data):
         self.load(iteration)
         embedding = self.vis_model.encoder(torch.from_numpy(data).to(dtype=torch.float32, device=self.DEVICE)).cpu().detach().numpy()
@@ -81,13 +60,42 @@ class Projector(ProjectorAbstractClass):
         self.load(iteration)
         data = self.vis_model.decoder(torch.from_numpy(np.expand_dims(embedding, axis=0)).to(dtype=torch.float32, device="cpu")).cpu().detach().numpy()
         return data.squeeze(axis=0)
+    
+class DeepDebuggerProjector(Projector):
+    def __init__(self, vis_model, content_path, vis_model_name, segments, device):
+        super().__init__(vis_model, content_path, vis_model_name, device)
+        self.segments = segments
+        self.segments = segments    #[(1,6),(6, 15),(15,42),(42,200)]
+        self.current_range = (-1,-1)
+
+    def load(self, iteration):
+        # [s,e)
+        init_e = self.segments[-1][1]
+        if (iteration >= self.current_range[0] and iteration <self.current_range[1]) or (iteration == init_e and self.current_range[1] == init_e):
+            print("Same range as current visualization model...")
+            return 
+        # else
+        for i in range(len(self.segments)):
+            s = self.segments[i][0]
+            e = self.segments[i][1]
+            # range [s,e)
+            if (iteration >= s and iteration < e) or (iteration == init_e and e == init_e):
+                idx = i
+                break
+        # TODO vis model name as a hyperparameter
+        file_path = os.path.join(self.content_path, "Model", "{}_{}.pth".format(self.vis_model_name, idx))
+        save_model = torch.load(file_path, map_location="cpu")
+        self.vis_model.load_state_dict(save_model["state_dict"])
+        self.vis_model.to(self.DEVICE)
+        self.vis_model.eval()
+        self.current_range = (s, e)
+        print("Successfully load the visualization model for range ({},{})...".format(s,e))
 
 
-class ALProjector(Projector):
+class ALProjector(DeepDebuggerProjector):
     def __init__(self, vis_model, content_path, vis_model_name, device) -> None:
-        super().__init__(vis_model, content_path, None, device)
+        super().__init__(vis_model, content_path,vis_model_name, None, device)
         self.current_range = None
-        self.vis_model_name = vis_model_name
 
     def load(self, iteration):
         file_path=os.path.join(self.content_path, "Model", "Iteration_{}".format(iteration), self.vis_model_name+".pth")
@@ -99,11 +107,10 @@ class ALProjector(Projector):
         print("Successfully load the visualization model for Iteration {}...".format(iteration))
 
 
-class DenseALProjector(Projector):
+class DenseALProjector(DeepDebuggerProjector):
     def __init__(self, vis_model, content_path, vis_model_name, device) -> None:
-        super().__init__(vis_model, content_path, None, device)
+        super().__init__(vis_model, content_path, vis_model_name, None, device)
         self.current_range = [-1,-1,-1] # iteration, e_s, e_e
-        self.vis_model_name = vis_model_name
 
     def load(self, iteration, epoch):
         # [s,e)
@@ -154,9 +161,9 @@ class DenseALProjector(Projector):
         return data.squeeze(axis=0)
 
 
-class EvalProjector(Projector):
-    def __init__(self, vis_model, content_path, device, exp) -> None:
-        super().__init__(vis_model, content_path, None, device)
+class EvalProjector(DeepDebuggerProjector):
+    def __init__(self, vis_model, content_path, vis_model_name, device, exp) -> None:
+        super().__init__(vis_model, content_path, vis_model_name, None, device)
         self.exp = exp
         file_path = os.path.join(content_path, "Model", "{}".format(exp), "segments.json")
         with open(file_path, "r") as f:
@@ -188,8 +195,7 @@ class EvalProjector(Projector):
 
 class DVIProjector(Projector):
     def __init__(self, vis_model, content_path, vis_model_name, device) -> None:
-        super().__init__(vis_model, content_path, None, device)
-        self.vis_model_name = vis_model_name
+        super().__init__(vis_model, content_path, vis_model_name, device)
 
     def load(self, iteration):
         file_path = os.path.join(self.content_path, "Model", "Epoch_{}".format(iteration), "{}.pth".format(self.vis_model_name))
@@ -201,8 +207,7 @@ class DVIProjector(Projector):
 
 class TimeVisProjector(Projector):
     def __init__(self, vis_model, content_path, vis_model_name, device) -> None:
-        super().__init__(vis_model, content_path, None, device)
-        self.vis_model_name = vis_model_name
+        super().__init__(vis_model, content_path, vis_model_name, device)
 
     def load(self, iteration):
         file_path = os.path.join(self.content_path, "Model", "{}.pth".format(self.vis_model_name))

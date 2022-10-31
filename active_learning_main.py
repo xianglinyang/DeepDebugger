@@ -69,7 +69,7 @@ net = eval("subject_model.{}()".format(NET))
 # #                                                    TRAINING SETTING                                                  #
 # ########################################################################################################################
 
-data_provider = ActiveLearningDataProvider(content_path, net, BASE_ITERATION, split=-1, device=DEVICE, classes=CLASSES, verbose=1)
+data_provider = ActiveLearningDataProvider(content_path, net, BASE_ITERATION, device=DEVICE, classes=CLASSES, verbose=1)
 if PREPROCESS:
     data_provider._meta_data(iteration)
     LEN = len(data_provider.train_labels(iteration))

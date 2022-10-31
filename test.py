@@ -76,7 +76,7 @@ classes = ("airplane", "car", "bird", "cat", "deer", "dog", "frog", "horse", "sh
 ########################################################################################################################
 #                                                    TRAINING SETTING                                                  #
 ########################################################################################################################
-data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, split=-1, device=DEVICE, classes=CLASSES,verbose=1)
+data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD,  device=DEVICE, classes=CLASSES,verbose=1)
 if PREPROCESS:
     data_provider.initialize(LEN//10, l_bound=L_BOUND)
 

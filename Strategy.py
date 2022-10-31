@@ -92,7 +92,7 @@ class DeepVisualInsight(StrategyAbstractClass):
         import Model.model as subject_model
         net = eval("subject_model.{}()".format(NET))
 
-        self.data_provider = TimeVisDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, split=-1, device=self.DEVICE, classes=CLASSES,verbose=1)
+        self.data_provider = TimeVisDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=self.DEVICE, classes=CLASSES,verbose=1)
         self.model = VisModel(ENCODER_DIMS, DECODER_DIMS)
         negative_sample_rate = 5
         min_dist = .1
@@ -268,7 +268,7 @@ class TimeVis(StrategyAbstractClass):
         import Model.model as subject_model
         net = eval("subject_model.{}()".format(NET))
 
-        self.data_provider = TimeVisDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, split=-1, device=self.DEVICE, classes=CLASSES,verbose=1)
+        self.data_provider = TimeVisDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=self.DEVICE, classes=CLASSES,verbose=1)
         self.model = VisModel(ENCODER_DIMS, DECODER_DIMS)
         negative_sample_rate = 5
         min_dist = .1
@@ -415,7 +415,7 @@ class DeepDebugger(StrategyAbstractClass):
         import Model.model as subject_model
         net = eval("subject_model.{}()".format(NET))
 
-        self.data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, split=-1, device=self.DEVICE, classes=CLASSES,verbose=1)        
+        self.data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=self.DEVICE, classes=CLASSES,verbose=1)        
         self.model = VisModel(ENCODER_DIMS, DECODER_DIMS)
         negative_sample_rate = 5
         min_dist = .1

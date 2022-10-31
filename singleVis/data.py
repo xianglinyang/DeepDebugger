@@ -16,14 +16,13 @@ DataContainder module
 """
 class DataProviderAbstractClass(ABC):
     
-    def __init__(self, content_path, model, epoch_start, epoch_end, epoch_period, split):
+    def __init__(self, content_path, model, epoch_start, epoch_end, epoch_period):
         self.mode = "abstract"
         self.content_path = content_path
         self.model = model
         self.s = epoch_start
         self.e = epoch_end
         self.p = epoch_period
-        self.split = split
         
     @property
     @abstractmethod
@@ -48,13 +47,12 @@ class DataProviderAbstractClass(ABC):
         self.e = epoch_e
 
 class DataProvider(DataProviderAbstractClass):
-    def __init__(self, content_path, model, epoch_start, epoch_end, epoch_period, split, device, classes, verbose=1):
+    def __init__(self, content_path, model, epoch_start, epoch_end, epoch_period, device, classes, verbose=1):
         self.content_path = content_path
         self.model = model
         self.s = epoch_start
         self.e = epoch_end
         self.p = epoch_period
-        self.split = split
         self.DEVICE = device
         self.classes = classes
         self.verbose = verbose
@@ -90,8 +88,8 @@ class DataProvider(DataProviderAbstractClass):
 
 
 class NormalDataProvider(DataProvider):
-    def __init__(self, content_path, model, epoch_start, epoch_end, epoch_period, split, device, classes, verbose=1):
-        super().__init__(content_path, model, epoch_start, epoch_end, epoch_period, split, device, classes, verbose)
+    def __init__(self, content_path, model, epoch_start, epoch_end, epoch_period, device, classes, verbose=1):
+        super().__init__(content_path, model, epoch_start, epoch_end, epoch_period, device, classes, verbose)
         self.mode = "normal"
     
     @property
@@ -326,17 +324,15 @@ class NormalDataProvider(DataProvider):
             max_x = None
         return max_x
 
-
     def prediction_function(self, epoch):
         model_location = os.path.join(self.model_path, "Epoch_{:d}".format(epoch), "subject_model.pth")
         self.model.load_state_dict(torch.load(model_location, map_location=torch.device("cpu")))
         self.model.to(self.DEVICE)
         self.model.eval()
 
-        model = torch.nn.Sequential(*(list(self.model.children())[self.split:]))
-        model = model.to(self.DEVICE)
-        model = model.eval()
-        return model
+        pred_fn = self.model.prediction
+        return pred_fn
+
 
     def feature_function(self, epoch):
         model_location = os.path.join(self.model_path, "Epoch_{:d}".format(epoch), "subject_model.pth")
@@ -344,10 +340,8 @@ class NormalDataProvider(DataProvider):
         self.model = self.model.to(self.DEVICE)
         self.model.eval()
 
-        model = torch.nn.Sequential(*(list(self.model.children())[:self.split]))
-        model = model.to(self.DEVICE)
-        model = model.eval()
-        return model
+        fea_fn = self.model.feature
+        return fea_fn
 
     def get_pred(self, epoch, data):
         '''
@@ -394,9 +388,9 @@ class NormalDataProvider(DataProvider):
 
     
 class ActiveLearningDataProvider(DataProvider):
-    def __init__(self, content_path, model, base_epoch_start, split, device, classes, verbose=1):
+    def __init__(self, content_path, model, base_epoch_start, device, classes, verbose=1):
         # dummy input as epoch_end and epoch_period
-        super().__init__(content_path, model, base_epoch_start, base_epoch_start, 1, split, device, classes, verbose)
+        super().__init__(content_path, model, base_epoch_start, base_epoch_start, 1, device, classes, verbose)
         self.mode = "al"
     
     def label_num(self, iteration):
@@ -440,12 +434,7 @@ class ActiveLearningDataProvider(DataProvider):
         #     test_index = range(len(testing_data))
         # testing_data = testing_data[test_index]
 
-        model_location = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "subject_model.pth")
-        self.model.load_state_dict(torch.load(model_location, map_location=torch.device("cpu")))
-        self.model = self.model.to(self.DEVICE)
-        self.model.eval()
-
-        repr_model = torch.nn.Sequential(*(list(self.model.children())[:self.split]))
+        repr_model = self.feature_function(iteration)
 
         # training data clustering
         data_pool_representation = batch_run(repr_model, training_data)
@@ -494,12 +483,7 @@ class ActiveLearningDataProvider(DataProvider):
         index = load_labelled_data_index(index_file)
         training_data = training_data[index]
 
-        model_location = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "subject_model.pth")
-        self.model.load_state_dict(torch.load(model_location, map_location=torch.device("cpu")))
-        self.model = self.model.to(self.DEVICE)
-        self.model.eval()
-
-        repr_model = torch.nn.Sequential(*(list(self.model.children())[:self.split]))
+        repr_model = self.feature_function(iteration)
 
         t0 = time.time()
         confs = batch_run(self.model, training_data)
@@ -687,10 +671,9 @@ class ActiveLearningDataProvider(DataProvider):
         self.model.to(self.DEVICE)
         self.model.eval()
 
-        model = torch.nn.Sequential(*(list(self.model.children())[self.split:]))
-        model.to(self.DEVICE)
-        model.eval()
-        return model
+        pred_fn = self.model.prediction
+        return pred_fn
+
 
     def feature_function(self, epoch):
         model_location = os.path.join(self.model_path, "Iteration_{:d}".format(epoch), "subject_model.pth")
@@ -698,10 +681,8 @@ class ActiveLearningDataProvider(DataProvider):
         self.model.to(self.DEVICE)
         self.model.eval()
 
-        model = torch.nn.Sequential(*(list(self.model.children())[:self.split]))
-        model = model.to(self.DEVICE)
-        model = model.eval()
-        return model
+        fea_fn = self.model.feature
+        return fea_fn
 
     def get_pred(self, iteration, data):
         '''
@@ -743,8 +724,8 @@ class ActiveLearningDataProvider(DataProvider):
         return border
     
 class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
-    def __init__(self, content_path, model, base_epoch_start, epoch_num, split, device, classes, verbose=1):
-        super().__init__(content_path, model, base_epoch_start, split, device, classes, verbose)
+    def __init__(self, content_path, model, base_epoch_start, epoch_num, device, classes, verbose=1):
+        super().__init__(content_path, model, base_epoch_start, device, classes, verbose)
         self.mode = "dense_al"
         self.epoch_num = epoch_num
         self.s = 1
@@ -781,12 +762,7 @@ class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
         testing_data = testing_data[test_index]
 
         for n_epoch in range(1, self.epoch_num+1, 1):
-            model_location = os.path.join(self.model_path, "Iteration_{}".format(iteration), "Epoch_{:d}".format(n_epoch), "subject_model.pth")
-            self.model.load_state_dict(torch.load(model_location, map_location=torch.device("cpu")))
-            self.model = self.model.to(self.DEVICE)
-            self.model.eval()
-
-            repr_model = torch.nn.Sequential(*(list(self.model.children())[:self.split]))
+            repr_model = self.feature_function(iteration, n_epoch)
 
             # training data clustering
             data_pool_representation = batch_run(repr_model, training_data)
@@ -837,12 +813,7 @@ class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
             index = load_labelled_data_index(index_file)
             training_data = training_data[index]
 
-            model_location = os.path.join(self.model_path, "Iteration_{}".format(iteration), "Epoch_{:d}".format(n_epoch), "subject_model.pth")
-            self.model.load_state_dict(torch.load(model_location, map_location=torch.device("cpu")))
-            self.model = self.model.to(self.DEVICE)
-            self.model.eval()
-
-            repr_model = torch.nn.Sequential(*(list(self.model.children())[:self.split]))
+            repr_model = self.feature_function(iteration, n_epoch)
 
             t0 = time.time()
             confs = batch_run(self.model, training_data)
@@ -995,10 +966,8 @@ class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
         self.model.to(self.DEVICE)
         self.model.eval()
 
-        model = torch.nn.Sequential(*(list(self.model.children())[self.split:]))
-        model = model.to(self.DEVICE)
-        model = model.eval()
-        return model
+        pred_fn = self.model.prediction
+        return pred_fn
 
     def feature_function(self, iteration, epoch):
         model_location = os.path.join(self.model_path, "Iteration_{}".format(iteration), "Epoch_{:d}".format(epoch), "subject_model.pth")
@@ -1006,10 +975,8 @@ class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
         self.model = self.model.to(self.DEVICE)
         self.model.eval()
 
-        model = torch.nn.Sequential(*(list(self.model.children())[:self.split]))
-        model = model.to(self.DEVICE)
-        model = model.eval()
-        return model
+        fea_fn = self.model.feature
+        return fea_fn
 
     def get_pred(self, iteration, epoch, data):
         '''
