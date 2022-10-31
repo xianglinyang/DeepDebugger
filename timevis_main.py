@@ -133,7 +133,6 @@ edge_loader = DataLoader(dataset, batch_size=1000, sampler=sampler)
 ########################################################################################################################
 #                                                       TRAIN                                                          #
 ########################################################################################################################
-
 trainer = SingleVisTrainer(model, criterion, optimizer, lr_scheduler, edge_loader=edge_loader, DEVICE=DEVICE)
 
 t2=time.time()
@@ -141,13 +140,14 @@ trainer.train(PATIENT, MAX_EPOCH)
 t3 = time.time()
 
 save_dir = data_provider.model_path
-trainer.record_time(save_dir, "time_{}_{}.json".format(VIS_METHOD, VIS_MODEL_NAME), "complex_construction", t1-t0)
-trainer.record_time(save_dir, "time_{}_{}.json".format(VIS_METHOD, VIS_MODEL_NAME), "training", t3-t2)
+trainer.record_time(save_dir, "time_{}.json".format(VIS_MODEL_NAME), "complex_construction", t1-t0)
+trainer.record_time(save_dir, "time_{}.json".format(VIS_MODEL_NAME), "training", t3-t2)
 trainer.save(save_dir=save_dir, file_name="{}".format(VIS_MODEL_NAME))
 
 ########################################################################################################################
 #                                                      VISUALIZATION                                                   #
 ########################################################################################################################
+from singleVis.visualizer import visualizer
 
 vis = visualizer(data_provider, projector, 200)
 save_dir = os.path.join(data_provider.content_path, "img")
@@ -162,4 +162,4 @@ for i in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
 eval_epochs = range(EPOCH_START, EPOCH_END, EPOCH_PERIOD)
 evaluator = Evaluator(data_provider, projector)
 for eval_epoch in eval_epochs:
-    evaluator.save_epoch_eval(eval_epoch, 15, temporal_k=5, file_name="{}_{}".format(VIS_METHOD, EVALUATION_NAME))
+    evaluator.save_epoch_eval(eval_epoch, 15, temporal_k=5, file_name="{}".format(EVALUATION_NAME))
