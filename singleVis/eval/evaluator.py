@@ -905,8 +905,8 @@ class ALEvaluator(Evaluator):
         super().__init__(data_provider, projector, verbose)
 
     def train_acc(self, epoch):
-        data = self.data_provider.train_representation_lb(epoch)
-        labels = self.data_provider.train_labels_lb(epoch)
+        data = self.data_provider.train_representation(epoch)
+        labels = self.data_provider.train_labels(epoch)
         pred = self.data_provider.get_pred(epoch, data).argmax(1)
         return np.sum(labels==pred)/len(labels)
 
