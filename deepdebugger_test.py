@@ -3,7 +3,6 @@ import sys, os
 import json
 
 import argparse
-from git_space.DLVisDebugger.Strategy import DeepDebugger
 
 
 from singleVis.SingleVisualizationModel import VisModel
@@ -85,7 +84,7 @@ model = VisModel(ENCODER_DIMS, DECODER_DIMS)
 SEGMENTS = VISUALIZATION_PARAMETER["SEGMENTS"]
 RESUME_SEG = VISUALIZATION_PARAMETER["RESUME_SEG"]
 
-projector = DeepDebugger(vis_model=model, content_path=CONTENT_PATH, vis_model_name=VIS_MODEL_NAME, segments=SEGMENTS, device=DEVICE)
+projector = DeepDebuggerProjector(vis_model=model, content_path=CONTENT_PATH, vis_model_name=VIS_MODEL_NAME, segments=SEGMENTS, device=DEVICE)
 
 ########################################################################################################################
 #                                                      VISUALIZATION                                                   #
