@@ -1,3 +1,4 @@
+# TODO fix loading net, sys.append problem
 from abc import ABC, abstractmethod
 
 import torch
@@ -15,12 +16,12 @@ from singleVis.SingleVisualizationModel import VisModel
 from singleVis.losses import HybridLoss, SmoothnessLoss, UmapLoss, ReconstructionLoss, TemporalLoss, DVILoss, SingleVisLoss
 from singleVis.edge_dataset import HybridDataHandler, DVIDataHandler, DataHandler
 from singleVis.trainer import HybridVisTrainer, DVITrainer, SingleVisTrainer
-from singleVis.data import NormalDataProvider, TimeVisDataProvider
+from singleVis.data import NormalDataProvider, ActiveLearningDataProvider
 from singleVis.spatial_edge_constructor import kcHybridSpatialEdgeConstructor, SingleEpochSpatialEdgeConstructor, kcSpatialEdgeConstructor
 from singleVis.temporal_edge_constructor import GlobalTemporalEdgeConstructor
-from singleVis.projector import Projector, DVIProjector
+from singleVis.projector import DeepDebuggerProjector, DVIProjector, TimeVisProjector, ALProjector
 from singleVis.segmenter import Segmenter
-from singleVis.eval.evaluator import Evaluator
+from singleVis.eval.evaluator import Evaluator, ALEvaluator
 from singleVis.visualizer import visualizer
 from singleVis.utils import find_neighbor_preserving_rate
 
@@ -92,7 +93,7 @@ class DeepVisualInsight(StrategyAbstractClass):
         import Model.model as subject_model
         net = eval("subject_model.{}()".format(NET))
 
-        self.data_provider = TimeVisDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=self.DEVICE, classes=CLASSES,verbose=1)
+        self.data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=self.DEVICE, classes=CLASSES,verbose=1)
         self.model = VisModel(ENCODER_DIMS, DECODER_DIMS)
         negative_sample_rate = 5
         min_dist = .1
@@ -120,7 +121,6 @@ class DeepVisualInsight(StrategyAbstractClass):
                 self.data_provider._estimate_boundary(LEN//10, l_bound=L_BOUND)
     
     def _train(self):
-        TRAINING_PARAMETER = self.config["TRAINING"]
         EPOCH_START = self.config["EPOCH_START"]
         EPOCH_END = self.config["EPOCH_END"]
         EPOCH_PERIOD = self.config["EPOCH_PERIOD"]
@@ -268,7 +268,7 @@ class TimeVis(StrategyAbstractClass):
         import Model.model as subject_model
         net = eval("subject_model.{}()".format(NET))
 
-        self.data_provider = TimeVisDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=self.DEVICE, classes=CLASSES,verbose=1)
+        self.data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=self.DEVICE, classes=CLASSES,verbose=1)
         self.model = VisModel(ENCODER_DIMS, DECODER_DIMS)
         negative_sample_rate = 5
         min_dist = .1
@@ -276,7 +276,7 @@ class TimeVis(StrategyAbstractClass):
         umap_loss_fn = UmapLoss(negative_sample_rate, self.DEVICE, _a, _b, repulsion_strength=1.0)
         recon_loss_fn = ReconstructionLoss(beta=1.0)
         self.criterion = SingleVisLoss(umap_loss_fn, recon_loss_fn, lambd=LAMBDA)
-        self.projector = DVIProjector(vis_model=self.model, content_path=CONTENT_PATH, vis_model_name=VIS_MODEL_NAME, device=self.DEVICE)
+        self.projector = TimeVisProjector(vis_model=self.model, content_path=CONTENT_PATH, vis_model_name=VIS_MODEL_NAME, device=self.DEVICE)
 
     def _preprocess(self):
         PREPROCESS = self.config["VISUALIZATION"]["PREPROCESS"]
@@ -337,7 +337,7 @@ class TimeVis(StrategyAbstractClass):
         ########################################################################################################################
         #                                                       TRAIN                                                          #
         ########################################################################################################################
-        trainer = SingleVisTrainer(self.model, self.criterion, optimizer, lr_scheduler, edge_loader=edge_loader, DEVICE=DEVICE)
+        trainer = SingleVisTrainer(self.model, self.criterion, optimizer, lr_scheduler, edge_loader=edge_loader, DEVICE=self.DEVICE)
 
         t2=time.time()
         trainer.train(PATIENT, MAX_EPOCH)
@@ -408,6 +408,7 @@ class DeepDebugger(StrategyAbstractClass):
         S_LAMBDA = VISUALIZATION_PARAMETER["S_LAMBDA"]
         ENCODER_DIMS = VISUALIZATION_PARAMETER["ENCODER_DIMS"]
         DECODER_DIMS = VISUALIZATION_PARAMETER["DECODER_DIMS"]
+        VIS_MODEL_NAME = VISUALIZATION_PARAMETER["VIS_MODEL_NAME"]
 
         # define hyperparameters
         self.DEVICE = torch.device("cuda:{}".format(GPU_ID) if torch.cuda.is_available() else "cpu")
@@ -425,7 +426,7 @@ class DeepDebugger(StrategyAbstractClass):
         smooth_loss_fn = SmoothnessLoss(margin=0.5)
         self.criterion = HybridLoss(umap_loss_fn, recon_loss_fn, smooth_loss_fn, lambd1=LAMBDA, lambd2=S_LAMBDA)
         self.segmenter = Segmenter(data_provider=self.data_provider, threshold=78.5, range_s=EPOCH_START, range_e=EPOCH_END, range_p=EPOCH_PERIOD)
-        self.projector = Projector(vis_model=self.model, content_path=CONTENT_PATH, segments=None, device=self.DEVICE)
+        self.projector = DeepDebuggerProjector(vis_model=self.model, content_path=CONTENT_PATH,vis_model_name=VIS_MODEL_NAME, segments=None, device=self.DEVICE)
 
     def _preprocess(self):
         PREPROCESS = self.config["VISUALIZATION"]["PREPROCESS"]
@@ -442,8 +443,14 @@ class DeepDebugger(StrategyAbstractClass):
                 self.data_provider._estimate_boundary(LEN//10, l_bound=L_BOUND)
     
     def _segment(self):
+        VISUALIZATION_PARAMETER = self.config["VISUALIZATION"]
+        VIS_MODEL_NAME = VISUALIZATION_PARAMETER["VIS_MODEL_NAME"]
+        t0 = time.time()
         SEGMENTS = self.segmenter.segment()
+        t1 = time.time()
         self.projector.segments = SEGMENTS
+        self.segmenter.record_time(self.data_provider.model_path, "time_{}.json".format(VIS_MODEL_NAME), t1-t0)
+        print("Segmentation takes {:.1f} seconds.".format(round(t1-t0, 3)))
     
     def _train(self):
         TRAINING_PARAMETER = self.config["TRAINING"]
@@ -473,7 +480,7 @@ class DeepDebugger(StrategyAbstractClass):
             epoch_start, epoch_end = SEGMENTS[seg]
             self.data_provider.update_interval(epoch_s=epoch_start, epoch_e=epoch_end)
 
-            optimizer = torch.optim.Adam(model.parameters(), lr=.01, weight_decay=1e-5)
+            optimizer = torch.optim.Adam(self.model.parameters(), lr=.01, weight_decay=1e-5)
             lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=4, gamma=.1)
 
             t0 = time.time()
@@ -506,24 +513,24 @@ class DeepDebugger(StrategyAbstractClass):
             #                                                       TRAIN                                                          #
             ########################################################################################################################
 
-            trainer = HybridVisTrainer(model, self.criterion, optimizer, lr_scheduler, edge_loader=edge_loader, DEVICE=self.DEVICE)
+            trainer = HybridVisTrainer(self.model, self.criterion, optimizer, lr_scheduler, edge_loader=edge_loader, DEVICE=self.DEVICE)
 
             t2=time.time()
             trainer.train(PATIENT, MAX_EPOCH)
             t3 = time.time()
 
-            file_name = "DeepDebugger_time"
-            trainer.record_time(file_name, "complex_construction", seg, t1-t0)
-            trainer.record_time(file_name, "training", seg, t3-t2)
+            file_name = "time_{}".format(VIS_MODEL_NAME)
+            trainer.record_time(self.data_provider.model_path, file_name, "complex_construction", seg, t1-t0)
+            trainer.record_time(self.data_provider.model_path, file_name, "training", seg, t3-t2)
 
             trainer.save(save_dir=self.data_provider.model_path, file_name="{}_{}".format(VIS_MODEL_NAME, seg))
-            model = trainer.model
+            self.model = trainer.model
 
             # update prev_idxs and prev_embedding
             prev_selected = time_step_idxs_list[0]
             prev_data = torch.from_numpy(feature_vectors[:len(prev_selected)]).to(dtype=torch.float32, device=self.DEVICE)
-            model.to(device=self.DEVICE)
-            prev_embedding = model.encoder(prev_data).cpu().detach().numpy()
+            self.model = self.model.to(device=self.DEVICE)
+            prev_embedding = self.model.encoder(prev_data).cpu().detach().numpy()
     
 
     def _evaluate(self):
@@ -533,18 +540,176 @@ class DeepDebugger(StrategyAbstractClass):
         VISUALIZATION_PARAMETER = self.config["VISUALIZATION"]
         EVALUATION_NAME = VISUALIZATION_PARAMETER["EVALUATION_NAME"]
         N_NEIGHBORS = VISUALIZATION_PARAMETER["N_NEIGHBORS"]
-        eval_epochs = list(range(EPOCH_START, EPOCH_END, EPOCH_PERIOD))
+        eval_epochs = list(range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD))
         self.evaluator = Evaluator(self.data_provider, self.projector)
         for eval_epoch in eval_epochs:
             self.evaluator.save_epoch_eval(eval_epoch, N_NEIGHBORS, temporal_k=5, file_name="{}".format(EVALUATION_NAME))
+    
+    def _visualize(self):
+        EPOCH_START = self.config["EPOCH_START"]
+        EPOCH_END = self.config["EPOCH_END"]
+        EPOCH_PERIOD = self.config["EPOCH_PERIOD"]
 
+        self.vis =  (self.data_provider, self.projector, 200, "plasma")
+        save_dir = os.path.join(self.data_provider.content_path, "img")
+        os.makedirs(save_dir, exist_ok=True)
+        for i in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
+            self.vis.savefig(i, path=os.path.join(save_dir, "{}_{}.png".format(self.VIS_METHOD, i)))
 
     def visualize_embedding(self):
         self._preprocess()
         self._segment()
         self._train()
+        self._visualize()
         self._evaluate()
 
+class DVIAL(StrategyAbstractClass):
+    def __init__(self, CONTENT_PATH, config):
+        super().__init__(CONTENT_PATH, config)
+    
+    def _init(self, iteration, resume_iteration=-1):
+        SETTING = self.config["SETTING"] # active learning
+        CLASSES = self.config["CLASSES"]
+        DATASET = self.config["DATASET"]
+        BASE_ITERATION = self.config["BASE_ITERATION"]
+        GPU_ID = self.config["GPU_ID"]
+        self.DEVICE = torch.device("cuda:{}".format(GPU_ID) if torch.cuda.is_available() else "cpu")
+
+        #################################################   VISUALIZATION PARAMETERS    ########################################
+        PREPROCESS = self.config["VISUALIZATION"]["PREPROCESS"]
+        B_N_EPOCHS = self.config["VISUALIZATION"]["BOUNDARY"]["B_N_EPOCHS"]
+        L_BOUND = self.config["VISUALIZATION"]["BOUNDARY"]["L_BOUND"]
+        LAMBDA = self.config["VISUALIZATION"]["LAMBDA"]
+        ENCODER_DIMS = self.config["VISUALIZATION"]["ENCODER_DIMS"]
+        DECODER_DIMS = self.config["VISUALIZATION"]["DECODER_DIMS"]
+        N_NEIGHBORS = self.config["VISUALIZATION"]["N_NEIGHBORS"]
+        MAX_EPOCH = self.config["VISUALIZATION"]["MAX_EPOCH"]
+        S_N_EPOCHS = self.config["VISUALIZATION"]["S_N_EPOCHS"]
+        PATIENT = self.config["VISUALIZATION"]["PATIENT"]
+        VIS_MODEL_NAME = self.config["VISUALIZATION"]["VIS_MODEL_NAME"]
+        RESOLUTION = self.config["VISUALIZATION"]["RESOLUTION"]
+        EVALUATION_NAME = self.config["VISUALIZATION"]["EVALUATION_NAME"]
+
+        ############################################   ACTIVE LEARNING MODEL PARAMETERS    ######################################
+        TRAINING_PARAMETERS = self.config["TRAINING"]
+        NET = TRAINING_PARAMETERS["NET"]
+
+        import Model.model as subject_model
+        net = eval("subject_model.{}()".format(NET))
+
+        self.data_provider = ActiveLearningDataProvider(self.CONTENT_PATH, net, BASE_ITERATION, device=self.DEVICE, classes=CLASSES, verbose=1)
+        self.model = VisModel(ENCODER_DIMS, DECODER_DIMS)
+        self.projector = ALProjector(vis_model=self.model, content_path=CONTENT_PATH, vis_model_name=VIS_MODEL_NAME, device=self.DEVICE)
+
+        if resume_iteration > 0:
+            self.projector.load(resume_iteration)
+
+    def _preprocess(self, iteration):
+        PREPROCESS = self.config["VISUALIZATION"]["PREPROCESS"]
+        B_N_EPOCHS = self.config["VISUALIZATION"]["BOUNDARY"]["B_N_EPOCHS"]
+        L_BOUND = self.config["VISUALIZATION"]["BOUNDARY"]["L_BOUND"]
+
+        if PREPROCESS:
+            self.data_provider._meta_data(iteration)
+            LEN = len(self.data_provider.train_labels(iteration))
+            if B_N_EPOCHS >0:
+                self.data_provider._estimate_boundary(iteration, LEN//10, l_bound=L_BOUND)
+
+    def _train(self, iteration):
+        S_N_EPOCHS = self.config["VISUALIZATION"]["S_N_EPOCHS"]
+        LAMBDA = self.config["VISUALIZATION"]["LAMBDA"]
+        MAX_EPOCH = self.config["VISUALIZATION"]["MAX_EPOCH"]
+        PATIENT = self.config["VISUALIZATION"]["PATIENT"]
+        VIS_MODEL_NAME = self.config["VISUALIZATION"]["VIS_MODEL_NAME"]
+
+        t0 = time.time()
+        spatial_cons = SingleEpochSpatialEdgeConstructor(self.data_provider, iteration, 5, 0, 15)
+        edge_to, edge_from, probs, feature_vectors, attention = spatial_cons.construct()
+        t1 = time.time()
+
+        probs = probs / (probs.max()+1e-3)
+        eliminate_zeros = probs>1e-3
+        edge_to = edge_to[eliminate_zeros]
+        edge_from = edge_from[eliminate_zeros]
+        probs = probs[eliminate_zeros]
+
+        # save result
+        save_dir = os.path.join(self.data_provider.model_path, "time_al.json")
+        if not os.path.exists(save_dir):
+            evaluation = dict()
+        else:
+            f = open(save_dir, "r")
+            evaluation = json.load(f)
+            f.close()
+        if "complex_construction" not in evaluation.keys():
+            evaluation["complex_construction"] = dict()
+        evaluation["complex_construction"][str(iteration)] = round(t1-t0, 3)
+        with open(save_dir, 'w') as f:
+            json.dump(evaluation, f)
+        print("constructing complex in {:.1f} seconds.".format(t1-t0))
+
+
+        dataset = DataHandler(edge_to, edge_from, feature_vectors, attention)
+        n_samples = int(np.sum(S_N_EPOCHS * probs) // 1)
+        # chosse sampler based on the number of dataset
+        if len(edge_to) > 2^24:
+            sampler = CustomWeightedRandomSampler(probs, n_samples, replacement=True)
+        else:
+            sampler = WeightedRandomSampler(probs, n_samples, replacement=True)
+        edge_loader = DataLoader(dataset, batch_size=1024, sampler=sampler)
+
+        negative_sample_rate = 5
+        min_dist = .1
+        _a, _b = find_ab_params(1.0, min_dist)
+        umap_loss_fn = UmapLoss(negative_sample_rate, self.DEVICE, _a, _b, repulsion_strength=1.0)
+        recon_loss_fn = ReconstructionLoss(beta=1.0)
+        criterion = SingleVisLoss(umap_loss_fn, recon_loss_fn, lambd=LAMBDA)
+
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=.01, weight_decay=1e-5)
+        lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=4, gamma=.1)
+
+        trainer = SingleVisTrainer(self.model, criterion, optimizer, lr_scheduler,edge_loader=edge_loader, DEVICE=DEVICE)
+        t2=time.time()
+        trainer.train(PATIENT, MAX_EPOCH)
+        t3 = time.time()
+        # save result
+        save_dir = os.path.join(self.data_provider.model_path, "time_al.json")
+        if not os.path.exists(save_dir):
+            evaluation = dict()
+        else:
+            f = open(save_dir, "r")
+            evaluation = json.load(f)
+            f.close()
+        if  "training" not in evaluation.keys():
+            evaluation["training"] = dict()
+        evaluation["training"][str(iteration)] = round(t3-t2, 3)
+        with open(save_dir, 'w') as f:
+            json.dump(evaluation, f)
+        save_dir = os.path.join(self.data_provider.model_path, "Iteration_{}".format(iteration))
+        os.makedirs(save_dir, exist_ok=True)
+        trainer.save(save_dir=save_dir, file_name=VIS_MODEL_NAME)
+
+    def _evaluate(self, iteration):
+        EVALUATION_NAME = self.config["VISUALIZATION"]["EVALUATION_NAME"]
+        self.evaluator = ALEvaluator(self.data_provider, self.projector)
+        self.evaluator.save_epoch_eval(iteration, file_name=EVALUATION_NAME)
+
+    def _visualize(self, iteration):
+        self.vis = visualizer(self.data_provider, self.projector, 200)
+        save_dir = os.path.join(self.data_provider.content_path, "img")
+        os.makedirs(save_dir, exist_ok=True)
+        data = self.data_provider.train_representation(iteration)
+        pred = self.data_provider.get_pred(iteration, data).argmax(1)
+        labels = self.data_provider.train_labels(iteration)
+        self.vis.savefig_cus(iteration, data, pred, labels, path=os.path.join(save_dir, "{}_al.png".format(iteration)))
+
+
+    def visualize_embedding(self, iteration, resume_iter=-1):
+        self._init(iteration, resume_iter)
+        self._preprocess(iteration)
+        self._train(iteration)
+        self._evaluate(iteration)
+        self._visualize(iteration)
 
 if __name__ == "__main__":
     import json
@@ -552,17 +717,30 @@ if __name__ == "__main__":
     with open(os.path.join(CONTENT_PATH, "config.json"), "r") as f:
         config = json.load(f)
 
+    #------------------------DVI-----------------------------------
     VIS_METHOD = "DVI"
     dvi_config = config[VIS_METHOD]
     dvi = DeepVisualInsight(CONTENT_PATH, dvi_config)
     dvi.visualize_embedding()
 
+    #------------------------TimeVis-------------------------------
     VIS_METHOD = "TimeVis"
     timevis_config = config[VIS_METHOD]
     timevis = TimeVis(CONTENT_PATH, timevis_config)
     timevis.visualize_embedding()
 
+    #------------------------DeepDebugger--------------------------
     VIS_METHOD = "DeepDebugger"
     deepdebugger_config = config[VIS_METHOD]
     deepdebugger = DeepDebugger(CONTENT_PATH, deepdebugger_config)
     deepdebugger.visualize_embedding()
+
+    #------------------------DVI for AL----------------------------
+    VIS_METHOD = "DVIAL"
+    dvi_al_config = config[VIS_METHOD]
+    dvi_al = DVIAL(CONTENT_PATH, dvi_al_config)
+
+    start_i = 1
+    for iteration in range(1,5,1):
+        resume_iter = iteration-1 if iteration>start_i else -1
+        dvi_al.visualize_embedding(iteration, resume_iter)
