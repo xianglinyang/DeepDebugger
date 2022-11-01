@@ -1,6 +1,7 @@
 import torch
 import sys,os
 import time
+import json
 import argparse
 
 from singleVis.SingleVisualizationModel import SingleVisualizationModel
@@ -8,6 +9,7 @@ from singleVis.data import NormalDataProvider
 from singleVis.eval.evaluator import SegEvaluator
 from singleVis.projector import EvalProjector
 
+VIS_METHOD= "DeepDebugger"
 ########################################################################################################################
 #                                                     LOAD PARAMETERS                                                  #
 ########################################################################################################################
@@ -21,7 +23,9 @@ CONTENT_PATH = args.content_path
 EXP = args.exp
 GPU_ID = args.gpu
 sys.path.append(CONTENT_PATH)
-from config import config
+with open(os.path.join(CONTENT_PATH, "config.json"), "r") as f:
+    conf = json.load(f)
+config = conf[VIS_METHOD]
 
 # # record output information
 # now = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime(time.time())) 
@@ -51,7 +55,8 @@ INIT_NUM = VISUALIZATION_PARAMETER["INIT_NUM"]
 ALPHA = VISUALIZATION_PARAMETER["ALPHA"]
 BETA = VISUALIZATION_PARAMETER["BETA"]
 MAX_HAUSDORFF = VISUALIZATION_PARAMETER["MAX_HAUSDORFF"]
-HIDDEN_LAYER = VISUALIZATION_PARAMETER["HIDDEN_LAYER"]
+ENCODER_DIMS = VISUALIZATION_PARAMETER["ENCODER_DIMS"]
+DECODER_DIMS = VISUALIZATION_PARAMETER["DECODER_DIMS"]
 S_N_EPOCHS = VISUALIZATION_PARAMETER["S_N_EPOCHS"]
 T_N_EPOCHS = VISUALIZATION_PARAMETER["T_N_EPOCHS"]
 N_NEIGHBORS = VISUALIZATION_PARAMETER["N_NEIGHBORS"]
@@ -80,7 +85,7 @@ data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EP
 if PREPROCESS:
     data_provider.initialize(LEN//10, l_bound=L_BOUND)
 
-model = SingleVisualizationModel(input_dims=512, output_dims=2, units=256, hidden_layer=HIDDEN_LAYER)
+model = VisModel(ENCODER_DIMS, DECODER_DIMS)
 projector = EvalProjector(vis_model=model, content_path=CONTENT_PATH, device=DEVICE, exp=EXP)
 
 

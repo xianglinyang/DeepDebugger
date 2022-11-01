@@ -1,5 +1,6 @@
 import torch
 import sys, os
+import json
 
 import argparse
 from git_space.DLVisDebugger.Strategy import DeepDebugger
@@ -8,18 +9,22 @@ from git_space.DLVisDebugger.Strategy import DeepDebugger
 from singleVis.SingleVisualizationModel import VisModel
 from singleVis.data import NormalDataProvider
 from singleVis.eval.evaluator import Evaluator
-from singleVis.projector import Projector
+from singleVis.projector import DeepDebuggerProjector
 
 ########################################################################################################################
 #                                                     LOAD PARAMETERS                                                  #
 ########################################################################################################################
+VIS_METHOD= "DeepDebugger"
+
 parser = argparse.ArgumentParser(description='Process hyperparameters...')
 parser.add_argument('--content_path', type=str)
 args = parser.parse_args()
 
 CONTENT_PATH = args.content_path
 sys.path.append(CONTENT_PATH)
-from config import config
+with open(os.path.join(CONTENT_PATH, "config.json"), "r") as f:
+    conf = json.load(f)
+config = conf[VIS_METHOD]
 
 # record output information
 # now = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime(time.time())) 

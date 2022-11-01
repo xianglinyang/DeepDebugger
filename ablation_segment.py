@@ -13,7 +13,7 @@ from torch.utils.data import WeightedRandomSampler
 from umap.umap_ import find_ab_params
 
 from singleVis.custom_weighted_random_sampler import CustomWeightedRandomSampler
-from singleVis.SingleVisualizationModel import SingleVisualizationModel
+from singleVis.SingleVisualizationModel import VisModel
 from singleVis.losses import HybridLoss, SmoothnessLoss, UmapLoss, ReconstructionLoss
 from singleVis.edge_dataset import HybridDataHandler
 from singleVis.trainer import HybridVisTrainer
@@ -24,6 +24,7 @@ from singleVis.temporal_edge_constructor import GlobalTemporalEdgeConstructor
 #                                                     LOAD PARAMETERS                                                  #
 ########################################################################################################################
 EXP_NUM = 20
+VIS_METHOD = "DeepDebugger"
 
 parser = argparse.ArgumentParser(description='Process hyperparameters...')
 parser.add_argument('--content_path', type=str)
@@ -31,7 +32,9 @@ args = parser.parse_args()
 
 CONTENT_PATH = args.content_path
 sys.path.append(CONTENT_PATH)
-from config import config
+with open(os.path.join(CONTENT_PATH, "config.json"), "r") as f:
+    config = json.load(f)
+config = config[VIS_METHOD]
 
 SETTING = config["SETTING"]
 CLASSES = config["CLASSES"]
@@ -57,14 +60,13 @@ INIT_NUM = VISUALIZATION_PARAMETER["INIT_NUM"]
 ALPHA = VISUALIZATION_PARAMETER["ALPHA"]
 BETA = VISUALIZATION_PARAMETER["BETA"]
 MAX_HAUSDORFF = VISUALIZATION_PARAMETER["MAX_HAUSDORFF"]
-HIDDEN_LAYER = VISUALIZATION_PARAMETER["HIDDEN_LAYER"]
+ENCODER_DIMS = config["VISUALIZATION"]["ENCODER_DIMS"]
+DECODER_DIMS = config["VISUALIZATION"]["DECODER_DIMS"]
 S_N_EPOCHS = VISUALIZATION_PARAMETER["S_N_EPOCHS"]
 T_N_EPOCHS = VISUALIZATION_PARAMETER["T_N_EPOCHS"]
 N_NEIGHBORS = VISUALIZATION_PARAMETER["N_NEIGHBORS"]
 PATIENT = VISUALIZATION_PARAMETER["PATIENT"]
 MAX_EPOCH = VISUALIZATION_PARAMETER["MAX_EPOCH"]
-# SEGMENTS = VISUALIZATION_PARAMETER["SEGMENTS"]
-# RESUME_SEG = VISUALIZATION_PARAMETER["RESUME_SEG"]
 
 # define hyperparameters
 DEVICE = torch.device("cuda:{}".format(GPU_ID) if torch.cuda.is_available() else "cpu")
@@ -73,7 +75,7 @@ import Model.model as subject_model
 
 for exp in range(EXP_NUM):
     save_dir = os.path.join(CONTENT_PATH, "Model", "exp_{}".format(exp))
-    os.system("mkdir -p {}".format(save_dir))
+    os.makedirs(save_dir, exist_ok=True)
     # record output information
     now = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime(time.time())) 
     sys.stdout = open(os.path.join(save_dir, now+".txt"), "w")
@@ -85,7 +87,7 @@ for exp in range(EXP_NUM):
     data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=DEVICE, classes=CLASSES,verbose=1)
     if PREPROCESS:
         data_provider.initialize(LEN//10, l_bound=L_BOUND)
-    model = SingleVisualizationModel(input_dims=512, output_dims=2, units=256, hidden_layer=HIDDEN_LAYER)
+    model = VisModel(ENCODER_DIMS, DECODER_DIMS)
     negative_sample_rate = 5
     min_dist = .1
     _a, _b = find_ab_params(1.0, min_dist)
@@ -141,7 +143,7 @@ for exp in range(EXP_NUM):
         probs = probs[eliminate_zeros]
 
         # save result
-        save_file = os.path.join(save_dir, "SV_time_tnn_hybrid.json")
+        save_file = os.path.join(save_dir, "time_tnn_hybrid.json")
         if not os.path.exists(save_file):
             evaluation = dict()
         else:
@@ -153,7 +155,7 @@ for exp in range(EXP_NUM):
         evaluation["complex_construction"][str(seg)] = round(t3-t2, 3)
         with open(save_file, 'w') as f:
             json.dump(evaluation, f)
-        print("constructing timeVis complex for {}-th segment in {:.1f} seconds.".format(seg, t3-t2))
+        print("constructing complex for {}-th segment in {:.1f} seconds.".format(seg, t3-t2))
 
 
         dataset = HybridDataHandler(edge_to, edge_from, feature_vectors, attention, embedded, coefficient)
@@ -175,7 +177,7 @@ for exp in range(EXP_NUM):
         trainer.train(PATIENT, MAX_EPOCH)
         t3 = time.time()
         # save result
-        save_file = os.path.join(save_dir, "SV_time_tnn_hybrid.json")
+        save_file = os.path.join(save_dir, "time_tnn_hybrid.json")
         if not os.path.exists(save_file):
             evaluation = dict()
         else:

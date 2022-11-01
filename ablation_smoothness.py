@@ -23,6 +23,8 @@ from singleVis.segmenter import Segmenter
 ########################################################################################################################
 #                                                     LOAD PARAMETERS                                                  #
 ########################################################################################################################
+VIS_METHOD = "DeepDebugger" 
+
 parser = argparse.ArgumentParser(description='Process hyperparameters...')
 parser.add_argument('--content_path', type=str)
 parser.add_argument('--wt', type=int)
@@ -34,7 +36,9 @@ setting = "without_tl" if args.wt else "without_smoothness"
 
 CONTENT_PATH = args.content_path
 sys.path.append(CONTENT_PATH)
-from config import config
+with open(os.path.join(CONTENT_PATH, "config.json"), "r") as f:
+    config = json.load(f)
+config = config[VIS_METHOD]
 
 save_dir = os.path.join(CONTENT_PATH, "Model", "{}".format(setting))
 os.system("mkdir -p {}".format(save_dir))
@@ -106,8 +110,7 @@ print(SEGMENTS)
 projector = Projector(vis_model=model, content_path=CONTENT_PATH, segments=SEGMENTS, device=DEVICE)
 
 # save time result
-
-save_file = os.path.join(save_dir, "SV_time_tnn_hybrid.json")
+save_file = os.path.join(save_dir, "time_tnn_hybrid.json")
 if not os.path.exists(save_file):
     evaluation = dict()
 else:
@@ -150,7 +153,7 @@ for seg in range(start_point,-1,-1):
     probs = probs[eliminate_zeros]
 
     # save result
-    save_file = os.path.join(save_dir, "SV_time_tnn_hybrid.json")
+    save_file = os.path.join(save_dir, "time_tnn_hybrid.json")
     if not os.path.exists(save_file):
         evaluation = dict()
     else:
@@ -162,7 +165,7 @@ for seg in range(start_point,-1,-1):
     evaluation["complex_construction"][str(seg)] = round(t3-t2, 3)
     with open(save_file, 'w') as f:
         json.dump(evaluation, f)
-    print("constructing timeVis complex for {}-th segment in {:.1f} seconds.".format(seg, t3-t2))
+    print("constructing complex for {}-th segment in {:.1f} seconds.".format(seg, t3-t2))
 
 
     dataset = HybridDataHandler(edge_to, edge_from, feature_vectors, attention, embedded, coefficient)
@@ -184,7 +187,7 @@ for seg in range(start_point,-1,-1):
     trainer.train(PATIENT, MAX_EPOCH)
     t3 = time.time()
     # save result
-    save_file = os.path.join(save_dir, "SV_time_tnn_hybrid.json")
+    save_file = os.path.join(save_dir, "time_tnn_hybrid.json")
     if not os.path.exists(save_file):
         evaluation = dict()
     else:
