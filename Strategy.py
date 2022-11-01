@@ -567,28 +567,16 @@ class DVIAL(StrategyAbstractClass):
     def __init__(self, CONTENT_PATH, config):
         super().__init__(CONTENT_PATH, config)
     
-    def _init(self, iteration, resume_iteration=-1):
-        SETTING = self.config["SETTING"] # active learning
+    def _init(self, resume_iteration=-1):
         CLASSES = self.config["CLASSES"]
-        DATASET = self.config["DATASET"]
         BASE_ITERATION = self.config["BASE_ITERATION"]
         GPU_ID = self.config["GPU_ID"]
         self.DEVICE = torch.device("cuda:{}".format(GPU_ID) if torch.cuda.is_available() else "cpu")
 
         #################################################   VISUALIZATION PARAMETERS    ########################################
-        PREPROCESS = self.config["VISUALIZATION"]["PREPROCESS"]
-        B_N_EPOCHS = self.config["VISUALIZATION"]["BOUNDARY"]["B_N_EPOCHS"]
-        L_BOUND = self.config["VISUALIZATION"]["BOUNDARY"]["L_BOUND"]
-        LAMBDA = self.config["VISUALIZATION"]["LAMBDA"]
         ENCODER_DIMS = self.config["VISUALIZATION"]["ENCODER_DIMS"]
         DECODER_DIMS = self.config["VISUALIZATION"]["DECODER_DIMS"]
-        N_NEIGHBORS = self.config["VISUALIZATION"]["N_NEIGHBORS"]
-        MAX_EPOCH = self.config["VISUALIZATION"]["MAX_EPOCH"]
-        S_N_EPOCHS = self.config["VISUALIZATION"]["S_N_EPOCHS"]
-        PATIENT = self.config["VISUALIZATION"]["PATIENT"]
         VIS_MODEL_NAME = self.config["VISUALIZATION"]["VIS_MODEL_NAME"]
-        RESOLUTION = self.config["VISUALIZATION"]["RESOLUTION"]
-        EVALUATION_NAME = self.config["VISUALIZATION"]["EVALUATION_NAME"]
 
         ############################################   ACTIVE LEARNING MODEL PARAMETERS    ######################################
         TRAINING_PARAMETERS = self.config["TRAINING"]
@@ -633,21 +621,7 @@ class DVIAL(StrategyAbstractClass):
         edge_from = edge_from[eliminate_zeros]
         probs = probs[eliminate_zeros]
 
-        # save result
-        save_dir = os.path.join(self.data_provider.model_path, "time_al.json")
-        if not os.path.exists(save_dir):
-            evaluation = dict()
-        else:
-            f = open(save_dir, "r")
-            evaluation = json.load(f)
-            f.close()
-        if "complex_construction" not in evaluation.keys():
-            evaluation["complex_construction"] = dict()
-        evaluation["complex_construction"][str(iteration)] = round(t1-t0, 3)
-        with open(save_dir, 'w') as f:
-            json.dump(evaluation, f)
-        print("constructing complex in {:.1f} seconds.".format(t1-t0))
-
+        spatial_cons.record_time(self.data_provider.model_path, "time_{}".format(VIS_MODEL_NAME), "complex_construction", t1-t0)
 
         dataset = DataHandler(edge_to, edge_from, feature_vectors, attention)
         n_samples = int(np.sum(S_N_EPOCHS * probs) // 1)
@@ -668,12 +642,13 @@ class DVIAL(StrategyAbstractClass):
         optimizer = torch.optim.Adam(self.model.parameters(), lr=.01, weight_decay=1e-5)
         lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=4, gamma=.1)
 
-        trainer = SingleVisTrainer(self.model, criterion, optimizer, lr_scheduler,edge_loader=edge_loader, DEVICE=DEVICE)
+        trainer = SingleVisTrainer(self.model, criterion, optimizer, lr_scheduler,edge_loader=edge_loader, DEVICE=self.DEVICE)
         t2=time.time()
         trainer.train(PATIENT, MAX_EPOCH)
         t3 = time.time()
+
         # save result
-        save_dir = os.path.join(self.data_provider.model_path, "time_al.json")
+        save_dir = os.path.join(self.data_provider.model_path, "time_{}.json".format(VIS_MODEL_NAME))
         if not os.path.exists(save_dir):
             evaluation = dict()
         else:
@@ -705,7 +680,7 @@ class DVIAL(StrategyAbstractClass):
 
 
     def visualize_embedding(self, iteration, resume_iter=-1):
-        self._init(iteration, resume_iter)
+        self._init(resume_iter)
         self._preprocess(iteration)
         self._train(iteration)
         self._evaluate(iteration)
@@ -742,5 +717,5 @@ if __name__ == "__main__":
 
     start_i = 1
     for iteration in range(1,5,1):
-        resume_iter = iteration-1 if iteration>start_i else -1
+        resume_iter = iteration-1 if iteration > start_i else -1
         dvi_al.visualize_embedding(iteration, resume_iter)
