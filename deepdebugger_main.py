@@ -95,15 +95,8 @@ if PREPROCESS:
         data_provider._estimate_boundary(LEN//10, l_bound=L_BOUND)
         
 model = VisModel(ENCODER_DIMS, DECODER_DIMS)
-negative_sample_rate = 5
-min_dist = .1
-_a, _b = find_ab_params(1.0, min_dist)
-umap_loss_fn = UmapLoss(negative_sample_rate, DEVICE, _a, _b, repulsion_strength=1.0)
-recon_loss_fn = ReconstructionLoss(beta=1.0)
-smooth_loss_fn = SmoothnessLoss(margin=0.5)
-criterion = HybridLoss(umap_loss_fn, recon_loss_fn, smooth_loss_fn, lambd1=LAMBDA, lambd2=S_LAMBDA)
-segmenter = Segmenter(data_provider=data_provider, threshold=78.5, range_s=EPOCH_START, range_e=EPOCH_END, range_p=EPOCH_PERIOD)
 
+segmenter = Segmenter(data_provider=data_provider, threshold=78.5, range_s=EPOCH_START, range_e=EPOCH_END, range_p=EPOCH_PERIOD)
 
 # # segment epoch
 t0 = time.time()
@@ -120,6 +113,16 @@ with open(os.path.join(CONTENT_PATH, "config.json"), "w") as f:
     json.dump(conf, f)
 
 projector = DeepDebuggerProjector(vis_model=model, content_path=CONTENT_PATH, vis_model_name=VIS_MODEL_NAME, segments=SEGMENTS, device=DEVICE)
+########################################################################################################################
+#                                                       TRAINING                                                       #
+########################################################################################################################
+negative_sample_rate = 5
+min_dist = .1
+_a, _b = find_ab_params(1.0, min_dist)
+umap_loss_fn = UmapLoss(negative_sample_rate, DEVICE, _a, _b, repulsion_strength=1.0)
+recon_loss_fn = ReconstructionLoss(beta=1.0)
+smooth_loss_fn = SmoothnessLoss(margin=0.5)
+criterion = HybridLoss(umap_loss_fn, recon_loss_fn, smooth_loss_fn, lambd1=LAMBDA, lambd2=S_LAMBDA)
 
 # Resume from a checkpoint
 if RESUME_SEG in range(len(SEGMENTS)):
