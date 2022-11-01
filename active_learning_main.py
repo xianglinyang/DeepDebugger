@@ -11,7 +11,7 @@ from torch.utils.data import WeightedRandomSampler
 from umap.umap_ import find_ab_params
 
 from singleVis.custom_weighted_random_sampler import CustomWeightedRandomSampler
-from singleVis.SingleVisualizationModel import SingleVisualizationModel
+from singleVis.SingleVisualizationModel import VisModel
 from singleVis.losses import SingleVisLoss, UmapLoss, ReconstructionLoss
 from singleVis.edge_dataset import DataHandler
 from singleVis.trainer import SingleVisTrainer
@@ -20,23 +20,33 @@ from singleVis.eval.evaluator import ALEvaluator
 from singleVis.spatial_edge_constructor import SingleEpochSpatialEdgeConstructor
 from singleVis.projector import ALProjector
 ########################################################################################################################
+#                                                     DVI PARAMETERS                                                   #
+########################################################################################################################
+"""This serve as an example of DeepVisualInsight implementation in pytorch."""
+VIS_METHOD = "DVI" # DeepVisualInsight
+
+########################################################################################################################
 #                                                     LOAD PARAMETERS                                                  #
 ########################################################################################################################
 parser = argparse.ArgumentParser(description='Process hyperparameters...')
 parser.add_argument('--content_path', type=str, default="/home/xianglin/DVI_data/active_learning/random/resnet18/CIFAR10")
 parser.add_argument('-g',"--gpu_id", type=int, choices=[0,1], default=0)
 parser.add_argument('-i',"--iteration", type=int)
+parser.add_argument("--resume", type=int, default=-1, help="Resume from which iteration.")
 
 args = parser.parse_args()
-
 CONTENT_PATH = args.content_path
 GPU_ID = args.gpu_id
 iteration = args.iteration
+resume_iter = args.resume
 
 content_path = CONTENT_PATH
 sys.path.append(content_path)
 
-from config import config
+with open(os.path.join(CONTENT_PATH, "config.json"), "r") as f:
+    config = json.load(f)
+config = config[VIS_METHOD]
+# from config import config
 
 SETTING = config["SETTING"] # active learning
 CLASSES = config["CLASSES"]
@@ -49,7 +59,8 @@ PREPROCESS = config["VISUALIZATION"]["PREPROCESS"]
 B_N_EPOCHS = config["VISUALIZATION"]["BOUNDARY"]["B_N_EPOCHS"]
 L_BOUND = config["VISUALIZATION"]["BOUNDARY"]["L_BOUND"]
 LAMBDA = config["VISUALIZATION"]["LAMBDA"]
-HIDDEN_LAYER = config["VISUALIZATION"]["HIDDEN_LAYER"]
+ENCODER_DIMS = config["VISUALIZATION"]["ENCODER_DIMS"]
+DECODER_DIMS = config["VISUALIZATION"]["DECODER_DIMS"]
 N_NEIGHBORS = config["VISUALIZATION"]["N_NEIGHBORS"]
 MAX_EPOCH = config["VISUALIZATION"]["MAX_EPOCH"]
 S_N_EPOCHS = config["VISUALIZATION"]["S_N_EPOCHS"]
@@ -64,11 +75,9 @@ NET = TRAINING_PARAMETERS["NET"]
 
 import Model.model as subject_model
 net = eval("subject_model.{}()".format(NET))
-
 ########################################################################################################################
 #                                                    TRAINING SETTING                                                  #
 ########################################################################################################################
-
 data_provider = ActiveLearningDataProvider(content_path, net, BASE_ITERATION, device=DEVICE, classes=CLASSES, verbose=1)
 if PREPROCESS:
     data_provider._meta_data(iteration)
@@ -76,18 +85,13 @@ if PREPROCESS:
     if B_N_EPOCHS >0:
         data_provider._estimate_boundary(iteration, LEN//10, l_bound=L_BOUND)
 
-model = SingleVisualizationModel(input_dims=512, output_dims=2, units=256, hidden_layer=HIDDEN_LAYER)
-negative_sample_rate = 5
-min_dist = .1
-_a, _b = find_ab_params(1.0, min_dist)
-umap_loss_fn = UmapLoss(negative_sample_rate, DEVICE, _a, _b, repulsion_strength=1.0)
-recon_loss_fn = ReconstructionLoss(beta=1.0)
-criterion = SingleVisLoss(umap_loss_fn, recon_loss_fn, lambd=LAMBDA)
-
-optimizer = torch.optim.Adam(model.parameters(), lr=.01, weight_decay=1e-5)
-lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=4, gamma=.1)
+model = VisModel(ENCODER_DIMS, DECODER_DIMS)
 projector = ALProjector(vis_model=model, content_path=CONTENT_PATH, vis_model_name=VIS_MODEL_NAME, device=DEVICE)
-
+if resume_iter > 0:
+    projector.load(resume_iter)
+########################################################################################################################
+#                                                    EDGE DATASET                                                      #
+########################################################################################################################
 t0 = time.time()
 spatial_cons = SingleEpochSpatialEdgeConstructor(data_provider, iteration, 5, 0, 15)
 edge_to, edge_from, probs, feature_vectors, attention = spatial_cons.construct()
@@ -112,7 +116,7 @@ if "complex_construction" not in evaluation.keys():
 evaluation["complex_construction"][str(iteration)] = round(t1-t0, 3)
 with open(save_dir, 'w') as f:
     json.dump(evaluation, f)
-print("constructing timeVis complex in {:.1f} seconds.".format(t1-t0))
+print("constructing complex in {:.1f} seconds.".format(t1-t0))
 
 
 dataset = DataHandler(edge_to, edge_from, feature_vectors, attention)
@@ -124,9 +128,18 @@ else:
     sampler = WeightedRandomSampler(probs, n_samples, replacement=True)
 edge_loader = DataLoader(dataset, batch_size=1024, sampler=sampler)
 
-# ########################################################################################################################
-# #                                                       TRAIN                                                          #
-# ########################################################################################################################
+########################################################################################################################
+#                                                       TRAIN                                                          #
+########################################################################################################################
+negative_sample_rate = 5
+min_dist = .1
+_a, _b = find_ab_params(1.0, min_dist)
+umap_loss_fn = UmapLoss(negative_sample_rate, DEVICE, _a, _b, repulsion_strength=1.0)
+recon_loss_fn = ReconstructionLoss(beta=1.0)
+criterion = SingleVisLoss(umap_loss_fn, recon_loss_fn, lambd=LAMBDA)
+
+optimizer = torch.optim.Adam(model.parameters(), lr=.01, weight_decay=1e-5)
+lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=4, gamma=.1)
 
 trainer = SingleVisTrainer(model, criterion, optimizer, lr_scheduler,edge_loader=edge_loader, DEVICE=DEVICE)
 t2=time.time()
@@ -149,9 +162,10 @@ save_dir = os.path.join(data_provider.model_path, "Iteration_{}".format(iteratio
 os.makedirs(save_dir, exist_ok=True)
 trainer.save(save_dir=save_dir, file_name=VIS_MODEL_NAME)
     
-# ########################################################################################################################
-# #                                                       EVALUATION                                                     #
-# ########################################################################################################################
+########################################################################################################################
+#                                                       EVALUATION                                                     #
+########################################################################################################################
+
 evaluator = ALEvaluator(data_provider, projector)
 evaluator.save_epoch_eval(iteration, file_name=EVALUATION_NAME)
 
@@ -160,7 +174,6 @@ evaluator.save_epoch_eval(iteration, file_name=EVALUATION_NAME)
 ########################################################################################################################
 
 from singleVis.visualizer import visualizer
-
 vis = visualizer(data_provider, projector, 200)
 save_dir = os.path.join(data_provider.content_path, "img")
 os.makedirs(save_dir, exist_ok=True)
