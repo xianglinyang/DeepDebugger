@@ -16,19 +16,55 @@ from singleVis.SingleVisualizationModel import VisModel
 from singleVis.losses import HybridLoss, SmoothnessLoss, UmapLoss, ReconstructionLoss, TemporalLoss, DVILoss, SingleVisLoss
 from singleVis.edge_dataset import HybridDataHandler, DVIDataHandler, DataHandler
 from singleVis.trainer import HybridVisTrainer, DVITrainer, SingleVisTrainer
-from singleVis.data import NormalDataProvider, ActiveLearningDataProvider
+from singleVis.data import DataProviderAbstractClass, NormalDataProvider, ActiveLearningDataProvider
 from singleVis.spatial_edge_constructor import kcHybridSpatialEdgeConstructor, SingleEpochSpatialEdgeConstructor, kcSpatialEdgeConstructor
 from singleVis.temporal_edge_constructor import GlobalTemporalEdgeConstructor
-from singleVis.projector import DeepDebuggerProjector, DVIProjector, TimeVisProjector, ALProjector
+from singleVis.projector import DeepDebuggerProjector, DVIProjector, ProjectorAbstractClass, TimeVisProjector, ALProjector
 from singleVis.segmenter import Segmenter
-from singleVis.eval.evaluator import Evaluator, ALEvaluator
-from singleVis.visualizer import visualizer
+from singleVis.eval.evaluator import Evaluator, ALEvaluator, EvaluatorAbstractClass
+from singleVis.visualizer import VisualizerAbstractClass, visualizer
 from singleVis.utils import find_neighbor_preserving_rate
 
 class StrategyAbstractClass(ABC):
-    def __init__(self, CONTENT_PATH, config):
-        self.config = config
+    def __init__(self, CONTENT_PATH, **config):
+        self._config = config
         self.CONTENT_PATH = CONTENT_PATH
+    
+    @property
+    def config(self)->dict:
+        return self._config
+    
+    @property
+    def projector(self)->ProjectorAbstractClass:
+        return self._projector
+    
+    @projector.setter
+    def projector(self, projector:ProjectorAbstractClass)->None:
+        self._projector = projector
+    
+    @property
+    def data_provider(self)->DataProviderAbstractClass:
+        return self._data_provider
+    
+    @data_provider.setter
+    def data_provider(self, data_provider:DataProviderAbstractClass)->None:
+        self._data_provider = data_provider
+
+    @property
+    def evaluator(self)->EvaluatorAbstractClass:
+        return self._evaluator
+    
+    @evaluator.setter
+    def evaluator(self, evaluator:EvaluatorAbstractClass)->None:
+        self._evaluator = evaluator
+    
+    @property
+    def vis(self)->VisualizerAbstractClass:
+        return self._vis
+    
+    @vis.setter
+    def vis(self, visualizer:VisualizerAbstractClass)->None:
+        self._vis = visualizer
     
     @abstractmethod
     def _init(self):
@@ -93,7 +129,7 @@ class DeepVisualInsight(StrategyAbstractClass):
         import Model.model as subject_model
         net = eval("subject_model.{}()".format(NET))
 
-        self.data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=self.DEVICE, classes=CLASSES,verbose=1)
+        self._data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=self.DEVICE, classes=CLASSES,verbose=1)
         self.model = VisModel(ENCODER_DIMS, DECODER_DIMS)
         negative_sample_rate = 5
         min_dist = .1
@@ -104,7 +140,7 @@ class DeepVisualInsight(StrategyAbstractClass):
         self.umap_fn = umap_loss_fn
         self.recon_fn = recon_loss_fn
         self.temporal_fn = temporal_loss_fn
-        self.projector = DVIProjector(vis_model=self.model, content_path=CONTENT_PATH, vis_model_name=VIS_MODEL_NAME, device=self.DEVICE)
+        self._projector = DVIProjector(vis_model=self.model, content_path=CONTENT_PATH, vis_model_name=VIS_MODEL_NAME, device=self.DEVICE)
 
     def _preprocess(self):
         PREPROCESS = self.config["VISUALIZATION"]["PREPROCESS"]
@@ -206,7 +242,7 @@ class DeepVisualInsight(StrategyAbstractClass):
         EPOCH_END = self.config["EPOCH_END"]
         EPOCH_PERIOD = self.config["EPOCH_PERIOD"]
 
-        self.vis = visualizer(self.data_provider, self.projector, 200, "plasma")
+        self._vis = visualizer(self.data_provider, self.projector, 200, "plasma")
         save_dir = os.path.join(self.data_provider.content_path, "img")
         if not os.path.exists(save_dir):
             os.mkdir(save_dir)
@@ -221,7 +257,7 @@ class DeepVisualInsight(StrategyAbstractClass):
         EVALUATION_NAME = VISUALIZATION_PARAMETER["EVALUATION_NAME"]
         N_NEIGHBORS = VISUALIZATION_PARAMETER["N_NEIGHBORS"]
         eval_epochs = list(range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD))
-        self.evaluator = Evaluator(self.data_provider, self.projector)
+        self._evaluator = Evaluator(self.data_provider, self.projector)
         for eval_epoch in eval_epochs:
             self.evaluator.save_epoch_eval(eval_epoch, N_NEIGHBORS, temporal_k=5, file_name="{}".format(EVALUATION_NAME))
 
@@ -268,7 +304,7 @@ class TimeVis(StrategyAbstractClass):
         import Model.model as subject_model
         net = eval("subject_model.{}()".format(NET))
 
-        self.data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=self.DEVICE, classes=CLASSES,verbose=1)
+        self._data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=self.DEVICE, classes=CLASSES,verbose=1)
         self.model = VisModel(ENCODER_DIMS, DECODER_DIMS)
         negative_sample_rate = 5
         min_dist = .1
@@ -276,7 +312,7 @@ class TimeVis(StrategyAbstractClass):
         umap_loss_fn = UmapLoss(negative_sample_rate, self.DEVICE, _a, _b, repulsion_strength=1.0)
         recon_loss_fn = ReconstructionLoss(beta=1.0)
         self.criterion = SingleVisLoss(umap_loss_fn, recon_loss_fn, lambd=LAMBDA)
-        self.projector = TimeVisProjector(vis_model=self.model, content_path=CONTENT_PATH, vis_model_name=VIS_MODEL_NAME, device=self.DEVICE)
+        self._projector = TimeVisProjector(vis_model=self.model, content_path=CONTENT_PATH, vis_model_name=VIS_MODEL_NAME, device=self.DEVICE)
 
     def _preprocess(self):
         PREPROCESS = self.config["VISUALIZATION"]["PREPROCESS"]
@@ -353,7 +389,7 @@ class TimeVis(StrategyAbstractClass):
         EPOCH_END = self.config["EPOCH_END"]
         EPOCH_PERIOD = self.config["EPOCH_PERIOD"]
 
-        self.vis = visualizer(self.data_provider, self.projector, 200, "plasma")
+        self._vis = visualizer(self.data_provider, self.projector, 200, "plasma")
         save_dir = os.path.join(self.data_provider.content_path, "img")
         if not os.path.exists(save_dir):
             os.mkdir(save_dir)
@@ -416,7 +452,7 @@ class DeepDebugger(StrategyAbstractClass):
         import Model.model as subject_model
         net = eval("subject_model.{}()".format(NET))
 
-        self.data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=self.DEVICE, classes=CLASSES,verbose=1)        
+        self._data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=self.DEVICE, classes=CLASSES,verbose=1)        
         self.model = VisModel(ENCODER_DIMS, DECODER_DIMS)
         negative_sample_rate = 5
         min_dist = .1
@@ -426,7 +462,7 @@ class DeepDebugger(StrategyAbstractClass):
         smooth_loss_fn = SmoothnessLoss(margin=0.5)
         self.criterion = HybridLoss(umap_loss_fn, recon_loss_fn, smooth_loss_fn, lambd1=LAMBDA, lambd2=S_LAMBDA)
         self.segmenter = Segmenter(data_provider=self.data_provider, threshold=78.5, range_s=EPOCH_START, range_e=EPOCH_END, range_p=EPOCH_PERIOD)
-        self.projector = DeepDebuggerProjector(vis_model=self.model, content_path=CONTENT_PATH,vis_model_name=VIS_MODEL_NAME, segments=None, device=self.DEVICE)
+        self._projector = DeepDebuggerProjector(vis_model=self.model, content_path=CONTENT_PATH,vis_model_name=VIS_MODEL_NAME, segments=None, device=self.DEVICE)
 
     def _preprocess(self):
         PREPROCESS = self.config["VISUALIZATION"]["PREPROCESS"]
@@ -550,7 +586,7 @@ class DeepDebugger(StrategyAbstractClass):
         EPOCH_END = self.config["EPOCH_END"]
         EPOCH_PERIOD = self.config["EPOCH_PERIOD"]
 
-        self.vis =  (self.data_provider, self.projector, 200, "plasma")
+        self._vis =  visualizer(self.data_provider, self.projector, 200, "plasma")
         save_dir = os.path.join(self.data_provider.content_path, "img")
         os.makedirs(save_dir, exist_ok=True)
         for i in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
@@ -585,9 +621,9 @@ class DVIAL(StrategyAbstractClass):
         import Model.model as subject_model
         net = eval("subject_model.{}()".format(NET))
 
-        self.data_provider = ActiveLearningDataProvider(self.CONTENT_PATH, net, BASE_ITERATION, device=self.DEVICE, classes=CLASSES, verbose=1)
+        self._data_provider = ActiveLearningDataProvider(self.CONTENT_PATH, net, BASE_ITERATION, device=self.DEVICE, classes=CLASSES, verbose=1)
         self.model = VisModel(ENCODER_DIMS, DECODER_DIMS)
-        self.projector = ALProjector(vis_model=self.model, content_path=CONTENT_PATH, vis_model_name=VIS_MODEL_NAME, device=self.DEVICE)
+        self._projector = ALProjector(vis_model=self.model, content_path=CONTENT_PATH, vis_model_name=VIS_MODEL_NAME, device=self.DEVICE)
 
         if resume_iteration > 0:
             self.projector.load(resume_iteration)
@@ -670,7 +706,7 @@ class DVIAL(StrategyAbstractClass):
         self.evaluator.save_epoch_eval(iteration, file_name=EVALUATION_NAME)
 
     def _visualize(self, iteration):
-        self.vis = visualizer(self.data_provider, self.projector, 200)
+        self._vis = visualizer(self.data_provider, self.projector, 200)
         save_dir = os.path.join(self.data_provider.content_path, "img")
         os.makedirs(save_dir, exist_ok=True)
         data = self.data_provider.train_representation(iteration)
