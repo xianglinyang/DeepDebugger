@@ -25,6 +25,9 @@ class SpatialEdgeConstructorAbstractClass(ABC):
         # return head, tail, weight, feature_vectors
         pass
 
+    @abstractmethod
+    def record_time(self, save_dir, file_name, operation, t):
+        pass
 
 '''Base class for Spatial Edge Constructor'''
 class SpatialEdgeConstructor(SpatialEdgeConstructorAbstractClass):
@@ -132,7 +135,18 @@ class SpatialEdgeConstructor(SpatialEdgeConstructorAbstractClass):
 
     def construct(self):
         return NotImplemented
-
+    
+    def record_time(self, save_dir, file_name, operation, t):
+        file_path = os.path.join(save_dir, file_name+".json")
+        if os.path.exists(file_path):
+            with open(file_path, "r") as f:
+                ti = json.load(f)
+        else:
+            ti = dict()
+        ti[operation] = t
+        with open(file_path, "w") as f:
+            json.dump(ti, f)
+        
 '''
 Strategies:
     Random: random select samples
@@ -235,6 +249,7 @@ class kcSpatialEdgeConstructor(SpatialEdgeConstructor):
         self.init_idxs = init_idxs
     
     def _get_unit(self, data, adding_num=100):
+        # normalize
         t0 = time.time()
         l = len(data)
         idxs = np.random.choice(np.arange(l), size=self.init_num, replace=False)
@@ -318,7 +333,7 @@ class kcSpatialEdgeConstructor(SpatialEdgeConstructor):
 
             if self.b_n_epochs != 0:
                 # select highly used border centers...
-                border_centers = self.data_provider.border_representation(t).squeeze()
+                border_centers = self.data_provider.border_representation(t)
                 t_num = len(selected_idxs)
                 b_num = len(border_centers)
 
@@ -329,7 +344,8 @@ class kcSpatialEdgeConstructor(SpatialEdgeConstructor):
                 rhos_t = np.concatenate((rhos_t1, rhos_t2[len(rhos_t1):]), axis=0)
                 fitting_data = np.concatenate((train_data, border_centers), axis=0)
                 pred_model = self.data_provider.prediction_function(t)
-                attention_t = get_attention(pred_model, fitting_data, temperature=.01, device=self.data_provider.DEVICE, verbose=1)
+                # attention_t = get_attention(pred_model, fitting_data, temperature=.01, device=self.data_provider.DEVICE, verbose=1)
+                attention_t = np.ones(fitting_data.shape)
             else:
                 t_num = len(selected_idxs)
                 b_num = 0
@@ -338,7 +354,8 @@ class kcSpatialEdgeConstructor(SpatialEdgeConstructor):
                 edge_to_t, edge_from_t, weight_t = self._construct_step_edge_dataset(complex, None)
                 fitting_data = np.copy(train_data)
                 pred_model = self.data_provider.prediction_function(t)
-                attention_t = get_attention(pred_model, fitting_data, temperature=.01, device=self.data_provider.DEVICE, verbose=1)
+                # attention_t = get_attention(pred_model, fitting_data, temperature=.01, device=self.data_provider.DEVICE, verbose=1)
+                attention_t = np.ones(fitting_data.shape)
 
 
             if edge_to is None:
@@ -385,11 +402,9 @@ class kcParallelSpatialEdgeConstructor(SpatialEdgeConstructor):
         t0 = time.time()
         l = len(data)
         idxs = np.random.choice(np.arange(l), size=self.init_num, replace=False)
-        # _,_ = hausdorff_dist_cus(data, idxs)
 
         id = IntrinsicDim(data)
         d0 = id.twonn_dimension_fast()
-        # d0 = twonn_dimension_fast(data)
 
         kc = kCenterGreedy(data)
         _ = kc.select_batch_with_budgets(idxs, adding_num)
@@ -423,6 +438,7 @@ class kcParallelSpatialEdgeConstructor(SpatialEdgeConstructor):
         init_selected_idxs = np.random.choice(np.arange(train_num), size=self.init_num, replace=False)
 
         baseline_data = self.data_provider.train_representation(self.data_provider.e)
+        baseline_data = baseline_data.reshape(len(baseline_data), -1)
         max_x = np.linalg.norm(baseline_data, axis=1).max()
         baseline_data = baseline_data/max_x
         
@@ -432,7 +448,8 @@ class kcParallelSpatialEdgeConstructor(SpatialEdgeConstructor):
         for t in range(self.data_provider.e, self.data_provider.s - 1, -self.data_provider.p):
             print("=================+++={:d}=+++================".format(t))
             # load train data and border centers
-            train_data = self.data_provider.train_representation(t).squeeze()
+            train_data = self.data_provider.train_representation(t)
+            train_data = train_data.reshape(len(train_data), -1)
 
             # normalize data by max ||x||_2
             max_x = np.linalg.norm(train_data, axis=1).max()
@@ -457,7 +474,7 @@ class kcParallelSpatialEdgeConstructor(SpatialEdgeConstructor):
 
             time_step_idxs_list.insert(0, selected_idxs)
 
-            train_data = self.data_provider.train_representation(t).squeeze()
+            train_data = self.data_provider.train_representation(t)
             train_data = train_data[selected_idxs]
             
             if self.b_n_epochs != 0:
@@ -535,17 +552,32 @@ class SingleEpochSpatialEdgeConstructor(SpatialEdgeConstructor):
             edge_to, edge_from, weight = self._construct_step_edge_dataset(complex, bw_complex, self.n_epochs)
             feature_vectors = np.concatenate((train_data, border_centers), axis=0)
             pred_model = self.data_provider.prediction_function(self.iteration)
-            attention = get_attention(pred_model, feature_vectors, temperature=.01, device=self.data_provider.DEVICE, verbose=1)
+            # attention = get_attention(pred_model, feature_vectors, temperature=.01, device=self.data_provider.DEVICE, verbose=1)
+            attention = np.ones(feature_vectors.shape)
         elif self.b_n_epochs == 0:
             complex, _, _, _ = self._construct_fuzzy_complex(train_data)
             edge_to, edge_from, weight = self._construct_step_edge_dataset(complex, None)
             feature_vectors = np.copy(train_data)
             pred_model = self.data_provider.prediction_function(self.iteration)
-            attention = get_attention(pred_model, feature_vectors, temperature=.01, device=self.data_provider.DEVICE, verbose=1)            
+            # attention = get_attention(pred_model, feature_vectors, temperature=.01, device=self.data_provider.DEVICE, verbose=1)            
+            attention = np.ones(feature_vectors.shape)
         else: 
             raise Exception("Illegal border edges proposion!")
             
         return edge_to, edge_from, weight, feature_vectors, attention
+    
+    def record_time(self, save_dir, file_name, operation, t):
+        file_path = os.path.join(save_dir, file_name+".json")
+        if os.path.exists(file_path):
+            with open(file_path, "r") as f:
+                ti = json.load(f)
+        else:
+            ti = dict()
+        if operation not in ti.keys():
+            ti[operation] = dict()
+        ti[operation][str(self.iteration)] = t
+        with open(file_path, "w") as f:
+            json.dump(ti, f)
 
 
 class kcHybridSpatialEdgeConstructor(SpatialEdgeConstructor):
