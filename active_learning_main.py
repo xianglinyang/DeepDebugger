@@ -23,22 +23,22 @@ from singleVis.projector import ALProjector
 #                                                     DVI PARAMETERS                                                   #
 ########################################################################################################################
 """This serve as an example of DeepVisualInsight implementation in pytorch."""
-VIS_METHOD = "DVI" # DeepVisualInsight
+VIS_METHOD = "DVIAL" # DeepVisualInsight
 
 ########################################################################################################################
 #                                                     LOAD PARAMETERS                                                  #
 ########################################################################################################################
 parser = argparse.ArgumentParser(description='Process hyperparameters...')
-parser.add_argument('--content_path', type=str, default="/home/xianglin/DVI_data/active_learning/random/resnet18/CIFAR10")
-parser.add_argument('-g',"--gpu_id", type=int, choices=[0,1], default=0)
+parser.add_argument('--content_path', type=str, default="/home/xianglin/projects/DVI_data/active_learning/random/resnet18/CIFAR10")
+parser.add_argument('-g',"--gpu_id", type=int, default=0)
 parser.add_argument('-i',"--iteration", type=int)
 parser.add_argument("--resume", type=int, default=-1, help="Resume from which iteration.")
 
 args = parser.parse_args()
 CONTENT_PATH = args.content_path
 GPU_ID = args.gpu_id
-iteration = args.iteration
-resume_iter = args.resume
+iteration = int(args.iteration)
+resume_iter = int(args.resume)
 
 content_path = CONTENT_PATH
 sys.path.append(content_path)
