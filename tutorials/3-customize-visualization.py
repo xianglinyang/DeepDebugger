@@ -7,6 +7,7 @@
 import torch
 import sys
 import os
+import json
 import time
 import numpy as np
 import argparse
@@ -16,6 +17,7 @@ from torch.utils.data import WeightedRandomSampler
 from singleVis.custom_weighted_random_sampler import CustomWeightedRandomSampler
 
 # >>>>>>>>>> Define different visualization components in the following file and import them
+sys.path.append("..")
 from singleVis.SingleVisualizationModel import VisModel
 from singleVis.losses import Loss # and other Losses 
 from singleVis.edge_dataset import DataHandlerAbstractClass
@@ -41,7 +43,9 @@ CONTENT_PATH = args.content_path
 sys.path.append(CONTENT_PATH)
 
 # Define your dataset hyperparameters in config
-from config import config
+with open(os.path.join(CONTENT_PATH, "config.json"), "r") as f:
+    config = json.load(f)
+config = config[VIS_METHOD]
 
 # record output information
 now = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime(time.time())) 
@@ -66,11 +70,8 @@ VISUALIZATION_PARAMETER = config["VISUALIZATION"]
 LAMBDA = VISUALIZATION_PARAMETER["LAMBDA"]
 B_N_EPOCHS = VISUALIZATION_PARAMETER["BOUNDARY"]["B_N_EPOCHS"]
 L_BOUND = VISUALIZATION_PARAMETER["BOUNDARY"]["L_BOUND"]
-INIT_NUM = VISUALIZATION_PARAMETER["INIT_NUM"]
-ALPHA = VISUALIZATION_PARAMETER["ALPHA"]
-BETA = VISUALIZATION_PARAMETER["BETA"]
-MAX_HAUSDORFF = VISUALIZATION_PARAMETER["MAX_HAUSDORFF"]
-HIDDEN_LAYER = VISUALIZATION_PARAMETER["HIDDEN_LAYER"]
+ENCODER_DIMS = VISUALIZATION_PARAMETER["ENCODER_DIMS"]
+DECODER_DIMS = VISUALIZATION_PARAMETER["DECODER_DIMS"]
 S_N_EPOCHS = VISUALIZATION_PARAMETER["S_N_EPOCHS"]
 T_N_EPOCHS = VISUALIZATION_PARAMETER["T_N_EPOCHS"]
 N_NEIGHBORS = VISUALIZATION_PARAMETER["N_NEIGHBORS"]
@@ -123,6 +124,7 @@ t0 = time.time()
 spatial_cons = SpatialEdgeConstructorAbstractClass(data_provider)
 edge_to, edge_from, probs, feature_vectors = spatial_cons.construct()
 t1 = time.time()
+spatial_cons.record_time(data_provider.model_path, "time_{}.json".format(VIS_MODEL_NAME), "complex_construction", t1-t0)
 # <<<<<<<<<< Define your own Edge dataset
 
 # remove edges with low weight (optional) 
@@ -154,8 +156,7 @@ t2=time.time()
 trainer.train(PATIENT, MAX_EPOCH)
 t3 = time.time()
 
-trainer.record_time("time_{}_{}.json".format(VIS_METHOD, VIS_MODEL_NAME), "complex_construction", t1-t0)
-trainer.record_time("time_{}_{}.json".format(VIS_METHOD, VIS_MODEL_NAME), "training", t3-t2)
+trainer.record_time(data_provider.model_path, "time_{}.json".format(VIS_MODEL_NAME), "training", t3-t2)
 save_dir = "path/to/model"
 trainer.save(save_dir=save_dir, file_name="{}".format(VIS_MODEL_NAME))
 
