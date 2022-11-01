@@ -4,7 +4,6 @@ from abc import ABC, abstractmethod
 import os
 import gc
 import time
-from git_space.DLVisDebugger.ablation_segment import DEVICE
 
 from singleVis.utils import *
 from singleVis.eval.evaluate import evaluate_inv_accu
