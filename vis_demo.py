@@ -86,7 +86,7 @@ import Model.model as subject_model
 net = eval("subject_model.{}()".format(NET))
 
 ########################################################################################################################
-#                                                   TRAINING                                                           #
+#                                                     DATA                                                             #
 ########################################################################################################################
 # >>>>>>>>>> Define data_provider
 data_provider = DataProviderAbstractClass(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, split=-1)
@@ -100,14 +100,16 @@ if PREPROCESS:
 model = VisModel(encoder_dims=[100,20,2], decoder_dims=[2,50,100])  # placeholder
 # <<<<<<<<<< Define your own visualization models
 
-# >>>>>>>>>> Define your own Losses
-criterion = Loss()
-# <<<<<<<<<< Define your own Losses
-
-
 # >>>>>>>>>> Define your own Projector
 projector = ProjectorAbstractClass()
 # <<<<<<<<<< Define your own Projector
+
+########################################################################################################################
+#                                                 EDGE DATASET                                                         #
+########################################################################################################################
+# >>>>>>>>>> Define your own Losses
+criterion = Loss()
+# <<<<<<<<<< Define your own Losses
 
 
 # >>>>>>>>>> Define your own training parameters
