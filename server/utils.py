@@ -11,6 +11,7 @@ import base64
 
 vis_path = ".."
 from context import VisContext, ActiveLearningContext, AnormalyContext
+from strategy import DeepDebugger, TimeVis, DeepVisualInsight
 
 from singleVis.SingleVisualizationModel import VisModel
 from singleVis.losses import SingleVisLoss, UmapLoss, ReconstructionLoss, SmoothnessLoss, HybridLoss
@@ -22,17 +23,35 @@ from singleVis.projector import Projector, ALProjector, DenseALProjector
 
 """Interface align"""
 
-def initialize_backend(CONTENT_PATH, VIS_METHOD, dense_al=False):
-
+def initialize_strategy(CONTENT_PATH, VIS_METHOD):
     # initailize strategy (visualization method)
-    # initialize context (data setting)
-    return context
-
     with open(os.path.join(CONTENT_PATH, "config.json"), "r") as f:
-        config = json.load(f)
-    config = config[VIS_METHOD]
+        conf = json.load(f)
+    config = conf[VIS_METHOD]
 
-    
+    if VIS_METHOD == "DeepVisualInsight":
+        strategy = DeepVisualInsight(CONTENT_PATH, config)
+    elif VIS_METHOD == "TimeVis":
+        strategy = TimeVis(CONTENT_PATH, config)
+    elif VIS_METHOD == DeepDebugger(CONTENT_PATH, config):
+        strategy = DeepDebugger(CONTENT_PATH, config)
+    else:
+        raise NotImplementedError
+    return strategy
+
+def initialize_context(strategy, setting):
+    if setting == "normal":
+        context = VisContext(strategy)
+    elif setting == "active learning":
+        context = ActiveLearningContext(strategy)
+    elif setting == "dense al":
+        context == ActiveLearningContext(strategy)
+    elif setting == "abnormal":
+        context = AnormalyContext(strategy, 80)
+    else:
+        raise NotImplementedError
+
+def initialize_backend(CONTENT_PATH, VIS_METHOD, dense_al=False):    
     # load hyperparameters
     CLASSES = config["CLASSES"]
     DATASET = config["DATASET"]
@@ -142,7 +161,6 @@ def initialize_backend(CONTENT_PATH, VIS_METHOD, dense_al=False):
 
 
 def update_epoch_projection(context, EPOCH, predicates):
-    return 
     train_data = timevis.data_provider.train_representation(EPOCH)
     test_data = timevis.data_provider.test_representation(EPOCH)
     all_data = np.concatenate((train_data, test_data), axis=0)
@@ -197,18 +215,6 @@ def update_epoch_projection(context, EPOCH, predicates):
     file_name = timevis.hyperparameters["VISUALIZATION"]["EVALUATION_NAME"]
     evaluation = timevis.evaluator.get_eval(file_name=file_name)
     eval_new = dict()
-    # eval_new["nn_train_15"] = evaluation["15"]['nn_train'][str(EPOCH)]
-    # eval_new['nn_test_15'] = evaluation["15"]['nn_test'][str(EPOCH)]
-    # eval_new['bound_train_15'] = evaluation["15"]['b_train'][str(EPOCH)]
-    # eval_new['bound_test_15'] = evaluation["15"]['b_test'][str(EPOCH)]
-    # eval_new['ppr_train'] = evaluation["ppr_train"][str(EPOCH)]
-    # eval_new['ppr_test'] = evaluation["ppr_test"][str(EPOCH)]
-    # eval_new["nn_train_15"] = 1
-    # eval_new['nn_test_15'] = 1
-    # eval_new['bound_train_15'] = 1
-    # eval_new['bound_test_15'] = 1
-    # eval_new['ppr_train'] = 1
-    # eval_new['ppr_test'] = 1
     eval_new["train_acc"] = evaluation["train_acc"][str(EPOCH)]
     eval_new["test_acc"] = evaluation["test_acc"][str(EPOCH)]
 
