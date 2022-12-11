@@ -18,7 +18,7 @@ from singleVis.SingleVisualizationModel import VisModel
 from singleVis.losses import UmapLoss, ReconstructionLoss, TemporalLoss, DVILoss
 from singleVis.edge_dataset import DVIDataHandler
 from singleVis.trainer import DVITrainer
-from singleVis.data import TimeVisDataProvider
+from singleVis.data import NormalDataProvider
 from singleVis.spatial_edge_constructor import SingleEpochSpatialEdgeConstructor
 from singleVis.projector import DVIProjector
 from singleVis.eval.evaluator import Evaluator
@@ -43,8 +43,8 @@ with open(os.path.join(CONTENT_PATH, "config.json"), "r") as f:
 config = config[VIS_METHOD]
 
 # record output information
-now = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime(time.time())) 
-sys.stdout = open(os.path.join(CONTENT_PATH, now+".txt"), "w")
+# now = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime(time.time())) 
+# sys.stdout = open(os.path.join(CONTENT_PATH, now+".txt"), "w")
 
 SETTING = config["SETTING"]
 CLASSES = config["CLASSES"]
@@ -86,7 +86,7 @@ net = eval("subject_model.{}()".format(NET))
 #                                                    TRAINING SETTING                                                  #
 ########################################################################################################################
 # Define data_provider
-data_provider = TimeVisDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=DEVICE, classes=CLASSES,verbose=1)
+data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=DEVICE, classes=CLASSES,verbose=1)
 if PREPROCESS:
     data_provider._meta_data()
     if B_N_EPOCHS >0:
@@ -177,7 +177,7 @@ for iteration in range(EPOCH_START, EPOCH_END+EPOCH_PERIOD, EPOCH_PERIOD):
 
 from singleVis.visualizer import visualizer
 
-vis = visualizer(data_provider, projector, 200, "plasma")
+vis = visualizer(data_provider, projector, 200, "tab10")
 save_dir = os.path.join(data_provider.content_path, "img")
 if not os.path.exists(save_dir):
     os.mkdir(save_dir)

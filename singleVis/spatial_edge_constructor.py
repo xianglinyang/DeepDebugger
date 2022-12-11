@@ -546,18 +546,18 @@ class SingleEpochSpatialEdgeConstructor(SpatialEdgeConstructor):
             border_centers = self.data_provider.border_representation(self.iteration).squeeze()
             complex, _, _, _ = self._construct_fuzzy_complex(train_data)
             bw_complex, _, _, _ = self._construct_boundary_wise_complex(train_data, border_centers)
-            edge_to, edge_from, weight = self._construct_step_edge_dataset(complex, bw_complex, self.n_epochs)
+            edge_to, edge_from, weight = self._construct_step_edge_dataset(complex, bw_complex)
             feature_vectors = np.concatenate((train_data, border_centers), axis=0)
             pred_model = self.data_provider.prediction_function(self.iteration)
-            # attention = get_attention(pred_model, feature_vectors, temperature=.01, device=self.data_provider.DEVICE, verbose=1)
-            attention = np.ones(feature_vectors.shape)
+            attention = get_attention(pred_model, feature_vectors, temperature=.01, device=self.data_provider.DEVICE, verbose=1)
+            # attention = np.ones(feature_vectors.shape)
         elif self.b_n_epochs == 0:
             complex, _, _, _ = self._construct_fuzzy_complex(train_data)
             edge_to, edge_from, weight = self._construct_step_edge_dataset(complex, None)
             feature_vectors = np.copy(train_data)
             pred_model = self.data_provider.prediction_function(self.iteration)
-            # attention = get_attention(pred_model, feature_vectors, temperature=.01, device=self.data_provider.DEVICE, verbose=1)            
-            attention = np.ones(feature_vectors.shape)
+            attention = get_attention(pred_model, feature_vectors, temperature=.01, device=self.data_provider.DEVICE, verbose=1)            
+            # attention = np.ones(feature_vectors.shape)
         else: 
             raise Exception("Illegal border edges proposion!")
             
