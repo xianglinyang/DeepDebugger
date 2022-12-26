@@ -270,21 +270,15 @@ class DVITrainer(SingleVisTrainer):
         t = tqdm(self.edge_loader, leave=True, total=len(self.edge_loader))
         
         for data in t:
-            edge_to, edge_from, a_to, a_from, w_prev = data
+            edge_to, edge_from, a_to, a_from = data
 
             edge_to = edge_to.to(device=self.DEVICE, dtype=torch.float32)
             edge_from = edge_from.to(device=self.DEVICE, dtype=torch.float32)
             a_to = a_to.to(device=self.DEVICE, dtype=torch.float32)
             a_from = a_from.to(device=self.DEVICE, dtype=torch.float32)
 
-            for param_name in w_prev.keys():
-                w_prev[param_name] = w_prev[param_name].to(device=self.DEVICE, dtype=torch.float32)
-
-            # for param in w_prev.values():
-            #     param = param.to(device=self.DEVICE, dtype=torch.float32)
-
             outputs = self.model(edge_to, edge_from)
-            umap_l, recon_l, temporal_l, loss = self.criterion(edge_to, edge_from, a_to, a_from, w_prev, self.model, outputs)
+            umap_l, recon_l, temporal_l, loss = self.criterion(edge_to, edge_from, a_to, a_from, self.model, outputs)
             all_loss.append(loss.item())
             umap_losses.append(umap_l.item())
             recon_losses.append(recon_l.item())

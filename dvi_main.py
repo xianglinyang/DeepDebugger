@@ -15,7 +15,7 @@ from umap.umap_ import find_ab_params
 
 from singleVis.custom_weighted_random_sampler import CustomWeightedRandomSampler
 from singleVis.SingleVisualizationModel import VisModel
-from singleVis.losses import UmapLoss, ReconstructionLoss, TemporalLoss, DVILoss
+from singleVis.losses import UmapLoss, ReconstructionLoss, TemporalLoss, DVILoss, SingleVisLoss, DummyTemporalLoss
 from singleVis.edge_dataset import DVIDataHandler
 from singleVis.trainer import DVITrainer
 from singleVis.data import NormalDataProvider
@@ -101,7 +101,7 @@ min_dist = .1
 _a, _b = find_ab_params(1.0, min_dist)
 umap_loss_fn = UmapLoss(negative_sample_rate, DEVICE, _a, _b, repulsion_strength=1.0)
 recon_loss_fn = ReconstructionLoss(beta=1.0)
-temporal_loss_fn = TemporalLoss()
+single_loss_fn = SingleVisLoss(umap_loss_fn, recon_loss_fn, lambd=LAMBDA1)
 # Define Projector
 projector = DVIProjector(vis_model=model, content_path=CONTENT_PATH, vis_model_name=VIS_MODEL_NAME, device=DEVICE)
 
@@ -115,6 +115,7 @@ w_prev = dict(model.named_parameters())
 for iteration in range(EPOCH_START, EPOCH_END+EPOCH_PERIOD, EPOCH_PERIOD):
     # Define DVI Loss
     if start_flag:
+        temporal_loss_fn = DummyTemporalLoss(DEVICE)
         criterion = DVILoss(umap_loss_fn, recon_loss_fn, temporal_loss_fn, lambd1=LAMBDA1, lambd2=0.0)
         start_flag = 0
     else:
@@ -122,6 +123,7 @@ for iteration in range(EPOCH_START, EPOCH_END+EPOCH_PERIOD, EPOCH_PERIOD):
         prev_data = data_provider.train_representation(iteration-EPOCH_PERIOD)
         curr_data = data_provider.train_representation(iteration)
         npr = find_neighbor_preserving_rate(prev_data, curr_data, N_NEIGHBORS)
+        temporal_loss_fn = TemporalLoss(w_prev, DEVICE)
         criterion = DVILoss(umap_loss_fn, recon_loss_fn, temporal_loss_fn, lambd1=LAMBDA1, lambd2=LAMBDA2*npr)
     # Define training parameters
     optimizer = torch.optim.Adam(model.parameters(), lr=.01, weight_decay=1e-5)
@@ -133,12 +135,12 @@ for iteration in range(EPOCH_START, EPOCH_END+EPOCH_PERIOD, EPOCH_PERIOD):
     t1 = time.time()
 
     probs = probs / (probs.max()+1e-3)
-    eliminate_zeros = probs>1e-3
+    eliminate_zeros = probs>5e-2    #1e-3
     edge_to = edge_to[eliminate_zeros]
     edge_from = edge_from[eliminate_zeros]
     probs = probs[eliminate_zeros]
     
-    dataset = DVIDataHandler(edge_to, edge_from, feature_vectors, attention, w_prev)
+    dataset = DVIDataHandler(edge_to, edge_from, feature_vectors, attention)
 
     n_samples = int(np.sum(S_N_EPOCHS * probs) // 1)
     # chose sampler based on the number of dataset
@@ -152,7 +154,7 @@ for iteration in range(EPOCH_START, EPOCH_END+EPOCH_PERIOD, EPOCH_PERIOD):
     #                                                       TRAIN                                                          #
     ########################################################################################################################
 
-    trainer = DVITrainer(model, criterion, optimizer, lr_scheduler,edge_loader=edge_loader, DEVICE=DEVICE)
+    trainer = DVITrainer(model, criterion, optimizer, lr_scheduler, edge_loader=edge_loader, DEVICE=DEVICE)
 
     t2=time.time()
     trainer.train(PATIENT, MAX_EPOCH)

@@ -135,18 +135,32 @@ class HybridLoss(nn.Module):
 
 
 class TemporalLoss(nn.Module):
-    def __init__(self) -> None:
+    def __init__(self, prev_w, device) -> None:
         super(TemporalLoss, self).__init__()
-    
-    def forward(self, w_prev, curr_module):
-        loss = torch.tensor(0., requires_grad=True)
+        self.prev_w = prev_w
+        self.device = device
+        for param_name in self.prev_w.keys():
+            self.prev_w[param_name] = self.prev_w[param_name].to(device=self.device, dtype=torch.float32)
+
+    def forward(self, curr_module):
+        loss = torch.tensor(0., requires_grad=True).to(self.device)
         c = 0
         for name, curr_param in curr_module.named_parameters():
             c = c + 1
-            prev_param = w_prev[name]
+            prev_param = self.prev_w[name]
             loss = loss + torch.norm(curr_param-prev_param, 2)
         # in dvi paper, they dont have this normalization (optional)
         loss = loss/c
+        return loss
+
+
+class DummyTemporalLoss(nn.Module):
+    def __init__(self, device) -> None:
+        super(DummyTemporalLoss, self).__init__()
+        self.device = device
+
+    def forward(self, curr_module):
+        loss = torch.tensor(0., requires_grad=True).to(self.device)
         return loss
 
 
@@ -159,13 +173,13 @@ class DVILoss(nn.Module):
         self.lambd1 = lambd1
         self.lambd2 = lambd2
 
-    def forward(self, edge_to, edge_from, a_to, a_from,w_prev, curr_model, outputs):
+    def forward(self, edge_to, edge_from, a_to, a_from, curr_model, outputs):
         embedding_to, embedding_from = outputs["umap"]
         recon_to, recon_from = outputs["recon"]
 
         recon_l = self.recon_loss(edge_to, edge_from, recon_to, recon_from, a_to, a_from)
         umap_l = self.umap_loss(embedding_to, embedding_from)
-        temporal_l = self.temporal_loss(w_prev, curr_model)
+        temporal_l = self.temporal_loss(curr_model)
 
         loss = umap_l + self.lambd1 * recon_l + self.lambd2 * temporal_l
 
