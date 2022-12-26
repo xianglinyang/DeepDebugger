@@ -107,10 +107,6 @@ projector = DVIProjector(vis_model=model, content_path=CONTENT_PATH, vis_model_n
 
 start_flag = 1
 prev_model = VisModel(ENCODER_DIMS, DECODER_DIMS)
-prev_model.load_state_dict(model.state_dict())
-for param in prev_model.parameters():
-    param.requires_grad = False
-w_prev = dict(model.named_parameters())
 
 for iteration in range(EPOCH_START, EPOCH_END+EPOCH_PERIOD, EPOCH_PERIOD):
     # Define DVI Loss
@@ -148,7 +144,7 @@ for iteration in range(EPOCH_START, EPOCH_END+EPOCH_PERIOD, EPOCH_PERIOD):
         sampler = CustomWeightedRandomSampler(probs, n_samples, replacement=True)
     else:
         sampler = WeightedRandomSampler(probs, n_samples, replacement=True)
-    edge_loader = DataLoader(dataset, batch_size=1000, sampler=sampler)
+    edge_loader = DataLoader(dataset, batch_size=5000, sampler=sampler, num_workers=8, prefetch_factor=10)
 
     ########################################################################################################################
     #                                                       TRAIN                                                          #
@@ -191,6 +187,12 @@ for i in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
 #                                                       EVALUATION                                                     #
 ########################################################################################################################
 eval_epochs = range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD)
+EVAL_EPOCH_DICT = {
+    "mnist":[1,10,15],
+    "fmnist":[1,25,50],
+    "cifar10":[1,100,199]
+}
+eval_epochs = EVAL_EPOCH_DICT[DATASET]
 evaluator = Evaluator(data_provider, projector)
 
 for eval_epoch in eval_epochs:
