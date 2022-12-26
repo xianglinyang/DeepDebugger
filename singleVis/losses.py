@@ -148,9 +148,10 @@ class TemporalLoss(nn.Module):
         for name, curr_param in curr_module.named_parameters():
             c = c + 1
             prev_param = self.prev_w[name]
-            loss = loss + torch.norm(curr_param-prev_param, 2)
+            # tf dvi: diff = tf.reduce_sum(tf.math.square(w_current[j] - w_prev[j]))
+            loss = loss + torch.sum(torch.square(curr_param-prev_param))
         # in dvi paper, they dont have this normalization (optional)
-        loss = loss/c
+        # loss = loss/c
         return loss
 
 
@@ -183,4 +184,4 @@ class DVILoss(nn.Module):
 
         loss = umap_l + self.lambd1 * recon_l + self.lambd2 * temporal_l
 
-        return umap_l, recon_l, temporal_l, loss
+        return umap_l, self.lambd1 *recon_l, self.lambd2 *temporal_l, loss

@@ -145,7 +145,7 @@ class SingleVisTrainer(TrainerAbstractClass):
             loss = self.train_step()
             self.lr_scheduler.step()
             # early stop, check whether converge or not
-            if prev_loss - loss < 1E-2:
+            if prev_loss - loss < 5E-3:
                 if patient == 0:
                     break
                 else:
