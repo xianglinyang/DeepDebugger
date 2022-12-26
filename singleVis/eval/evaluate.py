@@ -6,7 +6,7 @@ import numpy as np
 from pynndescent import NNDescent
 from sklearn.neighbors import NearestNeighbors
 from sklearn.manifold import trustworthiness
-from scipy.stats import kendalltau, spearmanr, pearsonr
+from scipy.stats import kendalltau, spearmanr, pearsonr, rankdata
 
 
 def evaluate_proj_nn_perseverance_knn(data, embedding, n_neighbors, metric="euclidean"):
@@ -210,6 +210,18 @@ def evaluate_proj_temporal_global_corr(high_rank, low_rank):
         tau_l[i] = tau
         p_l[i] = p
     return tau_l, p_l
+
+
+def _wcov(x, y, w, ms):
+    return np.sum(w * (x - ms[0]) * (y - ms[1]))
+def _wpearson(x, y, w):
+    mx, my = (np.sum(i * w) / np.sum(w) for i in [x, y])
+    return _wcov(x, y, w, [mx, my]) / np.sqrt(_wcov(x, x, w, [mx, mx]) * _wcov(y, y, w, [my, my]))
+def evaluate_proj_temporal_weighted_global_corr(high_rank, low_rank):
+    k = len(high_rank)
+    r = rankdata(high_rank).astype("int")-1
+    tau = _wpearson(high_rank[r], low_rank[r], 1/np.arange(1, k+1))
+    return tau
 
 
 def evaluate_keep_B(low_B, grid_view, decision_view, threshold=0.8):

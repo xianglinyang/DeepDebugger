@@ -52,6 +52,7 @@ class Evaluator(EvaluatorAbstractClass):
 
     def eval_nn_train(self, epoch, n_neighbors):
         train_data = self.data_provider.train_representation(epoch)
+        train_data = train_data.reshape(len(train_data), -1)
         embedding = self.projector.batch_project(epoch, train_data)
         val = evaluate_proj_nn_perseverance_knn(train_data, embedding, n_neighbors=n_neighbors, metric="euclidean")
         if self.verbose:
@@ -60,7 +61,9 @@ class Evaluator(EvaluatorAbstractClass):
 
     def eval_nn_test(self, epoch, n_neighbors):
         train_data = self.data_provider.train_representation(epoch)
+        train_data = train_data.reshape(len(train_data), -1)
         test_data = self.data_provider.test_representation(epoch)
+        test_data = test_data.reshape(len(test_data), -1)
         fitting_data = np.concatenate((train_data, test_data), axis=0)
         embedding = self.projector.batch_project(epoch, fitting_data)
         val = evaluate_proj_nn_perseverance_knn(fitting_data, embedding, n_neighbors=n_neighbors, metric="euclidean")
@@ -70,8 +73,9 @@ class Evaluator(EvaluatorAbstractClass):
 
     def eval_b_train(self, epoch, n_neighbors):
         train_data = self.data_provider.train_representation(epoch)
+        train_data = train_data.reshape(len(train_data), -1)
         border_centers = self.data_provider.border_representation(epoch)
-
+        border_centers = border_centers.reshape(len(border_centers), -1)
         low_center = self.projector.batch_project(epoch, border_centers)
         low_train = self.projector.batch_project(epoch, train_data)
 
@@ -86,7 +90,9 @@ class Evaluator(EvaluatorAbstractClass):
 
     def eval_b_test(self, epoch, n_neighbors):
         test_data = self.data_provider.test_representation(epoch)
+        test_data = test_data.reshape(len(test_data), -1)
         border_centers = self.data_provider.test_border_representation(epoch)
+        border_centers = border_centers.reshape(len(border_centers), -1)
 
         low_center = self.projector.batch_project(epoch, border_centers)
         low_test = self.projector.batch_project(epoch, test_data)
@@ -125,6 +131,25 @@ class Evaluator(EvaluatorAbstractClass):
         if self.verbose:
             print("#test# PPR: {:.2f} in epoch {:d}".format(val, epoch))
         return val
+    
+    def eval_inv_dist_train(self, epoch):
+        train_data = self.data_provider.train_representation(epoch)
+        embedding = self.projector.batch_project(epoch, train_data)
+        inv_data = self.projector.batch_inverse(epoch, embedding)
+        dist = np.linalg.norm(train_data-inv_data, axis=1).mean()
+        
+        if self.verbose:
+            print("#train# inverse projection distance: {:.2f} in epoch {:d}".format(dist, epoch))
+        return float(dist)
+
+    def eval_inv_dist_test(self, epoch):
+        test_data = self.data_provider.test_representation(epoch)
+        embedding = self.projector.batch_project(epoch, test_data)
+        inv_data = self.projector.batch_inverse(epoch, embedding)
+        dist = np.linalg.norm(test_data-inv_data, axis=1).mean()
+        if self.verbose:
+            print("#test# inverse projection distance: {:.2f} in epoch {:d}".format(dist, epoch))
+        return float(dist)
 
     def eval_temporal_train(self, n_neighbors):
         eval_num = (self.data_provider.e - self.data_provider.s) // self.data_provider.p
@@ -319,6 +344,7 @@ class Evaluator(EvaluatorAbstractClass):
 
             high_dists = np.linalg.norm(high_embeddings - high_embeddings[(epoch - start) //  period], axis=1)
             low_dists = np.linalg.norm(low_embeddings - low_embeddings[(epoch - start) //  period], axis=1)
+        
             corr, p = stats.spearmanr(high_dists, low_dists)
             corrs[i] = corr
             ps[i] = p
@@ -353,6 +379,71 @@ class Evaluator(EvaluatorAbstractClass):
             corrs[i] = corr
             ps[i] = p
         return corrs.mean()
+    
+    def eval_temporal_weighted_global_corr_train(self, epoch, start=None, end=None, period=None):
+        # check if we use the default value
+        if start is None:
+            start = self.data_provider.s
+            end = self.data_provider.e
+            period = self.data_provider.p
+        # set parameters
+        LEN = self.data_provider.train_num
+        EPOCH = (end - start) // period + 1
+        repr_dim = self.data_provider.representation_dim
+        all_train_repr = np.zeros((EPOCH,LEN,repr_dim))
+        low_repr = np.zeros((EPOCH,LEN,2))
+
+        # save all representation vectors
+        for i in range(start,end + 1, period):
+            index = (i - start) //  period
+            all_train_repr[index] = self.data_provider.train_representation(i)
+            low_repr[index] = self.projector.batch_project(i, all_train_repr[index])
+        
+        corrs = np.zeros(LEN)
+        for i in range(LEN):
+            high_embeddings = all_train_repr[:,i,:].squeeze()
+            low_embeddings = low_repr[:,i,:].squeeze()
+
+            high_dists = np.linalg.norm(high_embeddings - high_embeddings[(epoch - start) //  period], axis=1)
+            low_dists = np.linalg.norm(low_embeddings - low_embeddings[(epoch - start) //  period], axis=1)
+            
+            high_ranking = np.argsort(high_dists)
+            low_ranking = np.argsort(low_dists)
+            
+            corr = evaluate_proj_temporal_weighted_global_corr(high_ranking, low_ranking)
+            corrs[i] = corr
+        return corrs.mean()
+    
+    def eval_temporal_weighted_global_corr_test(self, epoch, start=None, end=None, period=None):
+        # check if we use the default value
+        if start is None:
+            start = self.data_provider.s
+            end = self.data_provider.e
+            period = self.data_provider.p
+        TEST_LEN = self.data_provider.test_num
+        EPOCH = (end - start) // period + 1
+        repr_dim = self.data_provider.representation_dim
+
+        all_test_repr = np.zeros((EPOCH,TEST_LEN,repr_dim))
+        low_repr = np.zeros((EPOCH,TEST_LEN,2))
+        for i in range(start,end + 1, period):
+            index = (i - start) //  period
+            all_test_repr[index] = self.data_provider.test_representation(i)
+            low_repr[index] = self.projector.batch_project(i, all_test_repr[index])
+
+        corrs = np.zeros(TEST_LEN)
+        e = (epoch - start) // period
+        for i in range(TEST_LEN):
+            high_embeddings = all_test_repr[:,i,:].squeeze()
+            low_embeddings = low_repr[:,i,:].squeeze()
+            high_dists = np.linalg.norm(high_embeddings - high_embeddings[e], axis=1)
+            low_dists = np.linalg.norm(low_embeddings - low_embeddings[e], axis=1)
+            high_ranking = np.argsort(high_dists)
+            low_ranking = np.argsort(low_dists)
+            corr = evaluate_proj_temporal_weighted_global_corr(high_ranking, low_ranking)
+            corrs[i] = corr
+        return corrs.mean()
+
     
     def eval_temporal_local_corr_train(self, epoch, stage, start=None, end=None, period=None):
         # check if we use the default value
@@ -717,14 +808,18 @@ class Evaluator(EvaluatorAbstractClass):
             evaluation["nn_train"] = dict()
         if "nn_test" not in evaluation:
             evaluation["nn_test"] = dict()
-        # if "b_train" not in evaluation:
-        #     evaluation["b_train"] = dict()
-        # if "b_test" not in evaluation:
-        #     evaluation["b_test"] = dict()
+        if "b_train" not in evaluation:
+            evaluation["b_train"] = dict()
+        if "b_test" not in evaluation:
+            evaluation["b_test"] = dict()
         if "ppr_train" not in evaluation.keys():
             evaluation["ppr_train"] = dict()
         if "ppr_test" not in evaluation.keys():
             evaluation["ppr_test"] = dict()
+        if "ppr_dist_train" not in evaluation.keys():
+            evaluation["ppr_dist_train"] = dict()
+        if "ppr_dist_test" not in evaluation.keys():
+            evaluation["ppr_dist_test"] = dict()
         if "tnn_train" not in evaluation.keys():
             evaluation["tnn_train"] = dict()
         if "tnn_test" not in evaluation.keys():
@@ -733,7 +828,10 @@ class Evaluator(EvaluatorAbstractClass):
             evaluation["tr_train"] = dict()
         if "tr_test" not in evaluation.keys():
             evaluation["tr_test"] = dict()  
-
+        if "wtr_train" not in evaluation.keys():
+            evaluation["wtr_train"] = dict()
+        if "wtr_test" not in evaluation.keys():
+            evaluation["wtr_test"] = dict() 
         if "tlr_train" not in evaluation.keys():
             evaluation["tlr_train"] = dict()
         if "tlr_test" not in evaluation.keys():
@@ -760,30 +858,37 @@ class Evaluator(EvaluatorAbstractClass):
         evaluation["ppr_train"][epoch_key] = self.eval_inv_train(n_epoch)
         evaluation["ppr_test"][epoch_key] = self.eval_inv_test(n_epoch)
 
+        evaluation["ppr_dist_train"][epoch_key] = self.eval_inv_dist_train(n_epoch)
+        evaluation["ppr_dist_test"][epoch_key] = self.eval_inv_dist_test(n_epoch)
+
         evaluation["train_acc"][epoch_key] = self.train_acc(n_epoch)
         evaluation["test_acc"][epoch_key] = self.test_acc(n_epoch)
 
-        # local temporal
-        if epoch_key not in evaluation["tnn_train"].keys():
-            evaluation["tnn_train"][epoch_key] = dict()
-        if epoch_key not in evaluation["tnn_test"].keys():
-            evaluation["tnn_test"][epoch_key] = dict()
-        evaluation["tnn_train"][epoch_key][str(temporal_k)] = self.eval_temporal_nn_train(n_epoch, temporal_k)
-        evaluation["tnn_test"][epoch_key][str(temporal_k)] = self.eval_temporal_nn_test(n_epoch, temporal_k)
+        # # local temporal
+        # if epoch_key not in evaluation["tnn_train"].keys():
+        #     evaluation["tnn_train"][epoch_key] = dict()
+        # if epoch_key not in evaluation["tnn_test"].keys():
+        #     evaluation["tnn_test"][epoch_key] = dict()
+        # evaluation["tnn_train"][epoch_key][str(temporal_k)] = self.eval_temporal_nn_train(n_epoch, temporal_k)
+        # evaluation["tnn_test"][epoch_key][str(temporal_k)] = self.eval_temporal_nn_test(n_epoch, temporal_k)
 
-        # global temporal ranking
-        evaluation["tr_train"][epoch_key] = self.eval_temporal_global_corr_train(n_epoch)
-        evaluation["tr_test"][epoch_key] = self.eval_temporal_global_corr_test(n_epoch)
+        # # global temporal ranking
+        # evaluation["tr_train"][epoch_key] = self.eval_temporal_global_corr_train(n_epoch)
+        # evaluation["tr_test"][epoch_key] = self.eval_temporal_global_corr_test(n_epoch)
+        
+        # weighted global temporal ranking
+        evaluation["wtr_train"][epoch_key] = self.eval_temporal_weighted_global_corr_train(n_epoch)
+        evaluation["wtr_test"][epoch_key] = self.eval_temporal_weighted_global_corr_test(n_epoch)
 
-        # local temporal ranking
-        evaluation["tlr_train"][epoch_key] = self.eval_temporal_local_corr_train(n_epoch, 3)
-        evaluation["tlr_test"][epoch_key] = self.eval_temporal_local_corr_test(n_epoch,3)
+        # # local temporal ranking
+        # evaluation["tlr_train"][epoch_key] = self.eval_temporal_local_corr_train(n_epoch, 3)
+        # evaluation["tlr_test"][epoch_key] = self.eval_temporal_local_corr_test(n_epoch,3)
 
-        # temporal
-        t_train_val, _ = self.eval_temporal_train(n_neighbors)
-        evaluation["temporal_train_mean"][n_key] = t_train_val
-        t_test_val, _ = self.eval_temporal_test(n_neighbors)
-        evaluation["temporal_test_mean"][n_key] = t_test_val
+        # # temporal
+        # t_train_val, _ = self.eval_temporal_train(n_neighbors)
+        # evaluation["temporal_train_mean"][n_key] = t_train_val
+        # t_test_val, _ = self.eval_temporal_test(n_neighbors)
+        # evaluation["temporal_test_mean"][n_key] = t_test_val
 
         with open(save_file, "w") as f:
             json.dump(evaluation, f)
