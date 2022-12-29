@@ -47,7 +47,7 @@ class DataProviderAbstractClass(ABC):
         self.e = epoch_e
 
 class DataProvider(DataProviderAbstractClass):
-    def __init__(self, content_path, model, epoch_start, epoch_end, epoch_period, device, classes, verbose=1):
+    def __init__(self, content_path, model, epoch_start, epoch_end, epoch_period, device, classes, epoch_name, verbose=1):
         self.content_path = content_path
         self.model = model
         self.s = epoch_start
@@ -56,6 +56,7 @@ class DataProvider(DataProviderAbstractClass):
         self.DEVICE = device
         self.classes = classes
         self.verbose = verbose
+        self.epoch_name = epoch_name
         self.model_path = os.path.join(self.content_path, "Model")
         if verbose:
             print("Finish initialization...")
@@ -88,13 +89,13 @@ class DataProvider(DataProviderAbstractClass):
 
 
 class NormalDataProvider(DataProvider):
-    def __init__(self, content_path, model, epoch_start, epoch_end, epoch_period, device, classes, verbose=1):
-        super().__init__(content_path, model, epoch_start, epoch_end, epoch_period, device, classes, verbose)
+    def __init__(self, content_path, model, epoch_start, epoch_end, epoch_period, device, classes, epoch_name, verbose=1):
+        super().__init__(content_path, model, epoch_start, epoch_end, epoch_period, device, classes, epoch_name, verbose)
         self.mode = "normal"
     
     @property
     def representation_dim(self):
-        train_data_loc = os.path.join(self.model_path, "Epoch_{:d}".format(self.s), "train_data.npy")
+        train_data_loc = os.path.join(self.model_path, "{}_{:d}".format(self.epoch_name, self.s), "train_data.npy")
         try:
             train_data = np.load(train_data_loc)
             repr_dim = np.prod(train_data.shape[1:])
@@ -117,14 +118,14 @@ class NormalDataProvider(DataProvider):
             t_s = time.time()
 
             # make it possible to choose a subset of testing data for testing
-            test_index_file = os.path.join(self.model_path, "Epoch_{:d}".format(n_epoch), "test_index.json")
+            test_index_file = os.path.join(self.model_path, "{}_{:d}".format(self.epoch_name, n_epoch), "test_index.json")
             if os.path.exists(test_index_file):
                 test_index = load_labelled_data_index(test_index_file)
             else:
                 test_index = range(len(testing_data))
             testing_data = testing_data[test_index]
 
-            model_location = os.path.join(self.model_path, "Epoch_{:d}".format(n_epoch), "subject_model.pth")
+            model_location = os.path.join(self.model_path, "{}_{:d}".format(self.epoch_name, n_epoch), "subject_model.pth")
             self.model.load_state_dict(torch.load(model_location, map_location=torch.device("cpu")))
             self.model = self.model.to(self.DEVICE)
             self.model.eval()
@@ -134,12 +135,12 @@ class NormalDataProvider(DataProvider):
 
             # training data clustering
             data_pool_representation = batch_run(repr_model, training_data)
-            location = os.path.join(self.model_path, "Epoch_{:d}".format(n_epoch), "train_data.npy")
+            location = os.path.join(self.model_path, "{}_{:d}".format(self.epoch_name, n_epoch), "train_data.npy")
             np.save(location, data_pool_representation)
 
             # test data
             test_data_representation = batch_run(repr_model, testing_data)
-            location = os.path.join(self.model_path, "Epoch_{:d}".format(n_epoch), "test_data.npy")
+            location = os.path.join(self.model_path, "{}_{:d}".format(self.epoch_name, n_epoch), "test_data.npy")
             np.save(location, test_data_representation)
 
             t_e = time.time()
@@ -177,7 +178,7 @@ class NormalDataProvider(DataProvider):
                                    map_location="cpu")
         training_data = training_data.to(self.DEVICE)
         for n_epoch in range(self.s, self.e + 1, self.p):
-            index_file = os.path.join(self.model_path, "Epoch_{:d}".format(n_epoch), "index.json")
+            index_file = os.path.join(self.model_path, "{}_{:d}".format(self.epoch_name, n_epoch), "index.json")
             index = load_labelled_data_index(index_file)
             training_data = training_data[index]
 
@@ -200,10 +201,10 @@ class NormalDataProvider(DataProvider):
             # get gap layer data
             border_points = border_points.to(self.DEVICE)
             border_centers = batch_run(repr_model, border_points)
-            location = os.path.join(self.model_path, "Epoch_{:d}".format(n_epoch), "border_centers.npy")
+            location = os.path.join(self.model_path, "{}_{:d}".format(self.epoch_name, n_epoch), "border_centers.npy")
             np.save(location, border_centers)
 
-            location = os.path.join(self.model_path, "Epoch_{:d}".format(n_epoch), "ori_border_centers.npy")
+            location = os.path.join(self.model_path, "{}_{:d}".format(self.epoch_name, n_epoch), "ori_border_centers.npy")
             np.save(location, border_points.cpu().numpy())
 
             num_adv_eg = num
@@ -212,10 +213,10 @@ class NormalDataProvider(DataProvider):
             # get gap layer data
             border_points = border_points.to(self.DEVICE)
             border_centers = batch_run(repr_model, border_points)
-            location = os.path.join(self.model_path, "Epoch_{:d}".format(n_epoch), "test_border_centers.npy")
+            location = os.path.join(self.model_path, "{}_{:d}".format(self.epoch_name, n_epoch), "test_border_centers.npy")
             np.save(location, border_centers)
 
-            location = os.path.join(self.model_path, "Epoch_{:d}".format(n_epoch), "test_ori_border_centers.npy")
+            location = os.path.join(self.model_path, "{}_{:d}".format(self.epoch_name, n_epoch), "test_ori_border_centers.npy")
             np.save(location, border_points.cpu().numpy())
 
             if self.verbose > 0:
@@ -241,8 +242,8 @@ class NormalDataProvider(DataProvider):
 
     def train_representation(self, epoch):
         # load train data
-        train_data_loc = os.path.join(self.model_path, "Epoch_{:d}".format(epoch), "train_data.npy")
-        index_file = os.path.join(self.model_path, "Epoch_{:d}".format(epoch), "index.json")
+        train_data_loc = os.path.join(self.model_path, "{}_{:d}".format(self.epoch_name, epoch), "train_data.npy")
+        index_file = os.path.join(self.model_path, "{}_{:d}".format(self.epoch_name, epoch), "index.json")
         index = load_labelled_data_index(index_file)
         try:
             train_data = np.load(train_data_loc)
@@ -255,7 +256,7 @@ class NormalDataProvider(DataProvider):
     def train_labels(self, epoch):
         # load train data
         training_data_loc = os.path.join(self.content_path, "Training_data", "training_dataset_label.pth")
-        index_file = os.path.join(self.model_path, "Epoch_{:d}".format(epoch), "index.json")
+        index_file = os.path.join(self.model_path, "{}_{:d}".format(self.epoch_name, epoch), "index.json")
         index = load_labelled_data_index(index_file)
         try:
             training_labels = torch.load(training_data_loc, map_location="cpu")
@@ -266,10 +267,10 @@ class NormalDataProvider(DataProvider):
         return training_labels.numpy()
 
     def test_representation(self, epoch):
-        data_loc = os.path.join(self.model_path, "Epoch_{:d}".format(epoch), "test_data.npy")
+        data_loc = os.path.join(self.model_path, "{}_{:d}".format(self.epoch_name, epoch), "test_data.npy")
         try:
             test_data = np.load(data_loc)
-            index_file = os.path.join(self.model_path, "Epoch_{:d}".format(epoch), "test_index.json")
+            index_file = os.path.join(self.model_path, "{}_{:d}".format(self.epoch_name, epoch), "test_index.json")
             if os.path.exists(index_file):
                 index = load_labelled_data_index(index_file)
                 test_data = test_data[index]
@@ -284,7 +285,7 @@ class NormalDataProvider(DataProvider):
         testing_data_loc = os.path.join(self.content_path, "Testing_data", "testing_dataset_label.pth")
         try:
             testing_labels = torch.load(testing_data_loc).to(device=self.DEVICE)
-            index_file = os.path.join(self.model_path, "Epoch_{:d}".format(epoch), "test_index.json")
+            index_file = os.path.join(self.model_path, "{}_{:d}".format(self.epoch_name, epoch), "test_index.json")
             if os.path.exists(index_file):
                 idxs = load_labelled_data_index(index_file)
                 testing_labels = testing_labels[idxs]
@@ -294,7 +295,7 @@ class NormalDataProvider(DataProvider):
         return testing_labels.cpu().numpy()
 
     def border_representation(self, epoch):
-        border_centers_loc = os.path.join(self.model_path, "Epoch_{:d}".format(epoch),
+        border_centers_loc = os.path.join(self.model_path, "{}_{:d}".format(self.epoch_name, epoch),
                                           "border_centers.npy")
         try:
             border_centers = np.load(border_centers_loc)
@@ -304,7 +305,7 @@ class NormalDataProvider(DataProvider):
         return border_centers
     
     def test_border_representation(self, epoch):
-        border_centers_loc = os.path.join(self.model_path, "Epoch_{:d}".format(epoch),
+        border_centers_loc = os.path.join(self.model_path, "{}_{:d}".format(self.epoch_name, epoch),
                                           "test_border_centers.npy")
         try:
             border_centers = np.load(border_centers_loc)
@@ -314,8 +315,8 @@ class NormalDataProvider(DataProvider):
         return border_centers
     
     def max_norm(self, epoch):
-        train_data_loc = os.path.join(self.model_path, "Epoch_{:d}".format(epoch), "train_data.npy")
-        index_file = os.path.join(self.model_path, "Epoch_{:d}".format(epoch), "index.json")
+        train_data_loc = os.path.join(self.model_path, "{}_{:d}".format(self.epoch_name, epoch), "train_data.npy")
+        index_file = os.path.join(self.model_path, "{}_{:d}".format(self.epoch_name, epoch), "index.json")
         index = load_labelled_data_index(index_file)
         try:
             train_data = np.load(train_data_loc)
@@ -327,7 +328,7 @@ class NormalDataProvider(DataProvider):
         return max_x
 
     def prediction_function(self, epoch):
-        model_location = os.path.join(self.model_path, "Epoch_{:d}".format(epoch), "subject_model.pth")
+        model_location = os.path.join(self.model_path, "{}_{:d}".format(self.epoch_name, epoch), "subject_model.pth")
         self.model.load_state_dict(torch.load(model_location, map_location=torch.device("cpu")))
         self.model.to(self.DEVICE)
         self.model.eval()
@@ -337,7 +338,7 @@ class NormalDataProvider(DataProvider):
 
 
     def feature_function(self, epoch):
-        model_location = os.path.join(self.model_path, "Epoch_{:d}".format(epoch), "subject_model.pth")
+        model_location = os.path.join(self.model_path, "{}_{:d}".format(self.epoch_name, epoch), "subject_model.pth")
         self.model.load_state_dict(torch.load(model_location, map_location=torch.device("cpu")))
         self.model = self.model.to(self.DEVICE)
         self.model.eval()
@@ -369,7 +370,7 @@ class NormalDataProvider(DataProvider):
     def testing_accu(self, epoch):
         data = self.test_representation(epoch)
         labels = self.test_labels(epoch)
-        test_index_file = os.path.join(self.model_path, "Epoch_{}".format(epoch), "test_index.json")
+        test_index_file = os.path.join(self.model_path, "{}_{}".format(self.epoch_name, epoch), "test_index.json")
         if os.path.exists(test_index_file):
             index = load_labelled_data_index(test_index_file)
             labels = labels[index]
@@ -390,16 +391,17 @@ class NormalDataProvider(DataProvider):
 
     
 class ActiveLearningDataProvider(DataProvider):
-    def __init__(self, content_path, model, base_epoch_start, device, classes, verbose=1):
+    def __init__(self, content_path, model, base_epoch_start, device, classes, iteration_name="Iteration",verbose=1):
         # dummy input as epoch_end and epoch_period
-        super().__init__(content_path, model, base_epoch_start, base_epoch_start, 1, device, classes, verbose)
+        super().__init__(content_path, model, base_epoch_start, base_epoch_start, 1, device, classes, iteration_name, verbose)
         self.mode = "al"
+        self.iteration_name = iteration_name
     
     def label_num(self, iteration):
         return len(self.get_labeled_idx(iteration))
 
     def representation_dim(self, iteration):
-        train_data_loc = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "train_data.npy")
+        train_data_loc = os.path.join(self.model_path, "{}_{:d}".format(self.iteration_name, iteration), "train_data.npy")
         try:
             train_data = np.load(train_data_loc)
             repr_dim = np.prod(train_data.shape[1:])
@@ -408,7 +410,7 @@ class ActiveLearningDataProvider(DataProvider):
             return None
     
     def get_labeled_idx(self, iteration):
-        index_file = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "index.json")
+        index_file = os.path.join(self.model_path, "{}_{:d}".format(self.iteration_name, iteration), "index.json")
         lb_idxs = np.array(load_labelled_data_index(index_file))
         return lb_idxs
 
@@ -429,25 +431,16 @@ class ActiveLearningDataProvider(DataProvider):
         testing_data = testing_data.to(self.DEVICE)
 
         t_s = time.time()
-
-        # # make it possible to choose a subset of testing data for testing
-        # test_index_file = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "test_index.json")
-        # if os.path.exists(test_index_file):
-        #     test_index = load_labelled_data_index(test_index_file)
-        # else:
-        #     test_index = range(len(testing_data))
-        # testing_data = testing_data[test_index]
-
         repr_model = self.feature_function(iteration)
 
         # training data clustering
         data_pool_representation = batch_run(repr_model, training_data)
-        location = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "train_data.npy")
+        location = os.path.join(self.model_path, "{}_{:d}".format(self.iteration_name, iteration), "train_data.npy")
         np.save(location, data_pool_representation)
 
         # test data
         test_data_representation = batch_run(repr_model, testing_data)
-        location = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "test_data.npy")
+        location = os.path.join(self.model_path, "{}_{:d}".format(self.iteration_name, iteration), "test_data.npy")
         np.save(location, test_data_representation)
 
         t_e = time.time()
@@ -484,7 +477,7 @@ class ActiveLearningDataProvider(DataProvider):
         training_data = torch.load(os.path.join(training_data_path, "training_dataset_data.pth"),
                                    map_location="cpu")
         training_data = training_data.to(self.DEVICE)
-        index_file = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "index.json")
+        index_file = os.path.join(self.model_path, "{}_{:d}".format(self.iteration_name, iteration), "index.json")
         index = load_labelled_data_index(index_file)
         training_data = training_data[index]
 
@@ -501,10 +494,10 @@ class ActiveLearningDataProvider(DataProvider):
         # get gap layer data
         border_points = border_points.to(self.DEVICE)
         border_centers = batch_run(repr_model, border_points)
-        location = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "border_centers.npy")
+        location = os.path.join(self.model_path, "{}_{:d}".format(self.iteration_name, iteration), "border_centers.npy")
         np.save(location, border_centers)
 
-        location = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "ori_border_centers.npy")
+        location = os.path.join(self.model_path, "{}_{:d}".format(self.iteration_name, iteration), "ori_border_centers.npy")
         np.save(location, border_points.cpu().numpy())
 
         num_adv_eg = num
@@ -513,10 +506,10 @@ class ActiveLearningDataProvider(DataProvider):
         # get gap layer data
         border_points = border_points.to(self.DEVICE)
         border_centers = batch_run(repr_model, border_points)
-        location = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "test_border_centers.npy")
+        location = os.path.join(self.model_path, "{}_{:d}".format(self.iteration_name, iteration), "test_border_centers.npy")
         np.save(location, border_centers)
 
-        location = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "test_ori_border_centers.npy")
+        location = os.path.join(self.model_path, "{}_{:d}".format(self.iteration_nameiteration), "test_ori_border_centers.npy")
         np.save(location, border_points.cpu().numpy())
 
         if self.verbose > 0:
@@ -542,7 +535,7 @@ class ActiveLearningDataProvider(DataProvider):
 
     def train_representation(self, iteration):
         # load labelled train data
-        train_data_loc = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "train_data.npy")
+        train_data_loc = os.path.join(self.model_path, "{}_{:d}".format(self.iteration_name, iteration), "train_data.npy")
         try:
             idxs = self.get_labeled_idx(iteration)
             train_data = np.load(train_data_loc)[idxs]
@@ -564,7 +557,7 @@ class ActiveLearningDataProvider(DataProvider):
     
     def train_representation_ulb(self, iteration):
         # load train data
-        train_data_loc = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "train_data.npy")
+        train_data_loc = os.path.join(self.model_path, "{}_{:d}".format(self.iteration_name, iteration), "train_data.npy")
         lb_idxs = self.get_labeled_idx(iteration)
         try:
             train_data = np.load(train_data_loc)
@@ -590,7 +583,7 @@ class ActiveLearningDataProvider(DataProvider):
     
     def train_representation_all(self, iteration):
         # load train data
-        train_data_loc = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "train_data.npy")
+        train_data_loc = os.path.join(self.model_path, "{}_{:d}".format(self.iteration_name, iteration), "train_data.npy")
         try:
             train_data = np.load(train_data_loc)
         except Exception as e:
@@ -609,10 +602,10 @@ class ActiveLearningDataProvider(DataProvider):
         return training_labels.numpy()
 
     def test_representation(self, epoch):
-        data_loc = os.path.join(self.model_path, "Iteration_{:d}".format(epoch), "test_data.npy")
+        data_loc = os.path.join(self.model_path, "{}_{:d}".format(self.iteration_name, epoch), "test_data.npy")
         try:
             test_data = np.load(data_loc)
-            index_file = os.path.join(self.model_path, "Iteration_{:d}".format(epoch), "test_index.json")
+            index_file = os.path.join(self.model_path, "{}_{:d}".format(self.iteration_name, epoch), "test_index.json")
             if os.path.exists(index_file):
                 index = load_labelled_data_index(index_file)
                 test_data = test_data[index]
@@ -627,7 +620,7 @@ class ActiveLearningDataProvider(DataProvider):
         testing_data_loc = os.path.join(self.content_path, "Testing_data", "testing_dataset_label.pth")
         try:
             testing_labels = torch.load(testing_data_loc, map_location="cpu").numpy()
-            index_file = os.path.join(self.model_path, "Iteration_{:d}".format(epoch), "test_index.json")
+            index_file = os.path.join(self.model_path, "{}_{:d}".format(self.iteration_name, epoch), "test_index.json")
             if os.path.exists(index_file):
                 idxs = load_labelled_data_index(index_file)
                 testing_labels = testing_labels[idxs]
@@ -637,7 +630,7 @@ class ActiveLearningDataProvider(DataProvider):
         return testing_labels
 
     def border_representation(self, epoch):
-        border_centers_loc = os.path.join(self.model_path, "Iteration_{:d}".format(epoch),
+        border_centers_loc = os.path.join(self.model_path, "{}_{:d}".format(self.iteration_name, epoch),
                                           "border_centers.npy")
         try:
             border_centers = np.load(border_centers_loc)
@@ -647,7 +640,7 @@ class ActiveLearningDataProvider(DataProvider):
         return border_centers
     
     def test_border_representation(self, epoch):
-        border_centers_loc = os.path.join(self.model_path, "Iteration_{:d}".format(epoch),
+        border_centers_loc = os.path.join(self.model_path, "{}_{:d}".format(self.iteration_name, epoch),
                                           "test_border_centers.npy")
         try:
             border_centers = np.load(border_centers_loc)
@@ -662,7 +655,7 @@ class ActiveLearningDataProvider(DataProvider):
         return max_x
 
     def prediction_function(self, iteration):
-        model_location = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "subject_model.pth")
+        model_location = os.path.join(self.model_path, "{}_{:d}".format(self.iteration_name, iteration), "subject_model.pth")
         self.model.load_state_dict(torch.load(model_location, map_location=torch.device("cpu")))
         self.model.to(self.DEVICE)
         self.model.eval()
@@ -671,7 +664,7 @@ class ActiveLearningDataProvider(DataProvider):
         return pred_fn
 
     def feature_function(self, epoch):
-        model_location = os.path.join(self.model_path, "Iteration_{:d}".format(epoch), "subject_model.pth")
+        model_location = os.path.join(self.model_path, "{}_{:d}".format(self.iteration_name, epoch), "subject_model.pth")
         self.model.load_state_dict(torch.load(model_location, map_location=torch.device("cpu")))
         self.model.to(self.DEVICE)
         self.model.eval()
@@ -719,16 +712,17 @@ class ActiveLearningDataProvider(DataProvider):
         return border
     
 class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
-    def __init__(self, content_path, model, base_epoch_start, epoch_num, device, classes, verbose=1):
-        super().__init__(content_path, model, base_epoch_start, device, classes, verbose)
+    def __init__(self, content_path, model, base_epoch_start, epoch_num, device, classes, iteration_name="Iteration", epoch_name="Epoch", verbose=1):
+        super().__init__(content_path, model, base_epoch_start, device, classes, iteration_name, verbose)
         self.mode = "dense_al"
         self.epoch_num = epoch_num
         self.s = 1
         self.p = 1
         self.e = epoch_num
+        self.epoch_name = epoch_name
 
     def representation_dim(self):
-        train_data_loc = os.path.join(self.model_path, "Iteration_{}".format(self.s), "Epoch_{:d}".format(self.epoch_num), "train_data.npy")
+        train_data_loc = os.path.join(self.model_path, "{}_{}".format(self.iteration_name, self.s), "{}_{:d}".format(self.epoch_name, self.epoch_num), "train_data.npy")
         try:
             train_data = np.load(train_data_loc)
             repr_dim = np.prod(train_data.shape[1:])
@@ -750,7 +744,7 @@ class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
         t_s = time.time()
 
         # make it possible to choose a subset of testing data for testing
-        test_index_file = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "test_index.json")
+        test_index_file = os.path.join(self.model_path, "{}_{:d}".format(self.iteration_name, iteration), "test_index.json")
         if os.path.exists(test_index_file):
             test_index = load_labelled_data_index(test_index_file)
         else:
@@ -762,12 +756,12 @@ class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
 
             # training data clustering
             data_pool_representation = batch_run(repr_model, training_data)
-            location = os.path.join(self.model_path, "Iteration_{}".format(iteration), "Epoch_{:d}".format(n_epoch), "train_data.npy")
+            location = os.path.join(self.model_path, "{}_{}".format(self.iteration_name, iteration), "{}_{:d}".format(self.epoch_name, n_epoch), "train_data.npy")
             np.save(location, data_pool_representation)
 
             # test data
             test_data_representation = batch_run(repr_model, testing_data)
-            location = os.path.join(self.model_path, "Iteration_{}".format(iteration), "Epoch_{:d}".format(n_epoch), "test_data.npy")
+            location = os.path.join(self.model_path, "{}_{}".format(self.iteration_name, iteration), "{}_{:d}".format(self.epoch_name, n_epoch), "test_data.npy")
             np.save(location, test_data_representation)
 
         t_e = time.time()
@@ -806,7 +800,7 @@ class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
         training_data = training_data.to(self.DEVICE)
 
         for n_epoch in range(1, self.epoch_num+1, 1):
-            index_file = os.path.join(self.model_path, "Iteration_{}".format(iteration), "index.json")
+            index_file = os.path.join(self.model_path, "{}_{}".format(self.iteration_name, iteration), "index.json")
             index = load_labelled_data_index(index_file)
             training_data = training_data[index]
 
@@ -824,10 +818,10 @@ class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
             # get gap layer data
             border_points = border_points.to(self.DEVICE)
             border_centers = batch_run(repr_model, border_points)
-            location = os.path.join(self.model_path, "Iteration_{}".format(iteration), "Epoch_{:d}".format(n_epoch), "border_centers.npy")
+            location = os.path.join(self.model_path, "{}_{}".format(self.iteration_name, iteration), "{}_{:d}".format(self.epoch_name, n_epoch), "border_centers.npy")
             np.save(location, border_centers)
 
-            location = os.path.join(self.model_path, "Iteration_{}".format(iteration), "Epoch_{:d}".format(n_epoch), "ori_border_centers.npy")
+            location = os.path.join(self.model_path, "{}_{}".format(self.iteration_name, iteration), "{}_{:d}".format(self.epoch_name, n_epoch), "ori_border_centers.npy")
             np.save(location, border_points.cpu().numpy())
 
             num_adv_eg = num
@@ -836,14 +830,14 @@ class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
             # get gap layer data
             border_points = border_points.to(self.DEVICE)
             border_centers = batch_run(repr_model, border_points)
-            location = os.path.join(self.model_path, "Iteration_{}".format(iteration), "Epoch_{:d}".format(n_epoch), "test_border_centers.npy")
+            location = os.path.join(self.model_path, "{}_{}".format(self.iteration_name, iteration), "{}_{:d}".format(self.epoch_nanme, n_epoch), "test_border_centers.npy")
             np.save(location, border_centers)
 
-            location = os.path.join(self.model_path, "Iteration_{}".format(iteration), "Epoch_{:d}".format(n_epoch), "test_ori_border_centers.npy")
+            location = os.path.join(self.model_path, "{}_{}".format(self.iteration_name, iteration), "{}_{:d}".format(self.epoch_name, n_epoch), "test_ori_border_centers.npy")
             np.save(location, border_points.cpu().numpy())
 
             if self.verbose > 0:
-                print("Finish generating borders for Epoch {:d}...".format(epoch))
+                print("Finish generating borders for Epoch {:d}...".format(n_epoch))
         print(
             "Average time for generate border points for each iteration: {:.4f}".format(sum(time_borders_gen) / len(time_borders_gen)))
 
@@ -861,7 +855,7 @@ class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
 
     def train_representation(self, iteration, epoch):
         # load train data
-        train_data_loc = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "Epoch_{}".format(epoch), "train_data.npy")
+        train_data_loc = os.path.join(self.model_path, "{}_{:d}".format(self.iteration_name, iteration), "{}_{}".format(self.epoch_name, epoch), "train_data.npy")
         lb_idxs = self.get_labeled_idx(iteration)
         try:
             train_data = np.load(train_data_loc)[lb_idxs]
@@ -872,7 +866,7 @@ class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
 
     def train_representation_all(self, iteration, epoch):
         # load train data
-        train_data_loc = os.path.join(self.model_path, "Iteration_{}".format(iteration), "Epoch_{:d}".format(epoch), "train_data.npy")
+        train_data_loc = os.path.join(self.model_path, "{}_{}".format(self.iteration_name, iteration), "{}_{:d}".format(self.epoch_name, epoch), "train_data.npy")
         try:
             train_data = np.load(train_data_loc)
         except Exception as e:
@@ -882,7 +876,7 @@ class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
     
     def train_representation_ulb(self, iteration, epoch):
         # load train data
-        train_data_loc = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "Epoch_{}".format(epoch), "train_data.npy")
+        train_data_loc = os.path.join(self.model_path, "{}_{:d}".format(self.iteration_name, iteration), "{}_{}".format(self.epoch_name, epoch), "train_data.npy")
         lb_idxs = self.get_labeled_idx(iteration)
         try:
             train_data = np.load(train_data_loc)
@@ -910,7 +904,7 @@ class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
     def train_labels(self, iteration, epoch):
         # load labelled train labels
         training_data_loc = os.path.join(self.content_path, "Training_data", "training_dataset_label.pth")
-        index_file = os.path.join(self.model_path, "Iteration_{:d}".format(iteration), "index.json")
+        index_file = os.path.join(self.model_path, "{}_{:d}".format(self.iteration_name, iteration), "index.json")
         lb_idxs = np.array(load_labelled_data_index(index_file))
         try:
             training_labels = torch.load(training_data_loc, map_location="cpu")
@@ -931,10 +925,10 @@ class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
         return training_labels.numpy()
 
     def test_representation(self, iteration, epoch):
-        data_loc = os.path.join(self.model_path, "Iteration_{}".format(iteration), "Epoch_{}".format(epoch), "test_data.npy")
+        data_loc = os.path.join(self.model_path, "{}_{}".format(self.iteration_name, iteration), "{}_{}".format(self.epoch_name, epoch), "test_data.npy")
         try:
             test_data = np.load(data_loc)
-            index_file = os.path.join(self.model_path, "Iteration_{}".format(iteration), "test_index.json")
+            index_file = os.path.join(self.model_path, "{}_{}".format(self.iteration_name, iteration), "test_index.json")
             if os.path.exists(index_file):
                 index = load_labelled_data_index(index_file)
                 test_data = test_data[index]
@@ -944,7 +938,7 @@ class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
         return test_data
 
     def border_representation(self, iteration, epoch):
-        border_centers_loc = os.path.join(self.model_path, "Iteration_{}".format(iteration), "Epoch_{:d}".format(epoch),
+        border_centers_loc = os.path.join(self.model_path, "{}_{}".format(self.iteration_name, iteration), "{}_{:d}".format(self.epoch_name, epoch),
                                           "border_centers.npy")
         try:
             border_centers = np.load(border_centers_loc)
@@ -954,7 +948,7 @@ class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
         return border_centers
     
     def test_border_representation(self, iteration, epoch):
-        border_centers_loc = os.path.join(self.model_path, "Iteration_{}".format(iteration), "Epoch_{:d}".format(epoch),
+        border_centers_loc = os.path.join(self.model_path, "{}_{}".format(self.iteration_name, iteration), "{}_{:d}".format(self.epoch_name, epoch),
                                           "test_border_centers.npy")
         try:
             border_centers = np.load(border_centers_loc)
@@ -964,8 +958,8 @@ class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
         return border_centers
     
     def max_norm(self, iteration, epoch):
-        train_data_loc = os.path.join(self.model_path, "Iteration_{}".format(iteration), "Epoch_{:d}".format(epoch), "train_data.npy")
-        index_file = os.path.join(self.model_path, "Iteration_{}".format(iteration), "index.json")
+        train_data_loc = os.path.join(self.model_path, "{}_{}".format(self.iteration_name, iteration), "{}_{:d}".format(self.epoch_name, epoch), "train_data.npy")
+        index_file = os.path.join(self.model_path, "{}_{}".format(self.iteration_name, iteration), "index.json")
         index = load_labelled_data_index(index_file)
         try:
             train_data = np.load(train_data_loc)
@@ -977,7 +971,7 @@ class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
         return max_x
 
     def prediction_function(self, iteration, epoch):
-        model_location = os.path.join(self.model_path, "Iteration_{}".format(iteration), "Epoch_{:d}".format(epoch), "subject_model.pth")
+        model_location = os.path.join(self.model_path, "{}_{}".format(self.iteration_name, iteration), "{}_{:d}".format(self.epoch_name, epoch), "subject_model.pth")
         self.model.load_state_dict(torch.load(model_location, map_location=torch.device("cpu")))
         self.model.to(self.DEVICE)
         self.model.eval()
@@ -986,7 +980,7 @@ class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
         return pred_fn
 
     def feature_function(self, iteration, epoch):
-        model_location = os.path.join(self.model_path, "Iteration_{}".format(iteration), "Epoch_{:d}".format(epoch), "subject_model.pth")
+        model_location = os.path.join(self.model_path, "{}_{}".format(self.iteration_name, iteration), "{}_{:d}".format(self.epoch_name, epoch), "subject_model.pth")
         self.model.load_state_dict(torch.load(model_location, map_location=torch.device("cpu")))
         self.model = self.model.to(self.DEVICE)
         self.model.eval()
@@ -1018,7 +1012,7 @@ class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
     def testing_accu(self, iteration, epoch):
         data = self.test_representation(epoch)
         labels = self.test_labels(epoch)
-        test_index_file = os.path.join(self.model_path,"Iteration".format(iteration), "Epoch_{}".format(epoch), "test_index.json")
+        test_index_file = os.path.join(self.model_path,"{}_{}".format(self.iteration_name, iteration), "{}_{}".format(self.epoch_name, epoch), "test_index.json")
         if os.path.exists(test_index_file):
             index = load_labelled_data_index(test_index_file)
             labels = labels[index]
