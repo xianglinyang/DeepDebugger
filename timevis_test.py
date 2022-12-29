@@ -37,10 +37,6 @@ with open(os.path.join(CONTENT_PATH, "config.json"), "r") as f:
     config = json.load(f)
 config = config[VIS_METHOD]
 
-# record output information
-# now = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime(time.time())) 
-# sys.stdout = open(os.path.join(CONTENT_PATH, now+".txt"), "w")
-
 SETTING = config["SETTING"]
 CLASSES = config["CLASSES"]
 DATASET = config["DATASET"]
@@ -82,7 +78,6 @@ DEVICE = torch.device("cuda:{}".format(GPU_ID) if torch.cuda.is_available() else
 
 import Model.model as subject_model
 net = eval("subject_model.{}()".format(NET))
-# net = subject_model.resnet18(num_classes=12, in_channels=1)
 
 ########################################################################################################################
 #                                                    TRAINING SETTING                                                  #
@@ -93,61 +88,8 @@ if PREPROCESS:
     if B_N_EPOCHS >0:
         data_provider._estimate_boundary(LEN//10, l_bound=L_BOUND)
 
-
 model = VisModel(ENCODER_DIMS, DECODER_DIMS)
 projector = TimeVisProjector(vis_model=model, content_path=CONTENT_PATH, vis_model_name=VIS_MODEL_NAME, device=DEVICE)
-
-########################################################################################################################
-#                                                  EDGE DATASET                                                        #
-########################################################################################################################
-negative_sample_rate = 5
-min_dist = .1
-_a, _b = find_ab_params(1.0, min_dist)
-umap_loss_fn = UmapLoss(negative_sample_rate, DEVICE, _a, _b, repulsion_strength=1.0)
-recon_loss_fn = ReconstructionLoss(beta=1.0)
-criterion = SingleVisLoss(umap_loss_fn, recon_loss_fn, lambd=LAMBDA)
-
-optimizer = torch.optim.Adam(model.parameters(), lr=.01, weight_decay=1e-5)
-lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=4, gamma=.1)
-
-t0 = time.time()
-spatial_cons = kcSpatialEdgeConstructor(data_provider=data_provider, init_num=INIT_NUM, s_n_epochs=S_N_EPOCHS, b_n_epochs=B_N_EPOCHS, n_neighbors=N_NEIGHBORS, MAX_HAUSDORFF=MAX_HAUSDORFF, ALPHA=ALPHA, BETA=BETA)
-s_edge_to, s_edge_from, s_probs, feature_vectors, time_step_nums, time_step_idxs_list, knn_indices, sigmas, rhos, attention = spatial_cons.construct()
-temporal_cons = GlobalTemporalEdgeConstructor(X=feature_vectors, time_step_nums=time_step_nums, sigmas=sigmas, rhos=rhos, n_neighbors=N_NEIGHBORS, n_epochs=T_N_EPOCHS)
-t_edge_to, t_edge_from, t_probs = temporal_cons.construct()
-t1 = time.time()
-
-edge_to = np.concatenate((s_edge_to, t_edge_to),axis=0)
-edge_from = np.concatenate((s_edge_from, t_edge_from), axis=0)
-probs = np.concatenate((s_probs, t_probs), axis=0)
-probs = probs / (probs.max()+1e-3)
-eliminate_zeros = probs>1e-3
-edge_to = edge_to[eliminate_zeros]
-edge_from = edge_from[eliminate_zeros]
-probs = probs[eliminate_zeros]
-
-dataset = DataHandler(edge_to, edge_from, feature_vectors, attention)
-n_samples = int(np.sum(S_N_EPOCHS * probs) // 1)
-# chose sampler based on the number of dataset
-if len(edge_to) > pow(2,24):
-    sampler = CustomWeightedRandomSampler(probs, n_samples, replacement=True)
-else:
-    sampler = WeightedRandomSampler(probs, n_samples, replacement=True)
-edge_loader = DataLoader(dataset, batch_size=1000, sampler=sampler, num_workers=4, prefetch_factor=10)
-
-########################################################################################################################
-#                                                       TRAIN                                                          #
-########################################################################################################################
-trainer = SingleVisTrainer(model, criterion, optimizer, lr_scheduler, edge_loader=edge_loader, DEVICE=DEVICE)
-
-t2=time.time()
-trainer.train(PATIENT, MAX_EPOCH)
-t3 = time.time()
-
-save_dir = data_provider.model_path
-trainer.record_time(save_dir, "time_{}.json".format(VIS_MODEL_NAME), "complex_construction", t1-t0)
-trainer.record_time(save_dir, "time_{}.json".format(VIS_MODEL_NAME), "training", t3-t2)
-trainer.save(save_dir=save_dir, file_name="{}".format(VIS_MODEL_NAME))
 
 ########################################################################################################################
 #                                                      VISUALIZATION                                                   #
@@ -164,7 +106,7 @@ for i in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
 ########################################################################################################################
 #                                                       EVALUATION                                                     #
 ########################################################################################################################
-eval_epochs = range(EPOCH_START, EPOCH_END, EPOCH_PERIOD)
-evaluator = Evaluator(data_provider, projector)
-for eval_epoch in eval_epochs:
-    evaluator.save_epoch_eval(eval_epoch, 15, temporal_k=5, file_name="{}".format(EVALUATION_NAME))
+# eval_epochs = range(EPOCH_START, EPOCH_END, EPOCH_PERIOD)
+# evaluator = Evaluator(data_provider, projector)
+# for eval_epoch in eval_epochs:
+#     evaluator.save_epoch_eval(eval_epoch, 15, temporal_k=5, file_name="{}".format(EVALUATION_NAME))

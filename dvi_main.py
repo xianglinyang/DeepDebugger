@@ -140,11 +140,11 @@ for iteration in range(EPOCH_START, EPOCH_END+EPOCH_PERIOD, EPOCH_PERIOD):
 
     n_samples = int(np.sum(S_N_EPOCHS * probs) // 1)
     # chose sampler based on the number of dataset
-    if len(edge_to) > 2^24:
+    if len(edge_to) > pow(2,24):
         sampler = CustomWeightedRandomSampler(probs, n_samples, replacement=True)
     else:
         sampler = WeightedRandomSampler(probs, n_samples, replacement=True)
-    edge_loader = DataLoader(dataset, batch_size=5000, sampler=sampler, num_workers=8, prefetch_factor=10)
+    edge_loader = DataLoader(dataset, batch_size=2000, sampler=sampler, num_workers=8, prefetch_factor=10)
 
     ########################################################################################################################
     #                                                       TRAIN                                                          #
@@ -162,6 +162,8 @@ for iteration in range(EPOCH_START, EPOCH_END+EPOCH_PERIOD, EPOCH_PERIOD):
     trainer.record_time(save_dir, "time_{}".format(VIS_MODEL_NAME), "training", str(iteration), t3-t2)
     save_dir = os.path.join(data_provider.model_path, "Epoch_{}".format(iteration))
     trainer.save(save_dir=save_dir, file_name="{}".format(VIS_MODEL_NAME))
+
+    print("Finish epoch {}...".format(iteration))
 
     prev_model.load_state_dict(model.state_dict())
     for param in prev_model.parameters():
