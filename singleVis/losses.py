@@ -144,12 +144,13 @@ class TemporalLoss(nn.Module):
 
     def forward(self, curr_module):
         loss = torch.tensor(0., requires_grad=True).to(self.device)
-        c = 0
+        # c = 0
         for name, curr_param in curr_module.named_parameters():
-            c = c + 1
+            # c = c + 1
             prev_param = self.prev_w[name]
             # tf dvi: diff = tf.reduce_sum(tf.math.square(w_current[j] - w_prev[j]))
             loss = loss + torch.sum(torch.square(curr_param-prev_param))
+            # loss = loss + torch.norm(curr_param-prev_param, 2)
         # in dvi paper, they dont have this normalization (optional)
         # loss = loss/c
         return loss
@@ -177,6 +178,7 @@ class DVILoss(nn.Module):
     def forward(self, edge_to, edge_from, a_to, a_from, curr_model, outputs):
         embedding_to, embedding_from = outputs["umap"]
         recon_to, recon_from = outputs["recon"]
+        # TODO stop gradient edge_to_ng = edge_to.detach().clone()
 
         recon_l = self.recon_loss(edge_to, edge_from, recon_to, recon_from, a_to, a_from)
         umap_l = self.umap_loss(embedding_to, embedding_from)
