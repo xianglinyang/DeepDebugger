@@ -22,21 +22,25 @@ import os
 
 # evaluation on ablation study on segments
 # finish
-for exp in range(20):
-    os.system("python test_ablation_seg.py --content_path /home/xianglin/projects/DVI_data/resnet18_mnist -g 0 --exp exp_{}".format(str(exp)))
-    os.system("python test_ablation_seg.py --content_path /home/xianglin/projects/DVI_data/resnet18_fmnist -g 0 --exp exp_{}".format(str(exp)))
-    os.system("python test_ablation_seg.py --content_path /home/xianglin/projects/DVI_data/resnet18_cifar10 -g 0 --exp exp_{}".format(str(exp))) 
+# for exp in range(20):
+#     os.system("python test_ablation_seg.py --content_path /home/xianglin/projects/DVI_data/resnet18_mnist -g 0 --exp exp_{}".format(str(exp)))
+#     os.system("python test_ablation_seg.py --content_path /home/xianglin/projects/DVI_data/resnet18_fmnist -g 0 --exp exp_{}".format(str(exp)))
+#     os.system("python test_ablation_seg.py --content_path /home/xianglin/projects/DVI_data/resnet18_cifar10 -g 0 --exp exp_{}".format(str(exp))) 
 
 
-# evaluation ablation study on smoothness
-os.system("python test_ablation.py --content_path /home/xianglin/projects/DVI_data/resnet18_mnist -g 0 --exp without_smoothness")
-os.system("python test_ablation.py --content_path /home/xianglin/projects/DVI_data/resnet18_mnist -g 0 --exp without_tl")
-os.system("python test_ablation.py --content_path /home/xianglin/projects/DVI_data/resnet18_fmnist -g 0 --exp without_smoothness")
-os.system("python test_ablation.py --content_path /home/xianglin/projects/DVI_data/resnet18_fmnist -g 0 --exp without_tl")
-os.system("python test_ablation.py --content_path /home/xianglin/projects/DVI_data/resnet18_cifar10 -g 0 --exp without_smoothness")
-os.system("python test_ablation.py --content_path /home/xianglin/projects/DVI_data/resnet18_cifar10 -g 0 --exp without_tl")
+# # evaluation ablation study on smoothness
+# os.system("python test_ablation.py --content_path /home/xianglin/projects/DVI_data/resnet18_mnist -g 0 --exp without_smoothness")
+# os.system("python test_ablation.py --content_path /home/xianglin/projects/DVI_data/resnet18_mnist -g 0 --exp without_tl")
+# os.system("python test_ablation.py --content_path /home/xianglin/projects/DVI_data/resnet18_fmnist -g 0 --exp without_smoothness")
+# os.system("python test_ablation.py --content_path /home/xianglin/projects/DVI_data/resnet18_fmnist -g 0 --exp without_tl")
+# os.system("python test_ablation.py --content_path /home/xianglin/projects/DVI_data/resnet18_cifar10 -g 0 --exp without_smoothness")
+# os.system("python test_ablation.py --content_path /home/xianglin/projects/DVI_data/resnet18_cifar10 -g 0 --exp without_tl")
 
-# test hybird
-os.system("python test.py --content_path /home/xianglin/projects/DVI_data/resnet18_mnist")
-os.system("python test.py --content_path /home/xianglin/projects/DVI_data/resnet18_fmnist")
-os.system("python test.py --content_path /home/xianglin/projects/DVI_data/resnet18_cifar10")
+# # test hybird
+# os.system("python test.py --content_path /home/xianglin/projects/DVI_data/resnet18_mnist")
+# os.system("python test.py --content_path /home/xianglin/projects/DVI_data/resnet18_fmnist")
+# os.system("python test.py --content_path /home/xianglin/projects/DVI_data/resnet18_cifar10")
+
+os.system("python deepdebugger_main.py --content_path /home/xianglin/projects/DVI_data/resnet18_mnist")
+os.system("python deepdebugger_main.py --content_path /home/xianglin/projects/DVI_data/resnet18_fmnist")
+os.system("python deepdebugger_main.py --content_path /home/xianglin/projects/DVI_data/resnet18_cifar10")

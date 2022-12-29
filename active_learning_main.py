@@ -29,7 +29,7 @@ VIS_METHOD = "DVIAL" # DeepVisualInsight
 #                                                     LOAD PARAMETERS                                                  #
 ########################################################################################################################
 parser = argparse.ArgumentParser(description='Process hyperparameters...')
-parser.add_argument('--content_path', type=str, default="/home/xianglin/projects/DVI_data/active_learning/random/resnet18/CIFAR10")
+parser.add_argument('--content_path', type=str)
 parser.add_argument('-g',"--gpu_id", type=int, default=0)
 parser.add_argument('-i',"--iteration", type=int)
 parser.add_argument("--resume", type=int, default=-1, help="Resume from which iteration.")
@@ -173,11 +173,11 @@ evaluator.save_epoch_eval(iteration, file_name=EVALUATION_NAME)
 #                                                      VISUALIZATION                                                   #
 ########################################################################################################################
 
-from singleVis.visualizer import visualizer
-vis = visualizer(data_provider, projector, 200)
-save_dir = os.path.join(data_provider.content_path, "img")
-os.makedirs(save_dir, exist_ok=True)
-data = data_provider.train_representation(iteration)
-pred = data_provider.get_pred(iteration, data).argmax(1)
-labels = data_provider.train_labels(iteration)
-vis.savefig_cus(iteration, data, pred, labels, path=os.path.join(save_dir, "{}_{}_al.png".format(DATASET, iteration)))
+# from singleVis.visualizer import visualizer
+# vis = visualizer(data_provider, projector, 200)
+# save_dir = os.path.join(data_provider.content_path, "img")
+# os.makedirs(save_dir, exist_ok=True)
+# data = data_provider.train_representation(iteration)
+# pred = data_provider.get_pred(iteration, data).argmax(1)
+# labels = data_provider.train_labels(iteration)
+# vis.savefig_cus(iteration, data, pred, labels, path=os.path.join(save_dir, "{}_{}_al.png".format(DATASET, iteration)))

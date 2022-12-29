@@ -216,7 +216,13 @@ for i in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
 ########################################################################################################################
 #                                                       EVALUATION                                                     #
 ########################################################################################################################
-eval_epochs = range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD)
+# eval_epochs = range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD)
+EVAL_EPOCH_DICT = {
+    "mnist":[1,10,15],
+    "fmnist":[1,25,50],
+    "cifar10":[1,100,199]
+}
+eval_epochs = EVAL_EPOCH_DICT[DATASET]
 
 evaluator = Evaluator(data_provider, projector)
 for eval_epoch in eval_epochs:

@@ -78,7 +78,9 @@ classes = ("airplane", "car", "bird", "cat", "deer", "dog", "frog", "horse", "sh
 ########################################################################################################################
 data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD,  device=DEVICE, classes=CLASSES,verbose=1)
 if PREPROCESS:
-    data_provider.initialize(LEN//10, l_bound=L_BOUND)
+    data_provider._meta_data()
+    if B_N_EPOCHS >0:
+        data_provider._estimate_boundary(LEN//10, l_bound=L_BOUND)
 
 model = VisModel(ENCODER_DIMS, DECODER_DIMS)
 SEGMENTS = VISUALIZATION_PARAMETER["SEGMENTS"]
@@ -89,36 +91,43 @@ projector = DeepDebuggerProjector(vis_model=model, content_path=CONTENT_PATH, vi
 ########################################################################################################################
 #                                                      VISUALIZATION                                                   #
 ########################################################################################################################
-from singleVis.visualizer import visualizer
-vis = visualizer(data_provider, projector, 200)
-save_dir = os.path.join(data_provider.content_path, "img")
-os.makedirs(save_dir, exist_ok=True)
+# from singleVis.visualizer import visualizer
+# vis = visualizer(data_provider, projector, 200)
+# save_dir = os.path.join(data_provider.content_path, "img")
+# os.makedirs(save_dir, exist_ok=True)
 
 # noise_label = os.path.join(data_provider.content_path, "noisy_label.json")
 # with open(noise_label, "r") as f:
 #     noise_labels = json.load(f)
 
 # for i in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
-for i in [20]:
-    vis.savefig(i, path=os.path.join(save_dir, "{}_{}_tnn.png".format(DATASET, i)))
+# for i in [20]:
+    # vis.savefig(i, path=os.path.join(save_dir, "{}_{}_{}.png".format(DATASET, i)))
     # data = data_provider.train_representation(i)
     # labels = data_provider.train_labels(i)
     # selected = labels != np.array(noise_labels)
     # data = data[selected]
     # labels = np.array(noise_labels)[selected]
     # vis.savefig_cus(i, data, labels, labels, path=os.path.join(save_dir, "{}_{}_tnn.png".format(DATASET, i)))
+# from singleVis.visualizer import visualizer
+# vis = visualizer(data_provider, projector, 200)
+# save_dir = os.path.join(data_provider.content_path, "img")
+# os.makedirs(save_dir, exist_ok=True)
+
+# for i in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
+#     vis.savefig(i, path=os.path.join(save_dir, "{}_{}_{}.png".format(DATASET, i, VIS_METHOD)))
 ########################################################################################################################
 #                                                       EVALUATION                                                     #
 ########################################################################################################################
 EVAL_EPOCH_DICT = {
-    "mnist":[1,2,5,10,13,16,20],
-    "fmnist":[1,2,6,11,25,30,36,50],
-    "cifar10":[1,3,9,18,24,41,70,100,160,200]
+    "mnist":[1,10,15],
+    "fmnist":[1,25,50],
+    "cifar10":[1,100,199]
 }
 eval_epochs = EVAL_EPOCH_DICT[DATASET]
 
 evaluator = Evaluator(data_provider, projector)
 for eval_epoch in eval_epochs:
-    evaluator.save_epoch_eval(eval_epoch, 10, temporal_k=3, file_name="test_evaluation_hybrid")
-    evaluator.save_epoch_eval(eval_epoch, 15, temporal_k=5, file_name="test_evaluation_hybrid")
-    evaluator.save_epoch_eval(eval_epoch, 20, temporal_k=7,file_name="test_evaluation_hybrid")
+    # evaluator.save_epoch_eval(eval_epoch, 10, temporal_k=3, file_name=EVALUATION_NAME)
+    evaluator.save_epoch_eval(eval_epoch, 15, temporal_k=5, file_name=EVALUATION_NAME)
+    # evaluator.save_epoch_eval(eval_epoch, 20, temporal_k=7,file_name=EVALUATION_NAME)
