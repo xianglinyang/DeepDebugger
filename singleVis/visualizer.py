@@ -84,6 +84,30 @@ class visualizer(VisualizerAbstractClass):
         # self.fig.canvas.mpl_connect('pick_event', self.show_sample)
         # self.fig.canvas.mpl_connect('button_press_event', self.show_sample)
         self.disable_synth = False
+    
+    def _init_default_plot(self, only_img=True):
+        '''
+        Initialises matplotlib artists and plots. from DeepView and DVI
+        '''
+        plt.ion()
+        self.fig, self.ax = plt.subplots(1, 1, figsize=(8, 8))
+
+        if not only_img:
+            self.ax.set_title("TimeVis visualization")
+            self.desc = self.fig.text(0.5, 0.02, '', fontsize=8, ha='center')
+            self.ax.legend()
+        else:
+            self.ax.set_axis_off()
+        self.cls_plot = self.ax.imshow(np.zeros([5, 5, 3]),
+            interpolation='gaussian', zorder=0, vmin=0, vmax=1)
+
+        self.sample_plots = []
+        for c in range(self.class_num):
+            color = self.cmap(c/(self.class_num-1))
+            plot = self.ax.plot([], [], '.', label=self.classes[c], ms=5,
+                color=color, zorder=2, picker=mpl.rcParams['lines.markersize'])
+            self.sample_plots.append(plot[0])
+        self.disable_synth = False
         
     
     def get_epoch_plot_measures(self, epoch):
@@ -192,6 +216,32 @@ class visualizer(VisualizerAbstractClass):
         # self.fig.canvas.flush_events()
 
         # plt.text(-8, 8, "test", fontsize=18, style='oblique', ha='center', va='top', wrap=True)
+        plt.savefig(path)
+    
+    def save_default_fig(self, epoch, path="vis"):
+        '''
+        Shows the current plot.
+        '''
+        self._init_default_plot(only_img=True)
+
+        x_min, y_min, x_max, y_max = self.get_epoch_plot_measures(epoch)
+
+        _, decision_view = self.get_epoch_decision_view(epoch, self.resolution)
+        self.cls_plot.set_data(decision_view)
+        self.cls_plot.set_extent((x_min, x_max, y_max, y_min))
+        self.ax.set_xlim((x_min, x_max))
+        self.ax.set_ylim((y_min, y_max))
+
+        train_data = self.data_provider.train_representation(epoch)
+        train_labels = self.data_provider.train_labels(epoch)
+        pred = self.data_provider.get_pred(epoch, train_data)
+        pred = pred.argmax(axis=1)
+
+        embedding = self.projector.batch_project(epoch, train_data)
+
+        for c in range(self.class_num):
+            data = embedding[train_labels == c]
+            self.sample_plots[c].set_data(data.transpose())
         plt.savefig(path)
     
     def savefig_cus(self, epoch, data, pred, labels, path="vis"):
