@@ -216,3 +216,74 @@ class TimeVisProjector(Projector):
         self.vis_model.to(self.DEVICE)
         self.vis_model.eval()
         print("Successfully load the TimeVis visualization model for iteration {}".format(iteration))
+
+import tensorflow as tf
+
+class tfDVIProjector(ProjectorAbstractClass):
+    def __init__(self, content_path, flag):
+        self.content_path = content_path
+        self.model_path = os.path.join(self.content_path, "Model")
+        self.flag = flag
+        self.curr_iteration = -1
+        self.encoder = None
+        self.decoder = None
+
+    def load(self, epoch):
+        if self.curr_iteration == epoch:
+            print("Current autocoder model loaded from Epoch {}".format(epoch))
+            return
+        encoder_location = os.path.join(self.model_path, "Epoch_{:d}".format(epoch),"encoder" + self.flag)
+        decoder_location = os.path.join(self.model_path, "Epoch_{:d}".format(epoch),"decoder" + self.flag)
+        try:
+            self.encoder = tf.keras.models.load_model(encoder_location)
+            self.decoder = tf.keras.models.load_model(decoder_location)
+            print("Keras autocoder model loaded from Epoch {}".format(epoch))
+            self.curr_iteration = epoch
+        except FileNotFoundError:
+            print("Error! Projection function has not been initialized! Pls first visualize all.")
+
+    def batch_project(self, epoch, data):
+        '''
+        batch project data to 2D space
+        :param data: numpy.ndarray
+        :param epoch: int
+        :return: embedding numpy.ndarray
+        '''
+        self.load(epoch)
+        embedding = self.encoder(data).cpu().numpy()
+        return embedding
+
+    def individual_project(self, epoch, data):
+        '''
+        project a data to 2D space
+        :param data: numpy.ndarray
+        :param epoch: int
+        :return: embedding numpy.ndarray
+        '''
+        self.load(epoch)
+        data = np.expand_dims(data, axis=0)
+        embedding = self.encoder(data).cpu().numpy()
+        return embedding.squeeze(0)
+
+    def batch_inverse(self, epoch, data):
+        """
+        map 2D points back into high dimensional space
+        :param data: ndarray, (n, 2)
+        :param epoch: num of epoch
+        :return: high dim representation, numpy.ndarray
+        """
+        self.load(epoch)
+        representation_data = self.decoder(data).cpu().numpy()
+        return representation_data
+
+    def individual_inverse(self, epoch, data):
+        """
+        map a 2D point back into high dimensional space
+        :param data: ndarray, (1, 2)
+        :param epoch: num of epoch
+        :return: high dim representation, numpy.ndarray
+        """
+        self.load(epoch)
+        data = np.expand_dims(data, axis=0)
+        representation_data = self.decoder(data).cpu().numpy()
+        return representation_data.squeeze(0)

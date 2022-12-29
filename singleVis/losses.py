@@ -187,3 +187,125 @@ class DVILoss(nn.Module):
         loss = umap_l + self.lambd1 * recon_l + self.lambd2 * temporal_l
 
         return umap_l, self.lambd1 *recon_l, self.lambd2 *temporal_l, loss
+
+
+import tensorflow as tf
+def umap_loss(
+    batch_size,
+    negative_sample_rate,
+    _a,
+    _b,
+    repulsion_strength=1.0,
+):
+    """
+    Generate a keras-ccompatible loss function for UMAP loss
+
+    Parameters
+    ----------
+    batch_size : int
+        size of mini-batches
+    negative_sample_rate : int
+        number of negative samples per positive samples to train on
+    _a : float
+        distance parameter in embedding space
+    _b : float float
+        distance parameter in embedding space
+    repulsion_strength : float, optional
+        strength of repulsion vs attraction for cross-entropy, by default 1.0
+
+    Returns
+    -------
+    loss : function
+        loss function that takes in a placeholder (0) and the output of the keras network
+    """
+
+    @tf.function
+    def loss(placeholder_y, embed_to_from):
+        # split out to/from
+        embedding_to, embedding_from, weights = tf.split(
+            embed_to_from, num_or_size_splits=[2, 2, 1], axis=1
+        )
+        # embedding_to, embedding_from, weight = embed_to_from
+
+        # get negative samples
+        embedding_neg_to = tf.repeat(embedding_to, negative_sample_rate, axis=0)
+        repeat_neg = tf.repeat(embedding_from, negative_sample_rate, axis=0)
+        embedding_neg_from = tf.gather(
+            repeat_neg, tf.random.shuffle(tf.range(tf.shape(repeat_neg)[0]))
+        )
+
+        #  distances between samples (and negative samples)
+        distance_embedding = tf.concat(
+            (
+                tf.norm(embedding_to - embedding_from, axis=1),
+                tf.norm(embedding_neg_to - embedding_neg_from, axis=1),
+            ),
+            axis=0,
+        )
+
+        # convert probabilities to distances
+        probabilities_distance = convert_distance_to_probability(
+            distance_embedding, _a, _b
+        )
+
+        # set true probabilities based on negative sampling
+        probabilities_graph = tf.concat(
+            (tf.ones(batch_size), tf.zeros(batch_size * negative_sample_rate)), axis=0,
+        )
+        probabilities = tf.concat(
+            (tf.squeeze(weights), tf.zeros(batch_size * negative_sample_rate)), axis=0,
+        )
+
+        # compute cross entropy
+        (attraction_loss, repellant_loss, ce_loss) = compute_cross_entropy(
+            probabilities_graph,
+            probabilities_distance,
+            repulsion_strength=repulsion_strength,
+        )
+
+        return tf.reduce_mean(ce_loss)
+
+    return loss
+
+# step2
+def regularize_loss():
+    '''
+    Add temporal regularization L2 loss on weights
+    '''
+
+    @tf.function
+    def loss(w_prev, w_current, to_alpha):
+        assert len(w_prev) == len(w_current)
+        # multiple layers of weights, need to add them up
+        for j in range(len(w_prev)):
+            diff = tf.reduce_sum(tf.math.square(w_current[j] - w_prev[j]))
+            diff = tf.math.multiply(to_alpha, diff)
+            if j == 0:
+                alldiff = tf.reduce_mean(diff)
+            else:
+                alldiff += tf.reduce_mean(diff)
+        return alldiff
+
+    return loss
+
+def reconstruction_loss(
+    beta=1
+):
+    """
+    Generate a keras-ccompatible loss function for customize reconstruction loss
+
+    Parameters
+    ----------
+    beta: hyperparameter
+    Returns
+    -------
+    loss : function
+    """
+
+    @tf.function
+    def loss(edge_to, edge_from, recon_to, recon_from, alpha_to, alpha_from):
+        loss1 = tf.reduce_mean(tf.reduce_mean(tf.math.multiply(tf.math.pow((1+alpha_to), beta), tf.math.pow(edge_to - recon_to, 2)), 1))
+        loss2 = tf.reduce_mean(tf.reduce_mean(tf.math.multiply(tf.math.pow((1+alpha_from), beta), tf.math.pow(edge_from - recon_from, 2)), 1))
+        return (loss1 + loss2)/2
+
+    return loss
