@@ -6,6 +6,7 @@ from sklearn.cluster import Birch
 class TrajectoryManager:
     def __init__(self, embeddings_2d, cls_num, period=100, metric="a"):
         """ trajectory manager with no feedback
+        sample abnormal samples based on trajectories
         Parameters
         ----------
         samples: ndarray, shape(train_num, repr_dim)
@@ -67,6 +68,9 @@ class TrajectoryManager:
     
 
 class FeedbackTrajectoryManager(TrajectoryManager):
+    """ trajectory manager with feedback
+    sample abnormal samples based on trajectories
+    """
     def __init__(self, embeddings_2d, cls_num, period=100, metric="a"):
         super().__init__(embeddings_2d, cls_num, period, metric)
     
@@ -188,18 +192,10 @@ class FeedbackSampling(TrajectoryManager):
             return s_idxs, scores
         return s_idxs
 
+# TODO: extension for new features. make features a dictionary
 class Recommender:
     def __init__(self, uncertainty, embeddings_2d, cls_num, period=100, metric="a"):
-        """ trajectory manager with no feedback
-        Parameters
-        ----------
-        samples: ndarray, shape(train_num, repr_dim)
-        embeddings_2d : ndarray, shape (train_num, epoch_num, 2)
-            all 2d embeddings of representations by timevis
-        cls_num: int 
-            the number of classes to cluster
-        period: int
-            We only look at the last *period* epochs of trajectory
+        """ Recommend samples based on uncertainty and embeddings
         """
         self.uncertainty = uncertainty
         self.embeddings_2d = embeddings_2d
