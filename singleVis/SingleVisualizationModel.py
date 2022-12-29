@@ -95,3 +95,152 @@ class VisModel(nn.Module):
         outputs["recon"] = (recon_to, recon_from)
 
         return outputs
+
+
+'''
+The visualization model definition class
+'''
+import tensorflow as tf
+from tensorflow import keras
+
+class tfModel(keras.Model):
+    def __init__(self, optimizer, loss, loss_weights, temporal, encoder_dims, decoder_dims, step3=False, withoutB=False, attention=True, batch_size=1000, prev_trainable_variables=None):
+
+        super(tfModel, self).__init__()
+        self._init_autoencoder(encoder_dims, decoder_dims)
+        self.optimizer = optimizer  # optimizer
+        self.temporal = temporal
+        self.step3 = step3
+        self.withoutB = withoutB
+        self.attention = attention
+
+        self.loss = loss  # dict of 3 losses {"total", "umap", "reconstrunction", "regularization"}
+        self.loss_weights = loss_weights  # weights for each loss (in total 3 losses)
+
+        self.prev_trainable_variables = prev_trainable_variables  # weights for previous iteration
+        self.e_var = None
+        self.d_var = None
+        self.batch_size = batch_size
+    
+    def _init_autoencoder(self, encoder_dims, decoder_dims):
+        self.encoder = tf.keras.Sequential([
+            tf.keras.layers.InputLayer(input_shape=(encoder_dims[0],)),
+            tf.keras.layers.Flatten(),
+        ])
+        for i in range(1, len(encoder_dims)-1, 1):
+            self.encoder.add(tf.keras.layers.Dense(units=encoder_dims[i], activation="relu", name="e_{}".format(i)))
+        self.encoder.add(tf.keras.layers.Dense(units=encoder_dims[-1], name="e_{}".format(len(encoder_dims))),)
+
+        self.decoder = tf.keras.Sequential([
+            tf.keras.layers.InputLayer(input_shape=(encoder_dims[-1],)),
+        ])
+        for i in range(1, len(decoder_dims)-1, 1):
+            self.decoder.add(tf.keras.layers.Dense(units=encoder_dims[i], activation="relu", name="d_{}".format(i)))
+        self.decoder.add(tf.keras.layers.Dense(units=encoder_dims[-1], name="recon"))
+        print(self.encoder)
+        print(self.decoder)
+
+    def train_step(self, x):
+
+        if self.temporal:
+            # get one batch
+            to_x, from_x, to_alpha, from_alpha, n_rate, weight = x[0]
+            if self.step3:
+                if self.e_var is None:
+                    self.e_var = [var for var in self.trainable_variables if "e_" in var.name]
+                if self.d_var is None:
+                    self.d_var = [var for var in self.trainable_variables if "d_" in var.name or "recon" in var.name]
+        else:
+            to_x, from_x, to_alpha, from_alpha, weight = x[0]
+
+        # Forward pass
+        with tf.GradientTape(persistent=True) as tape:
+
+            # parametric embedding
+            embedding_to = self.encoder(to_x)  # embedding for instance 1
+            embedding_from = self.encoder(from_x)  # embedding for instance 1
+            embedding_to_recon = self.decoder(embedding_to)  # reconstruct instance 1
+            embedding_from_recon = self.decoder(embedding_from)  # reconstruct instance 1
+
+            # concatenate embedding1 and embedding2 to prepare for umap loss
+            embedding_to_from = tf.concat((embedding_to, embedding_from, tf.cast(weight, dtype=tf.float32, name=None)),
+                                          axis=1)
+
+            # reconstruction loss
+            if self.attention:
+                reconstruct_loss = self.loss["reconstruction"](tf.cast(to_x, dtype=tf.float32), tf.cast(from_x, dtype=tf.float32), embedding_to_recon, embedding_from_recon, to_alpha, from_alpha)
+            else:
+                reconstruct_loss = self.loss["reconstruction"](y_true=to_x, y_pred=embedding_to_recon)/2 + \
+                                   self.loss["reconstruction"](y_true=from_x, y_pred=embedding_from_recon)/2
+
+
+            # umap loss
+            umap_loss = self.loss["umap"](None, embed_to_from=embedding_to_from)  # w_(t-1), no gradient
+
+            if self.temporal:
+                # compute alpha bar
+                alpha_mean = tf.cast(tf.reduce_mean(tf.stop_gradient(n_rate)), dtype=tf.float32)
+                if self.step3:
+                    # embedding loss
+                    embed_loss_to = self.loss["embedding_to"](None, embedding_to)
+                    embed_loss_to_recon = self.loss["embedding_to_recon"](None, embedding_to_recon)
+
+                    final_grad_result_list = list()
+
+                    embed_loss_to_grad_list = list()
+                    for i in range(len(self.e_var)):
+                        embed_loss_to_grad_list.append(list())
+                    for i in range(self.batch_size):
+                        for idx, item in enumerate(tape.gradient(embed_loss_to[i], self.e_var)):
+                            embed_loss_to_grad_list[idx].append(tf.math.abs(tf.stop_gradient(item)))
+                    for i in range(len(self.e_var)):
+                        result = tf.reduce_max(tf.stack(embed_loss_to_grad_list[i]), axis=0)
+                        final_grad_result_list.append(result)
+
+                    embed_loss_to_recon_grad_list = list()
+                    for i in range(len(self.d_var)):
+                        embed_loss_to_recon_grad_list.append(list())
+                    for i in range(self.batch_size):
+                        for idx, item in enumerate(tape.gradient(embed_loss_to_recon[i], self.d_var)):
+                            embed_loss_to_recon_grad_list[idx].append(tf.math.abs(tf.stop_gradient(item)))
+                    for i in range(len(self.d_var)):
+                        result = tf.reduce_max(tf.stack(embed_loss_to_recon_grad_list[i]), axis=0)
+                        final_grad_result_list.append(result)
+
+                # L2 norm of w current - w for last epoch (subject model's epoch)
+                # dummy zeros-loss if no previous epoch
+                if self.prev_trainable_variables is None:
+                    prev_trainable_variables = [tf.stop_gradient(x) for x in self.trainable_variables]
+                else:
+                    prev_trainable_variables = self.prev_trainable_variables
+                if not self.step3:
+                        regularization_loss = self.loss["regularization"](w_prev=prev_trainable_variables,
+                                                                          w_current=self.trainable_variables,
+                                                                          to_alpha=alpha_mean)
+
+                else:
+                    regularization_loss = self.loss["regularization"](w_prev=prev_trainable_variables,
+                                                                      w_current=self.trainable_variables,
+                                                                      to_alpha=alpha_mean,
+                                                                      final_grad_result_list=final_grad_result_list)
+                    # aggregate loss, weighted average
+                loss = tf.add(tf.add(tf.math.multiply(tf.constant(self.loss_weights["reconstruction"]), reconstruct_loss),
+                                     tf.math.multiply(tf.constant(self.loss_weights["umap"]), umap_loss)),
+                              tf.math.multiply(tf.constant(self.loss_weights["regularization"]), regularization_loss))
+            else:
+                loss = tf.add(tf.math.multiply(tf.constant(self.loss_weights["reconstruction"]), reconstruct_loss),
+                           tf.math.multiply(tf.constant(self.loss_weights["umap"]), umap_loss))
+
+        # Compute gradients
+        trainable_vars = self.trainable_variables
+        grads = tape.gradient(loss, trainable_vars)
+
+        # Update weights
+        self.optimizer.apply_gradients(zip(grads, trainable_vars))
+
+        if self.temporal:
+            return {"loss": loss, "umap": umap_loss, "reconstruction": reconstruct_loss,
+                    "regularization": regularization_loss}
+        else:
+            return {"loss": loss, "umap": umap_loss, "reconstruction": reconstruct_loss}
+
