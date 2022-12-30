@@ -6,7 +6,7 @@ import time
 import math
 import json
 
-from umap.umap_ import fuzzy_simplicial_set
+from umap.umap_ import fuzzy_simplicial_set, make_epochs_per_sample
 from pynndescent import NNDescent
 from sklearn.neighbors import NearestNeighbors
 from sklearn.utils import check_random_state
@@ -14,6 +14,7 @@ from sklearn.utils import check_random_state
 from singleVis.kcenter_greedy import kCenterGreedy
 from singleVis.intrinsic_dim import IntrinsicDim
 from singleVis.backend import get_graph_elements, get_attention
+from singleVis.utils import find_neighbor_preserving_rate
 
 class SpatialEdgeConstructorAbstractClass(ABC):
     @abstractmethod
@@ -541,6 +542,8 @@ class SingleEpochSpatialEdgeConstructor(SpatialEdgeConstructor):
     def construct(self):
         # load train data and border centers
         train_data = self.data_provider.train_representation(self.iteration)
+        # selected = np.random.choice(len(train_data), int(0.9*len(train_data)), replace=False)
+        # train_data = train_data[selected]
 
         if self.b_n_epochs > 0:
             border_centers = self.data_provider.border_representation(self.iteration).squeeze()
@@ -548,16 +551,16 @@ class SingleEpochSpatialEdgeConstructor(SpatialEdgeConstructor):
             bw_complex, _, _, _ = self._construct_boundary_wise_complex(train_data, border_centers)
             edge_to, edge_from, weight = self._construct_step_edge_dataset(complex, bw_complex)
             feature_vectors = np.concatenate((train_data, border_centers), axis=0)
-            pred_model = self.data_provider.prediction_function(self.iteration)
-            attention = get_attention(pred_model, feature_vectors, temperature=.01, device=self.data_provider.DEVICE, verbose=1)
-            # attention = np.ones(feature_vectors.shape)
+            # pred_model = self.data_provider.prediction_function(self.iteration)
+            # attention = get_attention(pred_model, feature_vectors, temperature=.01, device=self.data_provider.DEVICE, verbose=1)
+            attention = np.zeros(feature_vectors.shape)
         elif self.b_n_epochs == 0:
             complex, _, _, _ = self._construct_fuzzy_complex(train_data)
             edge_to, edge_from, weight = self._construct_step_edge_dataset(complex, None)
             feature_vectors = np.copy(train_data)
-            pred_model = self.data_provider.prediction_function(self.iteration)
-            attention = get_attention(pred_model, feature_vectors, temperature=.01, device=self.data_provider.DEVICE, verbose=1)            
-            # attention = np.ones(feature_vectors.shape)
+            # pred_model = self.data_provider.prediction_function(self.iteration)
+            # attention = get_attention(pred_model, feature_vectors, temperature=.01, device=self.data_provider.DEVICE, verbose=1)            
+            attention = np.zeros(feature_vectors.shape)
         else: 
             raise Exception("Illegal border edges proposion!")
             
@@ -920,3 +923,70 @@ class kcHybridDenseALSpatialEdgeConstructor(SpatialEdgeConstructor):
                 embedded = np.concatenate((np.zeros((len(fitting_data), 2)), embedded), axis=0)
 
         return edge_to, edge_from, weight, feature_vectors, embedded, coefficient, time_step_nums, time_step_idxs_list, knn_indices, sigmas, rhos, attention, (c0, d0)
+
+
+class tfEdgeConstructor(SpatialEdgeConstructor):
+    def __init__(self, data_provider, s_n_epochs, b_n_epochs, n_neighbors) -> None:
+        super().__init__(data_provider, 100, s_n_epochs, b_n_epochs, n_neighbors)
+    # override
+    def _construct_step_edge_dataset(self, vr_complex, bw_complex):
+        """
+        construct the mixed edge dataset for one time step
+            connect border points and train data(both direction)
+        :param vr_complex: Vietoris-Rips complex
+        :param bw_complex: boundary-augmented complex
+        :param n_epochs: the number of epoch that we iterate each round
+        :return: edge dataset
+        """
+        # get data from graph
+        _, vr_head, vr_tail, vr_weight, _ = get_graph_elements(vr_complex, self.s_n_epochs)
+        epochs_per_sample = make_epochs_per_sample(vr_weight, 10)
+        vr_head = np.repeat(vr_head, epochs_per_sample.astype("int"))
+        vr_tail = np.repeat(vr_tail, epochs_per_sample.astype("int"))
+        vr_weight = np.repeat(vr_weight, epochs_per_sample.astype("int"))
+        
+        # get data from graph
+        if self.b_n_epochs == 0:
+            return vr_head, vr_tail, vr_weight
+        else:
+            _, bw_head, bw_tail, bw_weight, _ = get_graph_elements(bw_complex, self.b_n_epochs)
+            b_epochs_per_sample = make_epochs_per_sample(bw_weight, self.b_n_epochs)
+            bw_head = np.repeat(bw_head, b_epochs_per_sample.astype("int"))
+            bw_tail = np.repeat(bw_tail, b_epochs_per_sample.astype("int"))
+            bw_weight = np.repeat(bw_weight, epochs_per_sample.astype("int"))
+            head = np.concatenate((vr_head, bw_head), axis=0)
+            tail = np.concatenate((vr_tail, bw_tail), axis=0)
+            weight = np.concatenate((vr_weight, bw_weight), axis=0)
+        return head, tail, weight
+        
+    def construct(self, prev_iteration, iteration):
+        '''
+        If prev_iteration<epoch_start, then temporal loss will be 0
+        '''
+        train_data = self.data_provider.train_representation(iteration)
+        if prev_iteration > self.data_provider.s:
+            prev_data = self.data_provider.train_representation(prev_iteration)
+        else:
+            prev_data = None
+        n_rate = find_neighbor_preserving_rate(prev_data, train_data, self.n_neighbors)
+        if self.b_n_epochs > 0:
+            border_centers = self.data_provider.border_representation(iteration).squeeze()
+            complex, _, _, _ = self._construct_fuzzy_complex(train_data)
+            bw_complex, _, _, _ = self._construct_boundary_wise_complex(train_data, border_centers)
+            edges_to_exp, edges_from_exp, weights_exp = self._construct_step_edge_dataset(complex, bw_complex)
+            feature_vectors = np.concatenate((train_data, border_centers), axis=0)
+            # pred_model = self.data_provider.prediction_function(self.iteration)
+            # attention = get_attention(pred_model, feature_vectors, temperature=.01, device=self.data_provider.DEVICE, verbose=1)
+            attention = np.zeros(feature_vectors.shape)
+
+        elif self.b_n_epochs == 0:
+            complex, _, _, _ = self._construct_fuzzy_complex(train_data)
+            edges_to_exp, edges_from_exp, weights_exp = self._construct_step_edge_dataset(complex, None)
+            feature_vectors = np.copy(train_data)
+            # pred_model = self.data_provider.prediction_function(self.iteration)
+            # attention = get_attention(pred_model, feature_vectors, temperature=.01, device=self.data_provider.DEVICE, verbose=1)            
+            attention = np.zeros(feature_vectors.shape)
+        else: 
+            raise Exception("Illegal border edges proposion!")
+            
+        return edges_to_exp, edges_from_exp, weights_exp, feature_vectors, attention, n_rate

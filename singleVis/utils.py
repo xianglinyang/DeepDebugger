@@ -285,7 +285,7 @@ def find_neighbor_preserving_rate(prev_data, train_data, n_neighbors):
     :return alpha: ndarray, shape (N,)
     """
     if prev_data is None:
-        return 0.0
+        return np.zeros(len(train_data))
     # number of trees in random projection forest
     n_trees = min(64, 5 + int(round((train_data.shape[0]) ** 0.5 / 20.0)))
     # max number of nearest neighbor iters to perform
@@ -317,7 +317,7 @@ def find_neighbor_preserving_rate(prev_data, train_data, n_neighbors):
     for i in range(len(train_indices)):
         pres = np.intersect1d(train_indices[i], prev_indices[i])
         temporal_pres[i] = len(pres) / float(n_neighbors)
-    return temporal_pres.mean()
+    return temporal_pres
 
 
 def kl_div(p, q):

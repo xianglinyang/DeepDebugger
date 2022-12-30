@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 import torch
 from torch import nn
-from singleVis.backend import convert_distance_to_probability, compute_cross_entropy
+from singleVis.backend import compute_cross_entropy_tf
 
 """Losses modules for preserving four propertes"""
 # https://github.com/ynjnpa/VocGAN/blob/5339ee1d46b8337205bec5e921897de30a9211a1/utils/stft_loss.py for losses module
@@ -244,9 +244,7 @@ def umap_loss(
         )
 
         # convert probabilities to distances
-        probabilities_distance = convert_distance_to_probability(
-            distance_embedding, _a, _b
-        )
+        probabilities_distance = 1.0 / (1.0 + _a * tf.math.pow(distance_embedding, 2 * _b))
 
         # set true probabilities based on negative sampling
         probabilities_graph = tf.concat(
@@ -257,7 +255,7 @@ def umap_loss(
         )
 
         # compute cross entropy
-        (attraction_loss, repellant_loss, ce_loss) = compute_cross_entropy(
+        (attraction_loss, repellant_loss, ce_loss) = compute_cross_entropy_tf(
             probabilities_graph,
             probabilities_distance,
             repulsion_strength=repulsion_strength,
