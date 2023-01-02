@@ -81,7 +81,7 @@ embeddings_2d = np.transpose(embeddings_2d, [1,0,2])
 
 labels = data_provider.train_labels_all(EPOCH_END)
 
-path = os.path.join(CONTENT_PATH, "Model", "{}_trajectory_embeddings.npy".format()(VIS_METHOD))
+path = os.path.join(CONTENT_PATH, "Model", "{}_trajectory_embeddings.npy".format(VIS_METHOD))
 np.save(path,embeddings_2d)
 # path = os.path.join(CONTENT_PATH, "Model", "Iteration_{}".format(iteration),"trajectory_embeddings.npy")
 # embeddings_2d = np.load(path)
@@ -94,7 +94,7 @@ ulb_uncertainty = uncertainty[ulb_idxs]
 ulb_trajectory = embeddings_2d[ulb_idxs]
 
 t_start = time.time()
-tm = Recommender(ulb_uncertainty, ulb_trajectory, cls_num=30, period=50, metric="a")
+tm = Recommender(ulb_uncertainty, ulb_trajectory, cls_num=30, period=int(TOTOAL_EPOCH*2/3), metric="a")
 tm.clustered()
 t_end = time.time()
 with open(os.path.join(CONTENT_PATH,  '{}_sample_recommender.pkl'.format(VIS_METHOD)), 'wb') as f:

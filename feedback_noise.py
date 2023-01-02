@@ -91,7 +91,7 @@ path = os.path.join(CONTENT_PATH, "Model","uncertainty.npy")
 np.save(path,uncertainty)
 
 t_start = time.time()
-tm = Recommender(uncertainty, embeddings_2d, cls_num=30, period=100, metric="a")
+tm = Recommender(uncertainty, embeddings_2d, cls_num=30, period=int(TOTOAL_EPOCH*2/3), metric="a")
 tm.clustered()
 t_end = time.time()
 with open(os.path.join(CONTENT_PATH,  '{}_sample_recommender.pkl'.format(VIS_METHOD)), 'wb') as f:

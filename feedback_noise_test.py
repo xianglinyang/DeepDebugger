@@ -7,11 +7,11 @@ import argparse
 def add_noise(rate, acc_idxs, rej_idxs):
     if rate == 0:
         return acc_idxs, rej_idxs
-    acc_noise = np.random.choice(len(acc_idxs), size=len(acc_idxs)*rate//1)
+    acc_noise = np.random.choice(len(acc_idxs), size=int(len(acc_idxs)*rate))
     acc_noise = acc_idxs[acc_noise]
     new_acc = np.setdiff1d(acc_idxs, acc_noise)
 
-    rej_noise = np.random.choice(len(rej_idxs), size=len(rej_idxs)*rate//1)
+    rej_noise = np.random.choice(len(rej_idxs), size=int(len(rej_idxs)*rate))
     rej_noise = rej_idxs[rej_noise]
     new_rej = np.setdiff1d(rej_idxs, rej_noise)
 
@@ -33,33 +33,32 @@ def init_sampling(tm, method, round, budget):
 
 def feedback_sampling(tm, method, round, budget, noise_rate=0.0):
     print("Feedback sampling ({}) with noise {}:".format(method, noise_rate))
-    rate = list()
+    rate = np.zeros(round)
     correct = np.array([]).astype(np.int32)
     wrong = np.array([]).astype(np.int32)
-    selected,_ = tm.sample_batch_init(correct, wrong, BUDGET)
+    selected,_ = tm.sample_batch_init(correct, wrong, budget)
     c = np.intersect1d(selected, noise_idxs)
     w = np.setdiff1d(selected, c)
     correct = np.concatenate((correct, c), axis=0)
     wrong = np.concatenate((wrong, w), axis=0)
-    rate.append(len(correct)/budget)
+    rate[0] = len(correct)/float(budget)
 
     # inject noise
     correct, wrong = add_noise(noise_rate, correct, wrong)
 
-    for _ in range(round-1):
-        selected,_ = tm.sample_batch(correct, wrong, BUDGET)
+    for r in range(1, round, 1):
+        selected,_ = tm.sample_batch(correct, wrong, budget)
         c = np.intersect1d(selected, noise_idxs)
         w = np.setdiff1d(selected, c)
-        rate.append(len(c)/BUDGET)
-
+        rate[r] = len(c)/budget
         # inject noise
-        c, w = add_noise(TOLERANCE, c, w)
+        c, w = add_noise(noise_rate, c, w)
 
         correct = np.concatenate((correct, c), axis=0)
         wrong = np.concatenate((wrong, w), axis=0)
-    print("Success Rate:\t{:.4f}".format(rate))
-    print(rate)
-    return rate
+    print("Success Rate:\t{:.4f}".format(rate.mean()))
+    ac_rate = np.array([rate[:i].mean() for i in range(1, len(rate)+1)])
+    return ac_rate
 
 
 parser = argparse.ArgumentParser()
@@ -125,12 +124,13 @@ init_sampling(timevis_tm, method="TimeVis", round=INIT_ROUND, budget=BUDGET)
 print("Random sampling feedback")
 random_rate = list()
 pool = np.arange(LEN)
-for _ in range(11):
+for _ in range(ROUND):
     s_idxs = np.random.choice(pool,size=BUDGET,replace=False)
     random_rate.append(len(np.intersect1d(s_idxs, noise_idxs))/BUDGET)
     pool = np.setdiff1d(pool, s_idxs)
 print("Success Rate:\t{:.4f}".format(sum(random_rate)/len(random_rate)))
-print(random_rate)
+ac_random_rate = np.array([random_rate[:i].mean() for i in range(1, len(random_rate)+1)])
+print(ac_random_rate)
 
 # dvi Feedback
 feedback_sampling(tm=dvi_tm, method="DVI", round=ROUND, budget=BUDGET)

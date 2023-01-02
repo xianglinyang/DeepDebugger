@@ -10,11 +10,11 @@ from singleVis.data import ActiveLearningDataProvider
 def add_noise(rate, acc_idxs, rej_idxs):
     if rate == 0:
         return acc_idxs, rej_idxs
-    acc_noise = np.random.choice(len(acc_idxs), size=len(acc_idxs)*rate//1)
+    acc_noise = np.random.choice(len(acc_idxs), size=int(len(acc_idxs)*rate))
     acc_noise = acc_idxs[acc_noise]
     new_acc = np.setdiff1d(acc_idxs, acc_noise)
 
-    rej_noise = np.random.choice(len(rej_idxs), size=len(rej_idxs)*rate//1)
+    rej_noise = np.random.choice(len(rej_idxs), size=int(len(rej_idxs)*rate))
     rej_noise = rej_idxs[rej_noise]
     new_rej = np.setdiff1d(rej_idxs, rej_noise)
 
@@ -23,7 +23,7 @@ def add_noise(rate, acc_idxs, rej_idxs):
     return new_acc, new_rej
 
 
-def init_sampling(tm, method, round, budget):
+def init_sampling(tm, method, round, budget, ulb_wrong):
     print("Feedback sampling initialization ({}):".format(method))
     rate = list()
     for _ in range(round):
@@ -38,9 +38,9 @@ def init_sampling(tm, method, round, budget):
     return sum(rate)/len(rate)
 
 
-def feedback_sampling(tm, method, round, budget, noise_rate=0):
+def feedback_sampling(tm, method, round, budget, ulb_wrong, noise_rate=0):
     print("Feedback sampling ({}) with noise rate {}:".format(method, noise_rate))
-    rate = list()
+    rate = np.zeros(round)
     correct = np.array([]).astype(np.int32)
     wrong = np.array([]).astype(np.int32)
     map_ulb =ulb_idxs.tolist()
@@ -51,10 +51,10 @@ def feedback_sampling(tm, method, round, budget, noise_rate=0):
     suggest_idxs = ulb_idxs[suggest_idxs]
     correct = np.intersect1d(suggest_idxs, ulb_wrong)
     wrong = np.setdiff1d(suggest_idxs, correct)
-    rate.append(len(correct)/budget)
+    rate[0] = len(correct)/budget
     # inject noise
     correct, wrong = add_noise(noise_rate, correct, wrong)
-    for _ in range(round-1):
+    for r in range(1, round):
         map_acc_idxs = np.array([map_ulb.index(i) for i in correct]).astype(np.int32)
         map_rej_idxs = np.array([map_ulb.index(i) for i in wrong]).astype(np.int32)
         suggest_idxs,_ = tm.sample_batch(map_acc_idxs, map_rej_idxs, budget)
@@ -62,15 +62,15 @@ def feedback_sampling(tm, method, round, budget, noise_rate=0):
 
         c = np.intersect1d(np.intersect1d(suggest_idxs, ulb_idxs), ulb_wrong)
         w = np.setdiff1d(suggest_idxs, c)
-        rate.append(len(c) / budget)
+        rate[r] = len(c) / budget
 
         # inject noise
         c, w = add_noise(noise_rate, c, w)
         correct = np.concatenate((correct, c), axis=0)
         wrong = np.concatenate((wrong, w), axis=0)
     print("Success Rate:\t{:.4f}".format(sum(rate)/len(rate)))
-    print(rate)
-    return rate
+    ac_rate = np.array([rate[:i].mean() for i in range(1, len(rate)+1)])
+    return ac_rate
 
 
 parser = argparse.ArgumentParser()
@@ -146,10 +146,10 @@ for _ in range(INIT_ROUND):
 print("Success Rate:\t{:.4f}".format(sum(random_rate)/len(random_rate)))
 
 # dvi init
-init_sampling(tm=dvi_tm, method="DVI", round=INIT_ROUND, budget=BUDGET)
+init_sampling(tm=dvi_tm, method="DVI", round=INIT_ROUND, budget=BUDGET, ulb_wrong=ulb_wrong)
 
 # timevis init
-init_sampling(tm=timevis_tm, method="TimeVis", round=INIT_ROUND, budget=BUDGET)
+init_sampling(tm=timevis_tm, method="TimeVis", round=INIT_ROUND, budget=BUDGET, ulb_wrong=ulb_wrong)
 
 #############################################
 #                 Feedback                  #
@@ -165,17 +165,17 @@ for _ in range(ROUND):
 print("Success Rate:\t{:.4f}".format(sum(random_rate)/len(random_rate)))
 
 # dvi sampling
-feedback_sampling(tm=dvi_tm, method="DVI", round=ROUND, budget=BUDGET, noise_rate=0.0)
+feedback_sampling(tm=dvi_tm, method="DVI", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, noise_rate=0.0)
 
 # timevis sampling
-feedback_sampling(tm=timevis_tm, method="TimeVis", round=ROUND, budget=BUDGET, noise_rate=0.0)
+feedback_sampling(tm=timevis_tm, method="TimeVis", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, noise_rate=0.0)
 
 #############################################
 #              Noise Feedback               #
 #############################################
 # dvi tolerance
-feedback_sampling(tm=dvi_tm, method="DVI", round=ROUND, budget=BUDGET, noise_rate=TOLERANCE)
+feedback_sampling(tm=dvi_tm, method="DVI", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, noise_rate=TOLERANCE)
 
 # timevis tolerance
-feedback_sampling(tm=timevis_tm, method="TimeVis", round=ROUND, budget=BUDGET, noise_rate=TOLERANCE)
+feedback_sampling(tm=timevis_tm, method="TimeVis", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, noise_rate=TOLERANCE)
 
