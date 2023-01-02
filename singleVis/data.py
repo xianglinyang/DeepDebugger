@@ -63,13 +63,9 @@ class DataProvider(DataProviderAbstractClass):
 
     @property
     def train_num(self):
-        training_data_path = os.path.join(self.content_path, "Training_data")
-        training_data = torch.load(os.path.join(training_data_path, "training_dataset_data.pth"),
-                                   map_location="cpu")
-        train_num = len(training_data)
-        del training_data
-        gc.collect()
-        return train_num
+        with open(os.path.join(self.content_path, "Model", "{}_{}".format(self.epoch_name, self.s), "index.json"), "r") as f:
+            idxs = json.load(f)
+        return len(idxs)
 
     @property
     def test_num(self):

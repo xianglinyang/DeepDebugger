@@ -242,18 +242,19 @@ class RandomSpatialEdgeConstructor(SpatialEdgeConstructor):
     
 
 class kcSpatialEdgeConstructor(SpatialEdgeConstructor):
-    def __init__(self, data_provider, init_num, s_n_epochs, b_n_epochs, n_neighbors, MAX_HAUSDORFF, ALPHA, BETA, init_idxs=None) -> None:
+    def __init__(self, data_provider, init_num, s_n_epochs, b_n_epochs, n_neighbors, MAX_HAUSDORFF, ALPHA, BETA, init_idxs=None, adding_num=100) -> None:
         super().__init__(data_provider, init_num, s_n_epochs, b_n_epochs, n_neighbors)
         self.MAX_HAUSDORFF = MAX_HAUSDORFF
         self.ALPHA = ALPHA
         self.BETA = BETA
         self.init_idxs = init_idxs
+        self.adding_num = adding_num
     
-    def _get_unit(self, data, adding_num=100):
+    def _get_unit(self, data, init_num, adding_num=100):
         # normalize
         t0 = time.time()
         l = len(data)
-        idxs = np.random.choice(np.arange(l), size=self.init_num, replace=False)
+        idxs = np.random.choice(np.arange(l), size=init_num, replace=False)
         # _,_ = hausdorff_dist_cus(data, idxs)
 
         id = IntrinsicDim(data)
@@ -298,20 +299,23 @@ class kcSpatialEdgeConstructor(SpatialEdgeConstructor):
         max_x = np.linalg.norm(baseline_data, axis=1).max()
         baseline_data = baseline_data/max_x
         
-        c0,d0,_ = self._get_unit(baseline_data)
+        c0,d0,_ = self._get_unit(baseline_data, self.init_num, self.adding_num)
+
+        if self.MAX_HAUSDORFF is None:
+            self.MAX_HAUSDORFF = c0-0.01
 
         # each time step
         for t in range(self.data_provider.e, self.data_provider.s - 1, -self.data_provider.p):
             print("=================+++={:d}=+++================".format(t))
             # load train data and border centers
-            train_data = self.data_provider.train_representation(t).squeeze()
+            train_data = self.data_provider.train_representation(t)
 
             # normalize data by max ||x||_2
             max_x = np.linalg.norm(train_data, axis=1).max()
             train_data = train_data/max_x
 
             # get normalization parameters for different epochs
-            c,d,_ = self._get_unit(train_data)
+            c,d,_ = self._get_unit(train_data, self.init_num,self.adding_num)
             c_c0 = math.pow(c/c0, self.BETA)
             d_d0 = math.pow(d/d0, self.ALPHA)
             print("Finish calculating normaling factor")
@@ -344,7 +348,7 @@ class kcSpatialEdgeConstructor(SpatialEdgeConstructor):
                 sigmas_t = np.concatenate((sigmas_t1, sigmas_t2[len(sigmas_t1):]), axis=0)
                 rhos_t = np.concatenate((rhos_t1, rhos_t2[len(rhos_t1):]), axis=0)
                 fitting_data = np.concatenate((train_data, border_centers), axis=0)
-                pred_model = self.data_provider.prediction_function(t)
+                # pred_model = self.data_provider.prediction_function(t)
                 # attention_t = get_attention(pred_model, fitting_data, temperature=.01, device=self.data_provider.DEVICE, verbose=1)
                 attention_t = np.ones(fitting_data.shape)
             else:
@@ -354,7 +358,7 @@ class kcSpatialEdgeConstructor(SpatialEdgeConstructor):
                 complex, sigmas_t, rhos_t, knn_idxs_t = self._construct_fuzzy_complex(train_data)
                 edge_to_t, edge_from_t, weight_t = self._construct_step_edge_dataset(complex, None)
                 fitting_data = np.copy(train_data)
-                pred_model = self.data_provider.prediction_function(t)
+                # pred_model = self.data_provider.prediction_function(t)
                 # attention_t = get_attention(pred_model, fitting_data, temperature=.01, device=self.data_provider.DEVICE, verbose=1)
                 attention_t = np.ones(fitting_data.shape)
 
