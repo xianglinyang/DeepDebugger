@@ -63,7 +63,7 @@ L_BOUND = VISUALIZATION_PARAMETER["BOUNDARY"]["L_BOUND"]
 INIT_NUM = VISUALIZATION_PARAMETER["INIT_NUM"]
 ALPHA = VISUALIZATION_PARAMETER["ALPHA"]
 BETA = VISUALIZATION_PARAMETER["BETA"]
-MAX_HAUSDORFF = VISUALIZATION_PARAMETER["MAX_HAUSDORFF"]
+# MAX_HAUSDORFF = VISUALIZATION_PARAMETER["MAX_HAUSDORFF"]
 ENCODER_DIMS = VISUALIZATION_PARAMETER["ENCODER_DIMS"]
 DECODER_DIMS = VISUALIZATION_PARAMETER["DECODER_DIMS"]
 S_N_EPOCHS = VISUALIZATION_PARAMETER["S_N_EPOCHS"]
@@ -87,11 +87,11 @@ net = eval("subject_model.{}()".format(NET))
 ########################################################################################################################
 #                                                    TRAINING SETTING                                                  #
 ########################################################################################################################
-data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=DEVICE, classes=CLASSES,verbose=1)
-if PREPROCESS:
-    data_provider._meta_data()
-    if B_N_EPOCHS >0:
-        data_provider._estimate_boundary(LEN//10, l_bound=L_BOUND)
+data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=DEVICE, classes=CLASSES, epoch_name="Epoch", verbose=1)
+# if PREPROCESS:
+#     data_provider._meta_data()
+#     if B_N_EPOCHS >0:
+#         data_provider._estimate_boundary(LEN//10, l_bound=L_BOUND)
 
 
 model = VisModel(ENCODER_DIMS, DECODER_DIMS)
@@ -111,7 +111,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=.01, weight_decay=1e-5)
 lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=4, gamma=.1)
 
 t0 = time.time()
-spatial_cons = kcSpatialEdgeConstructor(data_provider=data_provider, init_num=INIT_NUM, s_n_epochs=S_N_EPOCHS, b_n_epochs=B_N_EPOCHS, n_neighbors=N_NEIGHBORS, MAX_HAUSDORFF=MAX_HAUSDORFF, ALPHA=ALPHA, BETA=BETA)
+spatial_cons = kcSpatialEdgeConstructor(data_provider=data_provider, init_num=INIT_NUM, s_n_epochs=S_N_EPOCHS, b_n_epochs=B_N_EPOCHS, n_neighbors=N_NEIGHBORS, MAX_HAUSDORFF=None, ALPHA=ALPHA, BETA=BETA)
 s_edge_to, s_edge_from, s_probs, feature_vectors, time_step_nums, time_step_idxs_list, knn_indices, sigmas, rhos, attention = spatial_cons.construct()
 temporal_cons = GlobalTemporalEdgeConstructor(X=feature_vectors, time_step_nums=time_step_nums, sigmas=sigmas, rhos=rhos, n_neighbors=N_NEIGHBORS, n_epochs=T_N_EPOCHS)
 t_edge_to, t_edge_from, t_probs = temporal_cons.construct()
