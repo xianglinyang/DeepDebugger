@@ -81,7 +81,12 @@ parser.add_argument("--budget", type=int)
 # parser.add_argument("--ignore", type=float, default=0.0)
 parser.add_argument("--init_round", type=int, default=10000)
 parser.add_argument("--round", type=int, default=10, help="Feedback round")
+parser.add_argument("-g", default="0")
 args = parser.parse_args()
+
+# tensorflow
+visible_device = "0,1,2,3"
+os.environ["CUDA_VISIBLE_DEVICES"] = visible_device
 
 # get hyperparameters
 DATASET = args.dataset
@@ -91,6 +96,7 @@ TOLERANCE = args.tolerance
 # IGNORE_RATE = args.ignore
 ROUND = args.round
 INIT_ROUND = args.init_round
+GPU_ID = args.g
 
 
 # load meta data
@@ -100,7 +106,8 @@ with open(os.path.join(CONTENT_PATH, "config.json"), "r") as f:
 config = config["DVI"]
 
 CLASSES = config["CLASSES"]
-GPU_ID = config["GPU"]
+if GPU_ID is None:
+    GPU_ID = config["GPU"]
 EPOCH_START = config["EPOCH_START"]
 EPOCH_END = config["EPOCH_END"]
 EPOCH_PERIOD = config["EPOCH_PERIOD"]

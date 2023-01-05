@@ -70,6 +70,10 @@ parser.add_argument("--init_round", type=int, default=10000)
 parser.add_argument("--round", type=int, default=10, help="Feedback round")
 args = parser.parse_args()
 
+# # tensorflow
+# visible_device = "0,1,2,3"
+# os.environ["CUDA_VISIBLE_DEVICES"] = visible_device
+
 DATASET = args.dataset
 NOISE_RATE = args.noise_rate
 BUDGET = args.budget
