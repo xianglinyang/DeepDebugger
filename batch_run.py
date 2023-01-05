@@ -46,14 +46,31 @@ import os
 # os.system("python deepdebugger_main.py --content_path /home/xianglin/projects/DVI_data/resnet18_cifar10")
 
 # timevis on noisy dataset
+# datasets = ["cifar10","mnist","fmnist"]
+# rates = ["5", "10", "20"]
+# for data in datasets:
+#     for rate in rates:
+#         os.system("python timevis_main.py --content_path /home/xianglin/projects/DVI_data/noisy/symmetric/{}/{}".format(data, rate))
+# timevis on active learning dataset
+# datasets = ["CIFAR10", "FMNIST", "MNIST"]
+# rates = ["10", "20", "30"]
+# for data in datasets:
+#     for rate in rates:
+#         os.system("python timevis_main.py --content_path /home/xianglin/projects/DVI_data/active_learning/random/resnet18/{}/{}".format(data, rate))
+
+# feedback on noisy dataset
 datasets = ["cifar10","mnist","fmnist"]
 rates = ["5", "10", "20"]
+methods = ["tfDVI", "TimeVis"]
 for data in datasets:
     for rate in rates:
-        os.system("python timevis_main.py --content_path /home/xianglin/projects/DVI_data/noisy/symmetric/{}/{}".format(data, rate))
-# timevis on active learning dataset
-datasets = ["CIFAR10","MNIST","FMNIST"]
-rates = ["30", "10", "20"]
+        for method in methods:
+            os.system("python feedback_noise.py --dataset {} --noise_rate {} --method {}".format(data, rate, method))
+
+# feedback on active learning dataset
+rates = ["10", "20", "30"]
 for data in datasets:
     for rate in rates:
-        os.system("python timevis_main.py --content_path /home/xianglin/projects/DVI_data/active_learning/random/resnet18/{}/{}".format(data, rate))
+        for method in methods:
+            os.system("python feedback_al.py --dataset {} --rate {} --method {}".format(data.upper(), rate, method))
+

@@ -13,23 +13,30 @@ from singleVis.projector import TimeVisProjector,tfDVIProjector
 from singleVis.trajectory_manager import Recommender
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--dataset', type=str, choices=["cifar10","mnist","fmnist"])
+parser.add_argument('--dataset', type=str, choices=["CIFAR10","MNIST","FMNIST"])
 parser.add_argument('--rate', type=int, choices=[30,10,20])
-parser.add_argument("--method", type=str,choices=["DVI","TimeVis"])
+parser.add_argument("--method", type=str,choices=["tfDVI","TimeVis"])
+parser.add_argument("-g", default="0")
 args = parser.parse_args()
+
+# tensorflow
+visible_device = "1,2,3"
+os.environ["CUDA_VISIBLE_DEVICES"] = visible_device
 
 DATASET = args.dataset
 RATE = args.rate
 VIS_METHOD = args.method
+GPU_ID = args.g
 
-CONTENT_PATH = "/home/xianglin/projects/DVI_data/active_learning/random/resnet18/CIFAR10/{}".format(RATE)
+CONTENT_PATH = "/home/xianglin/projects/DVI_data/active_learning/random/resnet18/{}/{}".format(DATASET, RATE)
 sys.path.append(CONTENT_PATH)
 with open(os.path.join(CONTENT_PATH, "config.json"), "r") as f:
     config = json.load(f)
 config = config[VIS_METHOD]
 
 CLASSES = config["CLASSES"]
-GPU_ID = config["GPU"]
+if GPU_ID is None:
+    GPU_ID = config["GPU"]
 EPOCH_START = config["EPOCH_START"]
 EPOCH_END = config["EPOCH_END"]
 EPOCH_PERIOD = config["EPOCH_PERIOD"]
@@ -51,7 +58,7 @@ import Model.model as subject_model
 net = eval("subject_model.{}()".format(NET))
 data_provider = ActiveLearningDataProvider(CONTENT_PATH, net, EPOCH_START,device=DEVICE, classes=CLASSES, iteration_name="Epoch")
 
-if VIS_METHOD == "DVI":
+if VIS_METHOD == "tfDVI":
     # Define Projector
     flag = "_temporal_id_withoutB"
     projector = tfDVIProjector(CONTENT_PATH, flag=flag)
@@ -64,6 +71,7 @@ samples = data_provider.train_representation_all(EPOCH_END)
 pred = data_provider.get_pred(EPOCH_END, samples)
 confidence = np.amax(softmax(pred, axis=1), axis=1)
 uncertainty = 1-confidence
+print("Saving uncertainty...")
 
 # embedding trajectories
 TOTOAL_EPOCH = (EPOCH_END-EPOCH_START)//EPOCH_PERIOD + 1
@@ -78,6 +86,7 @@ for i in range(EPOCH_START, EPOCH_END, EPOCH_PERIOD):
     e = (i-EPOCH_START)//EPOCH_PERIOD
     embeddings_2d[e] = projector.batch_project(i, samples[e])
 embeddings_2d = np.transpose(embeddings_2d, [1,0,2])
+print("Saving trajectory embeddings...")
 
 labels = data_provider.train_labels_all(EPOCH_END)
 
@@ -99,8 +108,13 @@ tm.clustered()
 t_end = time.time()
 with open(os.path.join(CONTENT_PATH,  '{}_sample_recommender.pkl'.format(VIS_METHOD)), 'wb') as f:
     pickle.dump(tm, f, pickle.HIGHEST_PROTOCOL)
-with open(os.path.join(CONTENT_PATH,  'feedback.json'), 'r') as f:
-    run_time = json.load(f)
+if os.path.exists(os.path.join(CONTENT_PATH,  'feedback.json')):
+    with open(os.path.join(CONTENT_PATH,  'feedback.json'), 'r') as f:
+        run_time = json.load(f)
+else:
+    run_time = dict()
 run_time["{}".format(VIS_METHOD)] = round(t_end-t_start, 4)
 with open(os.path.join(CONTENT_PATH,  'feedback.json'), 'w') as f:
     json.dump(run_time, f)
+
+print("Active learning:\n Saving results for {}/{}/{}".format(DATASET, RATE, VIS_METHOD))

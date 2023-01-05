@@ -16,13 +16,18 @@ from singleVis.trajectory_manager import Recommender
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', type=str, choices=["cifar10","mnist","fmnist"])
 parser.add_argument('--noise_rate', type=int, choices=[5,10,20])
-parser.add_argument("--method", type=str,choices=["DVI","TimeVis"])
+parser.add_argument("--method", type=str,choices=["tfDVI","TimeVis"])
+parser.add_argument('-g', help="Which gpu to use", default="0")
 args = parser.parse_args()
+
+# tensorflow
+visible_device = "1,2,3"
+os.environ["CUDA_VISIBLE_DEVICES"] = visible_device
 
 DATASET = args.dataset
 NOISE_RATE = args.noise_rate
 VIS_METHOD = args.method
-
+GPU_ID = args.g
 
 CONTENT_PATH = "/home/xianglin/projects/DVI_data/noisy/symmetric/{}/{}/".format(DATASET, NOISE_RATE)
 sys.path.append(CONTENT_PATH)
@@ -31,11 +36,11 @@ with open(os.path.join(CONTENT_PATH, "config.json"), "r") as f:
 config = config[VIS_METHOD]
 
 CLASSES = config["CLASSES"]
-GPU_ID = config["GPU"]
+if GPU_ID is None:
+    GPU_ID = config["GPU"]
 EPOCH_START = config["EPOCH_START"]
 EPOCH_END = config["EPOCH_END"]
 EPOCH_PERIOD = config["EPOCH_PERIOD"]
-
 
 # Training parameter (subject model)
 TRAINING_PARAMETER = config["TRAINING"]
@@ -52,9 +57,9 @@ DEVICE = torch.device("cuda:{}".format(GPU_ID) if torch.cuda.is_available() else
 
 import Model.model as subject_model
 net = eval("subject_model.{}()".format(NET))
-data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=DEVICE, classes=CLASSES,verbose=1)
+data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=DEVICE, classes=CLASSES, epoch_name="Epoch", verbose=1)
 
-if VIS_METHOD == "DVI":
+if VIS_METHOD == "tfDVI":
     # Define Projector
     flag = "_temporal_id_withoutB"
     projector = tfDVIProjector(CONTENT_PATH, flag=flag)
@@ -78,6 +83,7 @@ embeddings_2d = np.transpose(embeddings_2d, [1,0,2])
 
 path = os.path.join(CONTENT_PATH, "Model","{}_trajectory_embeddings.npy".format(VIS_METHOD))
 np.save(path,embeddings_2d)
+print("Saving trajectory embeddings...")
 # path = os.path.join(CONTENT_PATH, "Model","{}_trajectory_embeddings.npy".format(VIS_METHOD))
 # embeddings_2d = np.load(path)
 
@@ -89,6 +95,7 @@ uncertainty = 1-confidence
 
 path = os.path.join(CONTENT_PATH, "Model","uncertainty.npy")
 np.save(path,uncertainty)
+print("Saving uncertainty...")
 
 t_start = time.time()
 tm = Recommender(uncertainty, embeddings_2d, cls_num=30, period=int(TOTOAL_EPOCH*2/3), metric="a")
@@ -96,9 +103,13 @@ tm.clustered()
 t_end = time.time()
 with open(os.path.join(CONTENT_PATH,  '{}_sample_recommender.pkl'.format(VIS_METHOD)), 'wb') as f:
     pickle.dump(tm, f, pickle.HIGHEST_PROTOCOL)
-
-with open(os.path.join(CONTENT_PATH,  'feedback.json'), 'r') as f:
-    run_time = json.load(f)
+if os.path.exists(os.path.join(CONTENT_PATH,  'feedback.json')):
+    with open(os.path.join(CONTENT_PATH,  'feedback.json'), 'r') as f:
+        run_time = json.load(f)
+else:
+    run_time = dict()
 run_time["{}".format(VIS_METHOD)] = round(t_end-t_start, 4)
 with open(os.path.join(CONTENT_PATH,  'feedback.json'), 'w') as f:
     json.dump(run_time, f)
+
+print("Noise:\n Saving results for {}/{}/{}".format(DATASET, NOISE_RATE, VIS_METHOD))
