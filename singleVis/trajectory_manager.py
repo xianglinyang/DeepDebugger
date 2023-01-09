@@ -1,5 +1,5 @@
 import numpy as np
-from sklearn.kernel_ridge import KernelRidge
+from sklearn.linear_model import Ridge
 from sklearn.cluster import Birch
 # TODO random ignore
 
@@ -194,7 +194,7 @@ class FeedbackSampling(TrajectoryManager):
 
 # TODO: extension for new features. make features a dictionary
 class Recommender:
-    def __init__(self, uncertainty, embeddings_2d, cls_num, period=100, metric="a"):
+    def __init__(self, uncertainty, embeddings_2d, cls_num, period=100):
         """ Recommend samples based on uncertainty and embeddings
         """
         self.uncertainty = uncertainty
@@ -203,31 +203,37 @@ class Recommender:
         self.train_num = train_num
         self.time_steps = time_steps
         self.period = period
-        self.metric = metric
         self.cls_num = cls_num
-
+        
+        self.position = self.embeddings_2d[:, -period:,:].reshape(self.train_num, -1)
         self.v = self.embeddings_2d[:, -period:,:][:,1:,:] - self.embeddings_2d[:, -period:,:][:,:-1,:]
-        self.a = self.v[:,1:,:]-self.v[:,:-1,:]
+        self.a = (self.v[:,1:,:]-self.v[:,:-1,:]).reshape(self.train_num, -1)
+        self.v = self.v.reshape(self.train_num, -1)
     
     def clustered(self):
         brc = Birch(n_clusters=self.cls_num)
-        if self.metric == "v":
-            brc.fit(self.v.reshape(self.train_num, -1))
-        elif self.metric == "a":
-            brc.fit(self.a.reshape(self.train_num, -1))
-        else:
-            print("Not a valid metric")
-        
-        self.predict_sub_labels = brc.labels_
-        self.suspect_clean = np.argsort(np.bincount(self.predict_sub_labels))[-3:]
-
-        # to be updated each time
-        self.cls_scores = np.zeros(self.cls_num)
+        brc.fit(self.v.reshape(self.train_num, -1))
+        self.predict_v_sub_labels = brc.labels_
+        self.v_scores = np.zeros(self.cls_num)
         for cls in range(self.cls_num):
-            self.cls_scores[cls] = 1 - np.sum(self.predict_sub_labels==cls)/self.train_num
-    
+            self.v_scores[cls] = 1 - np.sum(self.predict_v_sub_labels==cls)/self.train_num
+
+        brc = Birch(n_clusters=self.cls_num)
+        brc.fit(self.a.reshape(self.train_num, -1))
+        self.predict_a_sub_labels = brc.labels_
+        self.a_scores = np.zeros(self.cls_num)
+        for cls in range(self.cls_num):
+            self.a_scores[cls] = 1 - np.sum(self.predict_a_sub_labels==cls)/self.train_num
+
+        brc = Birch(n_clusters=self.cls_num)
+        brc.fit(self.position.reshape(self.train_num, -1))
+        self.predict_p_sub_labels = brc.labels_
+        self.p_scores = np.zeros(self.cls_num)
+        for cls in range(self.cls_num):
+            self.p_scores[cls] = 1 - np.sum(self.predict_p_sub_labels==cls)/self.train_num
+
     def sample_batch_init(self, acc_idxs, rej_idxs, budget):
-        scores = (self.uncertainty + self.cls_scores[self.predict_sub_labels])/2
+        scores = (self.uncertainty + self.v_scores[self.predict_v_sub_labels]+self.a_scores[self.predict_a_sub_labels]+self.p_scores[self.predict_p_sub_labels])/4
         selected = np.zeros(self.train_num)
         if len(acc_idxs)>0:
             selected[acc_idxs] = 1.
@@ -240,19 +246,21 @@ class Recommender:
         s_idxs = np.random.choice(not_selected_idxs, p=norm_rate, size=budget, replace=False)
         return s_idxs, scores[s_idxs]
     
-    def sample_batch(self, acc_idxs, rej_idxs, budget):
+    def sample_batch(self, acc_idxs, rej_idxs, budget, return_coef=False):
         if len(np.intersect1d(acc_idxs, rej_idxs))>0:
             raise Exception("Intersection between acc idxs and rej idxs!")
             
         s1 = self.uncertainty
-        s2 = self.cls_scores[self.predict_sub_labels]
-        X = np.vstack((s1,s2)).transpose([1,0])
+        s2 = self.v_scores[self.predict_v_sub_labels]
+        s3 = self.a_scores[self.predict_a_sub_labels]
+        s4 = self.p_scores[self.predict_p_sub_labels]
+        X = np.vstack((s1,s2,s3,s4)).transpose([1,0])
 
         exp_idxs = np.concatenate((acc_idxs, rej_idxs), axis=0)
         target_X = X[exp_idxs]
         target_Y = np.zeros(len(exp_idxs))
         target_Y[:len(acc_idxs)] = 1
-        krr = KernelRidge(alpha=1.0)
+        krr = Ridge(alpha=1.0)
         krr.fit(target_X, target_Y)
         scores = krr.predict(X)
 
@@ -260,10 +268,14 @@ class Recommender:
         remain_scores = scores[not_selected]
         args = np.argsort(remain_scores)[-budget:]
         selected_idxs = not_selected[args]
+        if return_coef:
+            return selected_idxs, scores[selected_idxs], krr.coef_
         return selected_idxs, scores[selected_idxs]
     
     def sample_batch_normal_init(self, acc_idxs, rej_idxs, budget):
-        scores = (self.uncertainty + self.cls_scores[self.predict_sub_labels])/2
+        # scores = (self.uncertainty + self.cls_scores[self.predict_sub_labels])/2
+        scores = (self.uncertainty + self.v_scores[self.predict_v_sub_labels]+self.a_scores[self.predict_a_sub_labels]+self.p_scores[self.predict_p_sub_labels])/4
+        
         selected = np.zeros(self.train_num)
         if len(acc_idxs)>0:
             selected[acc_idxs] = 1.
@@ -282,14 +294,16 @@ class Recommender:
             raise Exception("Intersection between acc idxs and rej idxs!")
             
         s1 = self.uncertainty
-        s2 = self.cls_scores[self.predict_sub_labels]
-        X = np.vstack((s1,s2)).transpose([1,0])
+        s2 = self.v_scores[self.predict_v_sub_labels]
+        s3 = self.a_scores[self.predict_a_sub_labels]
+        s4 = self.p_scores[self.predict_p_sub_labels]
+        X = np.vstack((s1,s2,s3,s4)).transpose([1,0])
 
         exp_idxs = np.concatenate((acc_idxs, rej_idxs), axis=0)
         target_X = X[exp_idxs]
         target_Y = np.zeros(len(exp_idxs))
         target_Y[:len(acc_idxs)] = 1
-        krr = KernelRidge(alpha=1.0)
+        krr = Ridge(alpha=1.0)
         krr.fit(target_X, target_Y)
         scores = krr.predict(X)
 
