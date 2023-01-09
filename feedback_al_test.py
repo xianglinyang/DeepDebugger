@@ -4,6 +4,7 @@ import time
 import json
 import torch
 import pickle
+import pandas as pd
 import argparse
 
 from singleVis.data import ActiveLearningDataProvider
@@ -39,7 +40,7 @@ def init_sampling(tm, method, round, budget, ulb_wrong):
     return sum(rate)/len(rate)
 
 
-def feedback_sampling(tm, method, round, budget, ulb_wrong, noise_rate=0):
+def feedback_sampling(tm, method, round, budget, ulb_wrong, noise_rate=0, replace_init=None):
     print("--------------------------------------------------------")
     print("({}) with noise rate {}:\n".format(method, noise_rate))
     rate = np.zeros(round)
@@ -53,7 +54,10 @@ def feedback_sampling(tm, method, round, budget, ulb_wrong, noise_rate=0):
     suggest_idxs = ulb_idxs[suggest_idxs]
     correct = np.intersect1d(suggest_idxs, ulb_wrong)
     wrong = np.setdiff1d(suggest_idxs, correct)
-    rate[0] = len(correct)/budget
+    if replace_init is None:
+        rate[0] = len(correct)/budget
+    else:
+        rate[0] = replace_init
     # inject noise
     correct, wrong = add_noise(noise_rate, correct, wrong)
     for r in range(1, round):
@@ -71,15 +75,15 @@ def feedback_sampling(tm, method, round, budget, ulb_wrong, noise_rate=0):
         correct = np.concatenate((correct, c), axis=0)
         wrong = np.concatenate((wrong, w), axis=0)
     ac_rate = np.array([rate[:i].mean() for i in range(1, len(rate)+1)])
-    print("Success Rate:{:.3f}\n{}\n".format(ac_rate[-1], ac_rate))
+    # print("Success Rate:{:.3f}\n{}\n".format(ac_rate[-1], repr(ac_rate)))
     print("Feature Importance:\t{}\n".format(coef_))
     return ac_rate
 
 def feedback_sampling_efficiency(tm, method, round, budget, ulb_wrong, repeat, noise_rate=0):
     print("--------------------------------------------------------")
     print("({}) with noise rate {}:\n".format(method, noise_rate))
-    all_time_cost = np.zeros(round)
-    for _ in range(repeat):
+    all_time_cost = np.zeros((repeat, round))
+    for rep in range(repeat):
         time_cost = np.zeros(round)
         correct = np.array([]).astype(np.int32)
         wrong = np.array([]).astype(np.int32)
@@ -100,7 +104,7 @@ def feedback_sampling_efficiency(tm, method, round, budget, ulb_wrong, repeat, n
             map_acc_idxs = np.array([map_ulb.index(i) for i in correct]).astype(np.int32)
             map_rej_idxs = np.array([map_ulb.index(i) for i in wrong]).astype(np.int32)
             t0 = time.time()
-            suggest_idxs,_,coef_ = tm.sample_batch(map_acc_idxs, map_rej_idxs, budget, True)
+            suggest_idxs,_,_ = tm.sample_batch(map_acc_idxs, map_rej_idxs, budget, True)
             t1 = time.time()
             suggest_idxs = ulb_idxs[suggest_idxs]
 
@@ -112,16 +116,23 @@ def feedback_sampling_efficiency(tm, method, round, budget, ulb_wrong, repeat, n
             c, w = add_noise(noise_rate, c, w)
             correct = np.concatenate((correct, c), axis=0)
             wrong = np.concatenate((wrong, w), axis=0)
-        all_time_cost = all_time_cost + time_cost
-    all_time_cost = all_time_cost/repeat
-    print("Time Cost:\n{}\n".format(all_time_cost)) 
-    return all_time_cost
+        all_time_cost[rep] = time_cost
+    print("Time Cost:\n{}\n".format(repr(all_time_cost.mean(0)))) 
+    return all_time_cost.mean(0)
+
+def record(old_array, to_be_record, task, dataset, method, rate, tolerance):
+    for i, v in enumerate(to_be_record, start=1):
+        if old_array is None:
+            old_array = np.array([task, dataset, method, rate, tolerance, str(i), str(v)])
+        else:
+            old_array = np.vstack((old_array, np.array([task, dataset, method, rate, tolerance, str(i), str(v)])))
+    return old_array
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', type=str, choices=["cifar10","mnist","fmnist"])
 parser.add_argument('--rate', type=int, choices=[30,10,20])
-parser.add_argument("--tolerance", type=float, help="Feedback noise")
+parser.add_argument("--tolerance", nargs="+", type=float, help="Feedback noise")
 parser.add_argument('--repeat', type=int, default=100, help="repeat x times to evaluate efficiency")
 parser.add_argument("--budget", type=int, default=50)
 parser.add_argument("--init_round", type=int, default=10000)
@@ -142,7 +153,6 @@ ROUND = args.round
 INIT_ROUND = args.init_round
 GPU_ID = args.g
 REPEAT = args.repeat
-
 
 # load meta data
 CONTENT_PATH = "/home/xianglin/projects/DVI_data/active_learning/random/resnet18/CIFAR10/{}".format(RATE)
@@ -165,6 +175,10 @@ LEN = TRAINING_PARAMETER["train_num"]   # all
 # define hyperparameters
 DEVICE = torch.device("cuda:{}".format(GPU_ID) if torch.cuda.is_available() else "cpu")
 
+# record output information
+# now = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime(time.time())) 
+# sys.stdout = open(os.path.join(CONTENT_PATH, now+".txt"), "w")
+
 sys.path.append(CONTENT_PATH)
 import Model.model as subject_model
 net = eval("subject_model.{}()".format(NET))
@@ -186,23 +200,25 @@ with open(os.path.join(CONTENT_PATH,'tfDVI_sample_recommender.pkl'), 'rb') as f:
 with open(os.path.join(CONTENT_PATH,'TimeVis_sample_recommender.pkl'), 'rb') as f:
     timevis_tm = pickle.load(f)
 
-# #############################################
-# #                   init                    #
-# #############################################
-# # random init
-# print("Random sampling init")
-# random_rate = list()
-# pool = np.array(ulb_idxs)
-# for _ in range(INIT_ROUND):
-#     s_idxs = np.random.choice(pool,size=BUDGET,replace=False)
-#     random_rate.append(len(np.intersect1d(s_idxs, ulb_wrong))/BUDGET)
-# print("Success Rate:\t{:.4f}".format(sum(random_rate)/len(random_rate)))
+data = None
+#############################################
+#                   init                    #
+#############################################
+# random init
+print("Random sampling init")
+random_rate = list()
+pool = np.array(ulb_idxs)
+for _ in range(INIT_ROUND):
+    s_idxs = np.random.choice(pool,size=BUDGET,replace=False)
+    random_rate.append(len(np.intersect1d(s_idxs, ulb_wrong))/BUDGET)
+print("Success Rate:\t{:.4f}".format(sum(random_rate)/len(random_rate)))
+random_init = sum(random_rate)/len(random_rate)
 
-# # dvi init
-# init_sampling(tm=dvi_tm, method="DVI", round=INIT_ROUND, budget=BUDGET, ulb_wrong=ulb_wrong)
+# dvi init
+dvi_init = init_sampling(tm=dvi_tm, method="DVI", round=INIT_ROUND, budget=BUDGET, ulb_wrong=ulb_wrong)
 
-# # timevis init
-# init_sampling(tm=timevis_tm, method="TimeVis", round=INIT_ROUND, budget=BUDGET, ulb_wrong=ulb_wrong)
+# timevis init
+timevis_init = init_sampling(tm=timevis_tm, method="TimeVis", round=INIT_ROUND, budget=BUDGET, ulb_wrong=ulb_wrong)
 
 #############################################
 #                 Feedback                  #
@@ -216,31 +232,53 @@ for r in range(ROUND):
     s_idxs = np.random.choice(pool,size=BUDGET,replace=False)
     random_rate[r] = len(np.intersect1d(s_idxs, ulb_wrong))/BUDGET
     pool = np.setdiff1d(pool, s_idxs)
+random_rate[0] = random_init
 ac_random_rate = np.array([random_rate[:i].mean() for i in range(1, len(random_rate)+1)])
-print("Random Success Rate:{:.3f}\n{}\n".format(ac_random_rate[-1], ac_random_rate))
+print("Random Success Rate:{:.3f}\n{}\n".format(ac_random_rate[-1], repr(ac_random_rate)))
+data = record(data, ac_random_rate, "feedback", DATASET, "Random", RATE, 0.0)
 
 # dvi sampling
-feedback_sampling(tm=dvi_tm, method="tfDVI", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, noise_rate=0.0)
+ac_dvi_rate = feedback_sampling(tm=dvi_tm, method="tfDVI", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong ,noise_rate=0.0, replace_init=dvi_init)
+data = record(data, ac_dvi_rate, "feedback", DATASET, "DVI", RATE, 0.0)
 
 # timevis sampling
-feedback_sampling(tm=timevis_tm, method="TimeVis", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, noise_rate=0.0)
+ac_tv_rate = feedback_sampling(tm=timevis_tm, method="TimeVis", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, noise_rate=0.0, replace_init=timevis_init)
+data = record(data, ac_tv_rate, "feedback", DATASET, "TimeVis", RATE, 0.0)
 
 #############################################
 #              Noise Feedback               #
 #############################################
-# dvi tolerance
-feedback_sampling(tm=dvi_tm, method="tfDVI", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, noise_rate=TOLERANCE)
+for tol in TOLERANCE:
+    # dvi tolerance
+    ac_dvi_rate = feedback_sampling(tm=dvi_tm, method="tfDVI", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, noise_rate=tol, replace_init=dvi_init)
+    data = record(data, ac_dvi_rate, "feedback", DATASET, "DVI", RATE, tol)
 
-# timevis tolerance
-feedback_sampling(tm=timevis_tm, method="TimeVis", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, noise_rate=TOLERANCE)
+    # timevis tolerance
+    ac_tv_rate = feedback_sampling(tm=timevis_tm, method="TimeVis", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, noise_rate=tol, replace_init=timevis_init)
+    data = record(data, ac_tv_rate, "feedback", DATASET, "TimeVis", RATE, tol)
 
 #############################################
 #           Feedback Efficiency             #
 #############################################
-
 # dvi time cost
-feedback_sampling_efficiency(tm=dvi_tm, method="tfDVI", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, repeat=REPEAT, noise_rate=0.0)
+dvi_c = feedback_sampling_efficiency(tm=dvi_tm, method="tfDVI", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, repeat=REPEAT, noise_rate=0.0)
+data = record(data, dvi_c, "efficiency", DATASET, "DVI", RATE, 0.0)
 
 # timevis time cost
-feedback_sampling_efficiency(tm=timevis_tm, method="TimeVis", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, repeat=REPEAT, noise_rate=0.0)
+timevis_c = feedback_sampling_efficiency(tm=timevis_tm, method="TimeVis", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, repeat=REPEAT, noise_rate=0.0)
+data = record(data, timevis_c, "efficiency", DATASET, "TimeVis", RATE, 0.0)
 
+
+#############################################
+#                    Save                   #
+#############################################
+# read results
+eval_path = "/home/xianglin/projects/DVI_data/active_learning/random/resnet18/feedback.xlsx"
+col = np.array(["task", "dataset", "method", "rate", "tolerance", "iter", "eval"])
+if os.path.exists(eval_path):
+    df = pd.read_excel(eval_path, index_col=0, dtype={"task":str, "dataset":str, "method":str, "rate":int, "tolerance":float, "iter":int, "eval":float})
+else:
+    df = pd.DataFrame({}, columns=col)
+df_curr = pd.DataFrame(data, columns=col)
+df = df.append(df_curr, ignore_index=True)
+df.to_excel(eval_path)
