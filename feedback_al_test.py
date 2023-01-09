@@ -82,8 +82,8 @@ def feedback_sampling(tm, method, round, budget, ulb_wrong, noise_rate=0, replac
 def feedback_sampling_efficiency(tm, method, round, budget, ulb_wrong, repeat, noise_rate=0):
     print("--------------------------------------------------------")
     print("({}) with noise rate {}:\n".format(method, noise_rate))
-    all_time_cost = np.zeros((repeat, round))
-    for rep in range(repeat):
+    all_time_cost = np.zeros(round)
+    for _ in range(repeat):
         time_cost = np.zeros(round)
         correct = np.array([]).astype(np.int32)
         wrong = np.array([]).astype(np.int32)
@@ -116,9 +116,9 @@ def feedback_sampling_efficiency(tm, method, round, budget, ulb_wrong, repeat, n
             c, w = add_noise(noise_rate, c, w)
             correct = np.concatenate((correct, c), axis=0)
             wrong = np.concatenate((wrong, w), axis=0)
-        all_time_cost[rep] = time_cost
-    print("Time Cost:\n{}\n".format(repr(all_time_cost.mean(0)))) 
-    return all_time_cost.mean(0)
+        all_time_cost =  all_time_cost+ time_cost
+    print("Time Cost:\n{}\n".format(repr(all_time_cost/repeat))) 
+    return all_time_cost/repeat
 
 def record(old_array, to_be_record, task, dataset, method, rate, tolerance):
     for i, v in enumerate(to_be_record, start=1):
