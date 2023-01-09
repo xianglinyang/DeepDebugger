@@ -155,7 +155,7 @@ GPU_ID = args.g
 REPEAT = args.repeat
 
 # load meta data
-CONTENT_PATH = "/home/xianglin/projects/DVI_data/active_learning/random/resnet18/CIFAR10/{}".format(RATE)
+CONTENT_PATH = "/home/xianglin/projects/DVI_data/active_learning/random/resnet18/{}/{}".format(DATASET.upper(), RATE)
 with open(os.path.join(CONTENT_PATH, "config.json"), "r") as f:
     config = json.load(f)
 config = config["tfDVI"]
@@ -174,10 +174,6 @@ LEN = TRAINING_PARAMETER["train_num"]   # all
 
 # define hyperparameters
 DEVICE = torch.device("cuda:{}".format(GPU_ID) if torch.cuda.is_available() else "cpu")
-
-# record output information
-# now = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime(time.time())) 
-# sys.stdout = open(os.path.join(CONTENT_PATH, now+".txt"), "w")
 
 sys.path.append(CONTENT_PATH)
 import Model.model as subject_model
