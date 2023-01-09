@@ -58,19 +58,31 @@ import os
 #     for rate in rates:
 #         os.system("python timevis_main.py --content_path /home/xianglin/projects/DVI_data/active_learning/random/resnet18/{}/{}".format(data, rate))
 
-# feedback on noisy dataset
-datasets = ["cifar10","mnist","fmnist"]
+# # feedback on noisy dataset
+# datasets = ["mnist", "fmnist", "cifar10"]
+# rates = ["5", "10", "20"]
+# methods = ["tfDVI", "TimeVis"]
+# for data in datasets:
+#     for rate in rates:
+#         for method in methods:
+#             os.system("python feedback_noise.py --dataset {} --noise_rate {} --method {}".format(data, rate, method))
+
+# # feedback on active learning dataset
+# rates = ["10", "20", "30"]
+# for data in datasets:
+#     for rate in rates:
+#         for method in methods:
+#             os.system("python feedback_al.py --dataset {} --rate {} --method {}".format(data.upper(), rate, method))
+
+# feedback test on noisy dataset
+datasets = ["mnist", "fmnist", "cifar10"]
 rates = ["5", "10", "20"]
-methods = ["tfDVI", "TimeVis"]
 for data in datasets:
     for rate in rates:
-        for method in methods:
-            os.system("python feedback_noise.py --dataset {} --noise_rate {} --method {}".format(data, rate, method))
+        os.system("python feedback_noise_test.py --dataset {} --noise_rate {} --tolerance 0.03 0.05 0.1 0.15 --repeat 100".format(data, rate))
 
-# feedback on active learning dataset
+# feedback test on active learning dataset
 rates = ["10", "20", "30"]
 for data in datasets:
     for rate in rates:
-        for method in methods:
-            os.system("python feedback_al.py --dataset {} --rate {} --method {}".format(data.upper(), rate, method))
-
+        os.system("python feedback_al_test.py --dataset {} --rate {} --tolerance 0.03 0.05 0.1 0.15 --repeat 100".format(data, rate))
