@@ -1,5 +1,6 @@
 import numpy as np
 import os, sys
+import time
 import json
 import torch
 import pickle
@@ -74,11 +75,54 @@ def feedback_sampling(tm, method, round, budget, ulb_wrong, noise_rate=0):
     print("Feature Importance:\t{}\n".format(coef_))
     return ac_rate
 
+def feedback_sampling_efficiency(tm, method, round, budget, ulb_wrong, repeat, noise_rate=0):
+    print("--------------------------------------------------------")
+    print("({}) with noise rate {}:\n".format(method, noise_rate))
+    all_time_cost = np.zeros(round)
+    for _ in range(repeat):
+        time_cost = np.zeros(round)
+        correct = np.array([]).astype(np.int32)
+        wrong = np.array([]).astype(np.int32)
+        map_ulb =ulb_idxs.tolist()
+
+        map_acc_idxs = np.array([map_ulb.index(i) for i in correct]).astype(np.int32)
+        map_rej_idxs = np.array([map_ulb.index(i) for i in wrong]).astype(np.int32)
+        t0 = time.time()
+        suggest_idxs, _ = tm.sample_batch_init(map_acc_idxs, map_rej_idxs, budget)
+        t1 = time.time()
+        suggest_idxs = ulb_idxs[suggest_idxs]
+        correct = np.intersect1d(suggest_idxs, ulb_wrong)
+        wrong = np.setdiff1d(suggest_idxs, correct)
+        time_cost[0] = t1-t0
+        # inject noise
+        correct, wrong = add_noise(noise_rate, correct, wrong)
+        for r in range(1, round):
+            map_acc_idxs = np.array([map_ulb.index(i) for i in correct]).astype(np.int32)
+            map_rej_idxs = np.array([map_ulb.index(i) for i in wrong]).astype(np.int32)
+            t0 = time.time()
+            suggest_idxs,_,coef_ = tm.sample_batch(map_acc_idxs, map_rej_idxs, budget, True)
+            t1 = time.time()
+            suggest_idxs = ulb_idxs[suggest_idxs]
+
+            c = np.intersect1d(np.intersect1d(suggest_idxs, ulb_idxs), ulb_wrong)
+            w = np.setdiff1d(suggest_idxs, c)
+            time_cost[r] = t1-t0
+
+            # inject noise
+            c, w = add_noise(noise_rate, c, w)
+            correct = np.concatenate((correct, c), axis=0)
+            wrong = np.concatenate((wrong, w), axis=0)
+        all_time_cost = all_time_cost + time_cost
+    all_time_cost = all_time_cost/repeat
+    print("Time Cost:\n{}\n".format(all_time_cost)) 
+    return all_time_cost
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', type=str, choices=["cifar10","mnist","fmnist"])
 parser.add_argument('--rate', type=int, choices=[30,10,20])
 parser.add_argument("--tolerance", type=float, help="Feedback noise")
+parser.add_argument('--repeat', type=int, default=100, help="repeat x times to evaluate efficiency")
 parser.add_argument("--budget", type=int, default=50)
 parser.add_argument("--init_round", type=int, default=10000)
 parser.add_argument("--round", type=int, default=10, help="Feedback round")
@@ -97,6 +141,7 @@ TOLERANCE = args.tolerance
 ROUND = args.round
 INIT_ROUND = args.init_round
 GPU_ID = args.g
+REPEAT = args.repeat
 
 
 # load meta data
@@ -188,4 +233,14 @@ feedback_sampling(tm=dvi_tm, method="tfDVI", round=ROUND, budget=BUDGET, ulb_wro
 
 # timevis tolerance
 feedback_sampling(tm=timevis_tm, method="TimeVis", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, noise_rate=TOLERANCE)
+
+#############################################
+#           Feedback Efficiency             #
+#############################################
+
+# dvi time cost
+feedback_sampling_efficiency(tm=dvi_tm, method="tfDVI", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, repeat=REPEAT, noise_rate=0.0)
+
+# timevis time cost
+feedback_sampling_efficiency(tm=timevis_tm, method="TimeVis", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, repeat=REPEAT, noise_rate=0.0)
 
