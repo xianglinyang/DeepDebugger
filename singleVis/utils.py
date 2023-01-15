@@ -328,4 +328,9 @@ def js_div(p, q):
     M = (p+q)/2
     return .5*kl_div(p, M)+.5*kl_div(q, M)
 
+def generate_random_trajectory(x_min, y_min, x_max, y_max, period):
+    xs = np.random.uniform(low=x_min, high=x_max, size=period)
+    ys = np.random.uniform(low=y_min, high=y_max, size=period)
+    trajectory = np.vstack((xs,ys)).transpose([1, 0])
+    return trajectory
 

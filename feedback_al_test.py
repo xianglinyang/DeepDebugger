@@ -3,11 +3,14 @@ import os, sys
 import time
 import json
 import torch
+from scipy.stats import spearmanr
+
 import pickle
 import pandas as pd
 import argparse
 
 from singleVis.data import ActiveLearningDataProvider
+from singleVis.utils import generate_random_trajectory
 
 def add_noise(rate, acc_idxs, rej_idxs):
     if rate == 0:
@@ -77,7 +80,7 @@ def feedback_sampling(tm, method, round, budget, ulb_wrong, noise_rate=0, replac
     ac_rate = np.array([rate[:i].mean() for i in range(1, len(rate)+1)])
     # print("Success Rate:{:.3f}\n{}\n".format(ac_rate[-1], repr(ac_rate)))
     print("Feature Importance:\t{}\n".format(coef_))
-    return ac_rate
+    return ac_rate, coef_
 
 def feedback_sampling_efficiency(tm, method, round, budget, ulb_wrong, repeat, noise_rate=0):
     print("--------------------------------------------------------")
@@ -154,6 +157,8 @@ INIT_ROUND = args.init_round
 GPU_ID = args.g
 REPEAT = args.repeat
 
+print(DATASET, RATE)
+
 # load meta data
 CONTENT_PATH = "/home/xianglin/projects/DVI_data/active_learning/random/resnet18/{}/{}".format(DATASET.upper(), RATE)
 with open(os.path.join(CONTENT_PATH, "config.json"), "r") as f:
@@ -196,74 +201,109 @@ with open(os.path.join(CONTENT_PATH,'tfDVI_sample_recommender.pkl'), 'rb') as f:
 with open(os.path.join(CONTENT_PATH,'TimeVis_sample_recommender.pkl'), 'rb') as f:
     timevis_tm = pickle.load(f)
 
+# #############################################
+# #               score comparing             #
+# #############################################
+
+# dvi_p_score = dvi_tm._sample_p_scores
+# dvi_v_score = dvi_tm._sample_v_scores
+# dvi_a_score = dvi_tm._sample_a_scores
+
+# timevis_p_score = timevis_tm._sample_p_scores
+# timevis_v_score = timevis_tm._sample_v_scores
+# timevis_a_score = timevis_tm._sample_a_scores
+
+# p_corr,_ = spearmanr(dvi_p_score, timevis_p_score)
+# v_corr,_ = spearmanr(dvi_v_score, timevis_v_score)
+# a_corr,_ = spearmanr(dvi_a_score, timevis_a_score)
+# print("Position ranking corr:\t{:.3f}".format(p_corr))
+# print("Velocity ranking corr:\t{:.3f}".format(v_corr))
+# print("Accelera ranking corr:\t{:.3f}".format(a_corr))
+
 data = None
+# #############################################
+# #                   init                    #
+# #############################################
+# # random init
+# print("Random sampling init")
+# random_rate = list()
+# pool = np.array(ulb_idxs)
+# for _ in range(INIT_ROUND):
+#     s_idxs = np.random.choice(pool,size=BUDGET,replace=False)
+#     random_rate.append(len(np.intersect1d(s_idxs, ulb_wrong))/BUDGET)
+# print("Success Rate:\t{:.4f}".format(sum(random_rate)/len(random_rate)))
+# random_init = sum(random_rate)/len(random_rate)
+
+# # dvi init
+# dvi_init = init_sampling(tm=dvi_tm, method="DVI", round=INIT_ROUND, budget=BUDGET, ulb_wrong=ulb_wrong)
+
+# # timevis init
+# timevis_init = init_sampling(tm=timevis_tm, method="TimeVis", round=INIT_ROUND, budget=BUDGET, ulb_wrong=ulb_wrong)
+
+# #############################################
+# #                 Feedback                  #
+# #############################################
+# # random sampling
+# print("--------------------------------------------------------")
+# print("Random sampling feedback:\n")
+# random_rate = np.zeros(ROUND)
+# pool = np.array(ulb_idxs)
+# for r in range(ROUND):
+#     s_idxs = np.random.choice(pool,size=BUDGET,replace=False)
+#     random_rate[r] = len(np.intersect1d(s_idxs, ulb_wrong))/BUDGET
+#     pool = np.setdiff1d(pool, s_idxs)
+# random_rate[0] = random_init
+# ac_random_rate = np.array([random_rate[:i].mean() for i in range(1, len(random_rate)+1)])
+# print("Random Success Rate:{:.3f}\n{}\n".format(ac_random_rate[-1], repr(ac_random_rate)))
+# data = record(data, ac_random_rate, "feedback", DATASET, "Random", RATE, 0.0)
+
+# # dvi sampling
+# ac_dvi_rate, dvi_coef_ = feedback_sampling(tm=dvi_tm, method="tfDVI", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong ,noise_rate=0.0, replace_init=dvi_init)
+# # data = record(data, ac_dvi_rate, "feedback", DATASET, "DVI", RATE, 0.0)
+# data = record(data, dvi_coef_, "FI", DATASET, "DVI", RATE, 0.0)
+
+# # timevis sampling
+# ac_tv_rate, tv_coef_ = feedback_sampling(tm=timevis_tm, method="TimeVis", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, noise_rate=0.0, replace_init=timevis_init)
+# # data = record(data, ac_tv_rate, "feedback", DATASET, "TimeVis", RATE, 0.0)
+# data = record(data, tv_coef_, "FI", DATASET, "TimeVis", RATE, 0.0)
+
+# #############################################
+# #              Noise Feedback               #
+# #############################################
+# for tol in TOLERANCE:
+#     # dvi tolerance
+#     ac_dvi_rate = feedback_sampling(tm=dvi_tm, method="tfDVI", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, noise_rate=tol, replace_init=dvi_init)
+#     data = record(data, ac_dvi_rate, "feedback", DATASET, "DVI", RATE, tol)
+
+#     # timevis tolerance
+#     ac_tv_rate = feedback_sampling(tm=timevis_tm, method="TimeVis", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, noise_rate=tol, replace_init=timevis_init)
+#     data = record(data, ac_tv_rate, "feedback", DATASET, "TimeVis", RATE, tol)
+
+# #############################################
+# #           Feedback Efficiency             #
+# #############################################
+# # dvi time cost
+# dvi_c = feedback_sampling_efficiency(tm=dvi_tm, method="tfDVI", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, repeat=REPEAT, noise_rate=0.0)
+# data = record(data, dvi_c, "efficiency", DATASET, "DVI", RATE, 0.0)
+
+# # timevis time cost
+# timevis_c = feedback_sampling_efficiency(tm=timevis_tm, method="TimeVis", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, repeat=REPEAT, noise_rate=0.0)
+# data = record(data, timevis_c, "efficiency", DATASET, "TimeVis", RATE, 0.0)
+
 #############################################
-#                   init                    #
+#              Random Anomaly               #
 #############################################
-# random init
-print("Random sampling init")
-random_rate = list()
-pool = np.array(ulb_idxs)
-for _ in range(INIT_ROUND):
-    s_idxs = np.random.choice(pool,size=BUDGET,replace=False)
-    random_rate.append(len(np.intersect1d(s_idxs, ulb_wrong))/BUDGET)
-print("Success Rate:\t{:.4f}".format(sum(random_rate)/len(random_rate)))
-random_init = sum(random_rate)/len(random_rate)
+xs = dvi_tm.embeddings_2d[:, -dvi_tm.period:, 0]
+ys = dvi_tm.embeddings_2d[:, -dvi_tm.period:, 1]
+new_sample = generate_random_trajectory(xs.min(), ys.min(), xs.max(), ys.max(), dvi_tm.period)
+dvi_new_score = dvi_tm.score_new_sample(new_sample)
+data = record(data, dvi_new_score, "RA", DATASET, "DVI", RATE, 0.0)
 
-# dvi init
-dvi_init = init_sampling(tm=dvi_tm, method="DVI", round=INIT_ROUND, budget=BUDGET, ulb_wrong=ulb_wrong)
-
-# timevis init
-timevis_init = init_sampling(tm=timevis_tm, method="TimeVis", round=INIT_ROUND, budget=BUDGET, ulb_wrong=ulb_wrong)
-
-#############################################
-#                 Feedback                  #
-#############################################
-# random sampling
-print("--------------------------------------------------------")
-print("Random sampling feedback:\n")
-random_rate = np.zeros(ROUND)
-pool = np.array(ulb_idxs)
-for r in range(ROUND):
-    s_idxs = np.random.choice(pool,size=BUDGET,replace=False)
-    random_rate[r] = len(np.intersect1d(s_idxs, ulb_wrong))/BUDGET
-    pool = np.setdiff1d(pool, s_idxs)
-random_rate[0] = random_init
-ac_random_rate = np.array([random_rate[:i].mean() for i in range(1, len(random_rate)+1)])
-print("Random Success Rate:{:.3f}\n{}\n".format(ac_random_rate[-1], repr(ac_random_rate)))
-data = record(data, ac_random_rate, "feedback", DATASET, "Random", RATE, 0.0)
-
-# dvi sampling
-ac_dvi_rate = feedback_sampling(tm=dvi_tm, method="tfDVI", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong ,noise_rate=0.0, replace_init=dvi_init)
-data = record(data, ac_dvi_rate, "feedback", DATASET, "DVI", RATE, 0.0)
-
-# timevis sampling
-ac_tv_rate = feedback_sampling(tm=timevis_tm, method="TimeVis", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, noise_rate=0.0, replace_init=timevis_init)
-data = record(data, ac_tv_rate, "feedback", DATASET, "TimeVis", RATE, 0.0)
-
-#############################################
-#              Noise Feedback               #
-#############################################
-for tol in TOLERANCE:
-    # dvi tolerance
-    ac_dvi_rate = feedback_sampling(tm=dvi_tm, method="tfDVI", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, noise_rate=tol, replace_init=dvi_init)
-    data = record(data, ac_dvi_rate, "feedback", DATASET, "DVI", RATE, tol)
-
-    # timevis tolerance
-    ac_tv_rate = feedback_sampling(tm=timevis_tm, method="TimeVis", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, noise_rate=tol, replace_init=timevis_init)
-    data = record(data, ac_tv_rate, "feedback", DATASET, "TimeVis", RATE, tol)
-
-#############################################
-#           Feedback Efficiency             #
-#############################################
-# dvi time cost
-dvi_c = feedback_sampling_efficiency(tm=dvi_tm, method="tfDVI", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, repeat=REPEAT, noise_rate=0.0)
-data = record(data, dvi_c, "efficiency", DATASET, "DVI", RATE, 0.0)
-
-# timevis time cost
-timevis_c = feedback_sampling_efficiency(tm=timevis_tm, method="TimeVis", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, repeat=REPEAT, noise_rate=0.0)
-data = record(data, timevis_c, "efficiency", DATASET, "TimeVis", RATE, 0.0)
-
+xs = timevis_tm.embeddings_2d[:, -timevis_tm.period:, 0]
+ys = timevis_tm.embeddings_2d[:, -timevis_tm.period:, 1]
+new_sample = generate_random_trajectory(xs.min(), ys.min(), xs.max(), ys.max(), timevis_tm.period)
+tv_new_score = timevis_tm.score_new_sample(new_sample)
+data = record(data, tv_new_score, "RA", DATASET, "TimeVis", RATE, 0.0)
 
 #############################################
 #                    Save                   #

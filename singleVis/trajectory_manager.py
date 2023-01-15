@@ -1,7 +1,43 @@
 import numpy as np
 from sklearn.linear_model import Ridge
 from sklearn.cluster import Birch
+from pynndescent import NNDescent
+from sklearn.neighbors import NearestNeighbors
 # TODO random ignore
+
+def find_cluster(trajectories, sub_labels, new_sample):
+    nbrs = NearestNeighbors(n_neighbors=2, algorithm='ball_tree').fit(trajectories)
+    distances, indices = nbrs.kneighbors(new_sample[np.newaxis,:])
+    nearest_neighbor_idx = indices[0, 1]
+    nearest_neighbor_dist = distances[0, 1]
+
+    cls_idx = sub_labels[nearest_neighbor_idx]
+    samples_in_cls = trajectories[np.argwhere(sub_labels==cls_idx).squeeze()]
+
+
+    # number of trees in random projection forest
+    n_trees = min(64, 5 + int(round(samples_in_cls.shape[0] ** 0.5 / 20.0)))
+    # max number of nearest neighbor iters to perform
+    n_iters = max(5, int(round(np.log2(samples_in_cls.shape[0]))))
+    # get nearest neighbors
+    nnd = NNDescent(
+        samples_in_cls,
+        n_neighbors=2,
+        metric="euclidean",
+        n_trees=n_trees,
+        n_iters=n_iters,
+        max_candidates=60,
+        verbose=False
+    )
+    _, dists = nnd.neighbor_graph
+    dists = dists[:, 1]
+    max_dist = dists.max()
+    if nearest_neighbor_dist< max_dist:
+        return cls_idx
+    else:
+        return -1
+
+    
 
 class TrajectoryManager:
     def __init__(self, embeddings_2d, cls_num, period=100, metric="a"):
@@ -210,6 +246,18 @@ class Recommender:
         self.a = (self.v[:,1:,:]-self.v[:,:-1,:]).reshape(self.train_num, -1)
         self.v = self.v.reshape(self.train_num, -1)
     
+    @property
+    def _sample_p_scores(self):
+        return self.p_scores[self.predict_p_sub_labels]
+    
+    @property
+    def _sample_v_scores(self):
+        return self.v_scores[self.predict_v_sub_labels]
+    
+    @property
+    def _sample_a_scores(self):
+        return self.a_scores[self.predict_a_sub_labels]
+    
     def clustered(self):
         brc = Birch(n_clusters=self.cls_num)
         brc.fit(self.v.reshape(self.train_num, -1))
@@ -312,3 +360,24 @@ class Recommender:
         args = np.argsort(remain_scores)[:budget]
         selected_idxs = not_selected[args]
         return selected_idxs, scores[selected_idxs]
+    
+    def score_new_sample(self, sample_trajectory):
+        new_position = sample_trajectory.reshape(-1)
+        new_v = sample_trajectory[1:, :] - sample_trajectory[:-1, :]
+        new_a = (new_v[1:,:]-new_v[:-1,:]).reshape(-1)
+        new_v = new_v.reshape(-1)
+
+        position_cls = find_cluster(self.position, self.predict_p_sub_labels, new_position)
+        v_cls = find_cluster(self.v, self.predict_v_sub_labels, new_v)
+        a_cls = find_cluster(self.a, self.predict_a_sub_labels, new_a)
+
+        new_p_score = self.p_scores[position_cls] if position_cls>=0 else 1-1/self.train_num
+        new_v_score = self.v_scores[v_cls] if v_cls>=0 else 1-1/self.train_num
+        new_a_score = self.a_scores[a_cls] if a_cls>=0 else 1-1/self.train_num
+
+        return new_p_score, new_v_score, new_a_score
+
+        
+
+
+
