@@ -272,11 +272,11 @@ data = None
 # #############################################
 # for tol in TOLERANCE:
 #     # dvi tolerance
-#     ac_dvi_rate = feedback_sampling(tm=dvi_tm, method="tfDVI", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, noise_rate=tol, replace_init=dvi_init)
+#     ac_dvi_rate, _ = feedback_sampling(tm=dvi_tm, method="tfDVI", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, noise_rate=tol, replace_init=dvi_init)
 #     data = record(data, ac_dvi_rate, "feedback", DATASET, "DVI", RATE, tol)
 
 #     # timevis tolerance
-#     ac_tv_rate = feedback_sampling(tm=timevis_tm, method="TimeVis", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, noise_rate=tol, replace_init=timevis_init)
+#     ac_tv_rate, _ = feedback_sampling(tm=timevis_tm, method="TimeVis", round=ROUND, budget=BUDGET, ulb_wrong=ulb_wrong, noise_rate=tol, replace_init=timevis_init)
 #     data = record(data, ac_tv_rate, "feedback", DATASET, "TimeVis", RATE, tol)
 
 # #############################################

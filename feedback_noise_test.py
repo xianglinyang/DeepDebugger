@@ -231,11 +231,11 @@ data = None
 
 # for tol in TOLERANCE:
 #     # dvi Feedback with noise
-#     ac_dvi_rate = feedback_sampling(tm=dvi_tm, method="tfDVI", round=ROUND, budget=BUDGET, noise_rate=tol, replace_init=dvi_init)
+#     ac_dvi_rate, _ = feedback_sampling(tm=dvi_tm, method="tfDVI", round=ROUND, budget=BUDGET, noise_rate=tol, replace_init=dvi_init)
 #     data = record(data, ac_dvi_rate, "feedback", DATASET, "DVI", NOISE_RATE, tol)
 
 #     # timevis Feedback with noise
-#     ac_tv_rate = feedback_sampling(tm=timevis_tm, method="TimeVis", round=ROUND, budget=BUDGET, noise_rate=tol, replace_init=timevis_init)
+#     ac_tv_rate, _ = feedback_sampling(tm=timevis_tm, method="TimeVis", round=ROUND, budget=BUDGET, noise_rate=tol, replace_init=timevis_init)
 #     data = record(data, ac_tv_rate, "feedback", DATASET, "TimeVis", NOISE_RATE, tol)
 
 # #############################################
@@ -250,31 +250,31 @@ data = None
 # timevis_c = feedback_sampling_efficiency(tm=timevis_tm, method="TimeVis", round=ROUND, budget=BUDGET, repeat=REPEAT)
 # data = record(data, timevis_c, "efficiency", DATASET, "TimeVis", NOISE_RATE, 0.0)
 
-#############################################
-#              Random Anomaly               #
-#############################################
-xs = dvi_tm.embeddings_2d[:, -dvi_tm.period:, 0]
-ys = dvi_tm.embeddings_2d[:, -dvi_tm.period:, 1]
-new_sample = generate_random_trajectory(xs.min(), ys.min(), xs.max(), ys.max(), dvi_tm.period)
-dvi_new_score = dvi_tm.score_new_sample(new_sample)
-data = record(data, dvi_new_score, "RA", DATASET, "DVI", NOISE_RATE, 0.0)
+# #############################################
+# #              Random Anomaly               #
+# #############################################
+# xs = dvi_tm.embeddings_2d[:, -dvi_tm.period:, 0]
+# ys = dvi_tm.embeddings_2d[:, -dvi_tm.period:, 1]
+# new_sample = generate_random_trajectory(xs.min(), ys.min(), xs.max(), ys.max(), dvi_tm.period)
+# dvi_new_score = dvi_tm.score_new_sample(new_sample)
+# data = record(data, dvi_new_score, "RA", DATASET, "DVI", NOISE_RATE, 0.0)
 
-xs = timevis_tm.embeddings_2d[:, -timevis_tm.period:, 0]
-ys = timevis_tm.embeddings_2d[:, -timevis_tm.period:, 1]
-new_sample = generate_random_trajectory(xs.min(), ys.min(), xs.max(), ys.max(), timevis_tm.period)
-tv_new_score = timevis_tm.score_new_sample(new_sample)
-data = record(data, tv_new_score, "RA", DATASET, "TimeVis", NOISE_RATE, 0.0)
+# xs = timevis_tm.embeddings_2d[:, -timevis_tm.period:, 0]
+# ys = timevis_tm.embeddings_2d[:, -timevis_tm.period:, 1]
+# new_sample = generate_random_trajectory(xs.min(), ys.min(), xs.max(), ys.max(), timevis_tm.period)
+# tv_new_score = timevis_tm.score_new_sample(new_sample)
+# data = record(data, tv_new_score, "RA", DATASET, "TimeVis", NOISE_RATE, 0.0)
 
-#############################################
-#                    Save                   #
-#############################################
-# read results
-eval_path = "/home/xianglin/projects/DVI_data/noisy/symmetric/feedback.xlsx"
-col = np.array(["task", "dataset", "method", "rate", "tolerance", "iter", "eval"])
-if os.path.exists(eval_path):
-    df = pd.read_excel(eval_path, index_col=0, dtype={"task":str, "dataset":str, "method":str, "rate":int, "tolerance":float, "iter":int, "eval":float})
-else:
-    df = pd.DataFrame({}, columns=col)
-df_curr = pd.DataFrame(data, columns=col)
-df = df.append(df_curr, ignore_index=True)
-df.to_excel(eval_path)
+# #############################################
+# #                    Save                   #
+# #############################################
+# # read results
+# eval_path = "/home/xianglin/projects/DVI_data/noisy/symmetric/feedback.xlsx"
+# col = np.array(["task", "dataset", "method", "rate", "tolerance", "iter", "eval"])
+# if os.path.exists(eval_path):
+#     df = pd.read_excel(eval_path, index_col=0, dtype={"task":str, "dataset":str, "method":str, "rate":int, "tolerance":float, "iter":int, "eval":float})
+# else:
+#     df = pd.DataFrame({}, columns=col)
+# df_curr = pd.DataFrame(data, columns=col)
+# df = df.append(df_curr, ignore_index=True)
+# df.to_excel(eval_path)
