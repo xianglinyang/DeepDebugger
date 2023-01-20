@@ -158,13 +158,13 @@ vis = visualizer(data_provider, projector, 200)
 save_dir = os.path.join(data_provider.content_path, "img")
 os.makedirs(save_dir, exist_ok=True)
 
-for i in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
+for i in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD*4):
     vis.save_default_fig(i, path=os.path.join(save_dir, "{}_{}_{}.png".format(DATASET, i, VIS_METHOD)))
 
 ########################################################################################################################
 #                                                       EVALUATION                                                     #
 ########################################################################################################################
-eval_epochs = range(EPOCH_START, EPOCH_END, EPOCH_PERIOD)
-evaluator = Evaluator(data_provider, projector)
-for eval_epoch in eval_epochs:
-    evaluator.save_epoch_eval(eval_epoch, 15, temporal_k=5, file_name="{}".format(EVALUATION_NAME))
+# eval_epochs = range(EPOCH_START, EPOCH_END, EPOCH_PERIOD)
+# evaluator = Evaluator(data_provider, projector)
+# for eval_epoch in eval_epochs:
+#     evaluator.save_epoch_eval(eval_epoch, 15, temporal_k=5, file_name="{}".format(EVALUATION_NAME))
