@@ -77,12 +77,12 @@ print("Saving uncertainty...")
 TOTOAL_EPOCH = (EPOCH_END-EPOCH_START)//EPOCH_PERIOD + 1
 
 samples = np.zeros((TOTOAL_EPOCH, LEN, 512))
-for i in range(EPOCH_START, EPOCH_END, EPOCH_PERIOD):
+for i in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
     e = (i-EPOCH_START)//EPOCH_PERIOD
     samples[e] = data_provider.train_representation_all(i)
 
 embeddings_2d = np.zeros((TOTOAL_EPOCH, LEN, 2))
-for i in range(EPOCH_START, EPOCH_END, EPOCH_PERIOD):
+for i in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
     e = (i-EPOCH_START)//EPOCH_PERIOD
     embeddings_2d[e] = projector.batch_project(i, samples[e])
 embeddings_2d = np.transpose(embeddings_2d, [1,0,2])
