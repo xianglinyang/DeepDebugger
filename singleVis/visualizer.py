@@ -80,6 +80,11 @@ class visualizer(VisualizerAbstractClass):
                                 fillstyle='full', ms=6, zorder=4)
             self.sample_plots.append(plot[0])
 
+        color = (0.0, 0.0, 0.0, 1.0)
+        plot = self.ax.plot([], [], '.', markeredgecolor=color,
+                            fillstyle='full', ms=20, zorder=1)
+        self.sample_plots.append(plot[0])
+
         # set the mouse-event listeners
         # self.fig.canvas.mpl_connect('pick_event', self.show_sample)
         # self.fig.canvas.mpl_connect('button_press_event', self.show_sample)
@@ -129,7 +134,7 @@ class visualizer(VisualizerAbstractClass):
 
         return x_min, y_min, x_max, y_max
     
-    def get_epoch_decision_view(self, epoch, resolution):
+    def get_epoch_decision_view(self, epoch, resolution, xy_limit=None):
         '''
         get background classifier view
         :param epoch_id: epoch that need to be visualized
@@ -140,7 +145,10 @@ class visualizer(VisualizerAbstractClass):
         '''
         print('Computing decision regions ...')
 
-        x_min, y_min, x_max, y_max = self.get_epoch_plot_measures(epoch)
+        if xy_limit is None:
+            x_min, y_min, x_max, y_max = self.get_epoch_plot_measures(epoch)
+        else:
+            x_min, y_min, x_max, y_max = xy_limit
 
         # create grid
         xs = np.linspace(x_min, x_max, resolution)
@@ -280,60 +288,34 @@ class visualizer(VisualizerAbstractClass):
         plt.savefig(path)
 
     
-    def savefig_trajectory(self, epoch, prev_data, prev_pred, prev_labels, data, pred, labels, path="vis"):
+    def savefig_trajectory(self, epoch, xs, ys, xy_limit=None, path="vis"):
         '''
         Shows the current plot with given data
         '''
         self._init_plot(only_img=True)
 
-        x_min, y_min, x_max, y_max = self.get_epoch_plot_measures(epoch)
+        if xy_limit is None:
+            x_min, y_min, x_max, y_max = self.get_epoch_plot_measures(epoch)
+        else:
+            x_min, y_min, x_max, y_max = xy_limit
 
-        _, decision_view = self.get_epoch_decision_view(epoch, self.resolution)
+        _, decision_view = self.get_epoch_decision_view(epoch, self.resolution, xy_limit)
         self.cls_plot.set_data(decision_view)
         self.cls_plot.set_extent((x_min, x_max, y_max, y_min))
         self.ax.set_xlim((x_min, x_max))
         self.ax.set_ylim((y_min, y_max))
 
-        # title
-        # params_str = 'res: %d'
-        # desc = params_str % (self.resolution)
-        # self.desc.set_text(desc)
+        self.sample_plots[-1].set_data(np.vstack((xs,ys)))
 
-        embedding = self.projector.batch_project(epoch, data)
-        prev_embedding = self.projector.batch_project(epoch, prev_data)
+        # set data point
+        u = xs[1:] - xs[:-1]
+        v = ys[1:] - ys[:-1]
 
-        # all_labels = np.concatenate((prev_labels, labels), axis=0)
-        # all_pred = np.concatenate((prev_pred, pred), axis=0)
-        # all_embedding = np.concatenate((prev_embedding, embedding), axis=0)
+        x = xs[:len(u)] # 使得维数和u,v一致
+        y = ys[:len(v)]
 
-        # show data with prev_data
-        # for c in range(self.class_num):
-        #     data = all_embedding[np.logical_and(all_labels == c, all_labels == all_pred)]
-        #     self.sample_plots[c].set_data(data.transpose())
-
-        # for c in range(self.class_num):
-        #     data = all_embedding[np.logical_and(all_labels == c, all_labels != all_pred)]
-        #     self.sample_plots[self.class_num+c].set_data(data.transpose())
-
-        # for c in range(self.class_num):
-        #     data = all_embedding[np.logical_and(all_pred == c, all_labels != all_pred)]
-        #     self.sample_plots[2*self.class_num + c].set_data(data.transpose())
-        # curr
-        color = (1.0, 1.0, 0.0, 1.0)
-        plot = self.ax.plot([], [], '.', markeredgecolor=color,
-                            fillstyle='full', ms=20, mew=4, zorder=1)
-        self.sample_plots.append(plot[0])
-        # prev
-        color = (1.0, 0.0, 0.0, 1.0)
-        plot = self.ax.plot([], [], '.', markeredgecolor=color,
-                            fillstyle='full', ms=20, mew=4, zorder=1)
-        self.sample_plots.append(plot[0])
-        
-        plt.quiver(prev_embedding[:, 0], prev_embedding[:, 1], embedding[:, 0]-prev_embedding[:, 0],embedding[:, 1]-prev_embedding[:, 1], scale_units='xy', angles='xy', scale=1, color='y')  
-        self.sample_plots[3*self.class_num].set_data(embedding.transpose())
-        self.sample_plots[3*self.class_num+1].set_data(prev_embedding.transpose())
-        
-        # plt.quiver(prev_embedding[:, 0], prev_embedding[:, 1], embedding[:, 0]-prev_embedding[:, 0],embedding[:, 1]-prev_embedding[:, 1], scale_units='xy', angles='xy', scale=1)  
+        # plt.quiver(prev_embedding[:, 0], prev_embedding[:, 1], embedding[:, 0]-prev_embedding[:, 0],embedding[:, 1]-prev_embedding[:, 1], scale_units='xy', angles='xy', scale=1, color='black')  
+        plt.quiver(x,y,u,v, angles='xy', scale_units='xy', scale=1, color="black")
         plt.savefig(path)
     
     def get_background(self, epoch, resolution):
