@@ -206,8 +206,9 @@ class DVIProjector(Projector):
         print("Successfully load the DVI visualization model for iteration {}".format(iteration))
 
 class TimeVisProjector(Projector):
-    def __init__(self, vis_model, content_path, vis_model_name, device) -> None:
+    def __init__(self, vis_model, content_path, vis_model_name, device, verbose=0) -> None:
         super().__init__(vis_model, content_path, vis_model_name, device)
+        self.verbose = verbose
 
     def load(self, iteration):
         file_path = os.path.join(self.content_path, "Model", "{}.pth".format(self.vis_model_name))
@@ -215,18 +216,20 @@ class TimeVisProjector(Projector):
         self.vis_model.load_state_dict(save_model["state_dict"])
         self.vis_model.to(self.DEVICE)
         self.vis_model.eval()
-        print("Successfully load the TimeVis visualization model for iteration {}".format(iteration))
+        if self.verbose>0:
+            print("Successfully load the TimeVis visualization model for iteration {}".format(iteration))
 
 import tensorflow as tf
 
 class tfDVIProjector(ProjectorAbstractClass):
-    def __init__(self, content_path, flag):
+    def __init__(self, content_path, flag, verbose=0):
         self.content_path = content_path
         self.model_path = os.path.join(self.content_path, "Model")
         self.flag = flag
         self.curr_iteration = -1
         self.encoder = None
         self.decoder = None
+        self.verbose = verbose
 
     def load(self, epoch):
         if self.curr_iteration == epoch:
@@ -237,7 +240,8 @@ class tfDVIProjector(ProjectorAbstractClass):
         try:
             self.encoder = tf.keras.models.load_model(encoder_location)
             self.decoder = tf.keras.models.load_model(decoder_location)
-            print("Keras autocoder model loaded from Epoch {}".format(epoch))
+            if self.verbose>0:
+                print("Keras autocoder model loaded from Epoch {}".format(epoch))
             self.curr_iteration = epoch
         except FileNotFoundError:
             print("Error! Projection function has not been initialized! Pls first visualize all.")
