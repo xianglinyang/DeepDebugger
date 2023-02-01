@@ -74,17 +74,24 @@ import os
 #         for method in methods:
 #             os.system("python feedback_al.py --dataset {} --rate {} --method {}".format(data.upper(), rate, method))
 
-repeat = 20
-for _ in range(repeat):
-    # # feedback test on noisy dataset
-    datasets = ["mnist", "fmnist", "cifar10"]
-    rates = ["5", "10", "20"]
-    for data in datasets:
-        for rate in rates:
-            os.system("python feedback_noise_test2.py --dataset {} --noise_rate {} --tolerance 0.03 0.05 0.1 0.15 --repeat 2 --round 50".format(data, rate))
+# repeat = 4
+# for _ in range(repeat):
+#     # # feedback test on noisy dataset
+#     datasets = ["mnist", "fmnist", "cifar10"]
+#     rates = ["5", "10", "20"]
+#     for data in datasets:
+#         for rate in rates:
+#             os.system("python feedback_noise_test.py --dataset {} --noise_rate {} --tolerance 0.03 0.05 0.1 0.15 --repeat 2 --round 50".format(data, rate))
 
-    # feedback test on active learning dataset
-    # rates = ["10", "20", "30"]
-    # for data in datasets:
-    #     for rate in rates:
-    #         os.system("python feedback_al_test.py --dataset {} --rate {} --tolerance 0.03 0.05 0.1 0.15 --repeat 1 --round 50".format(data, rate))
+#     # feedback test on active learning dataset
+#     rates = ["10", "20", "30"]
+#     for data in datasets:
+#         for rate in rates:
+#             os.system("python feedback_al_test.py --dataset {} --rate {} --tolerance 0.03 0.05 0.1 0.15 --repeat 1 --round 50".format(data, rate))
+
+os.system("python anomaly_detection.py --dataset mnist --method tfDVI")
+os.system("python anomaly_detection.py --dataset mnist --method TimeVis")
+os.system("python anomaly_detection.py --dataset fmnist --method tfDVI")
+os.system("python anomaly_detection.py --dataset fmnist --method TimeVis")
+os.system("python anomaly_detection.py --dataset cifar10 --method tfDVI")
+os.system("python anomaly_detection.py --dataset cifar10 --method TimeVis")
