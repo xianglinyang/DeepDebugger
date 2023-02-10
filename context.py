@@ -157,6 +157,12 @@ class VisContext(Context):
         index = load_labelled_data_index(index_file)
         return index
     
+    def get_max_iter(self):
+        EPOCH_START = self.strategy.config["EPOCH_START"]
+        EPOCH_END = self.strategy.config["EPOCH_END"]
+        EPOCH_PERIOD = self.strategy.config["EPOCH_PERIOD"]
+        return int((EPOCH_END-EPOCH_START)/EPOCH_PERIOD)+1
+    
     def reset(self):
         return
 
