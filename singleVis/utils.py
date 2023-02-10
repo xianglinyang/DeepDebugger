@@ -334,3 +334,24 @@ def generate_random_trajectory(x_min, y_min, x_max, y_max, period):
     trajectory = np.vstack((xs,ys)).transpose([1, 0])
     return trajectory
 
+def generate_random_trajectory_momentum(init_position, period, alpha, gamma, vx, vy):
+    xs = np.ones(period)
+    ys = np.ones(period)
+    xs[0] = init_position[0]
+    ys[0] = init_position[1]
+    for i in range(1, period):
+        v_sample = np.zeros(2)
+        v_sample[0] = np.random.normal(vx[i-1], 5, 1)[0]
+        v_sample[1] = np.random.normal(vy[i-1], 5, 1)[0]
+        # normalize
+        history_direction = np.array([xs[i-1]-xs[0], ys[i-1]-ys[0]])
+        if i > 1:
+            history_direction = history_direction/np.linalg.norm(history_direction)*np.linalg.norm(v_sample)
+        v = gamma*v_sample+alpha*history_direction
+        xs[i] = xs[i-1] + v[0]
+        ys[i] = ys[i-1] + v[1]
+    return np.vstack((xs,ys)).transpose([1, 0])
+    # return xs, ys
+
+
+
