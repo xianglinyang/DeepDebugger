@@ -130,4 +130,4 @@ dmypy.json
 
 data/
 
-singleVis/plot/plot_results/*
+singleVis/plot/plot_results/
