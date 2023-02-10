@@ -1035,6 +1035,6 @@ class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
         border = is_B(preds)
         return border
     
-    def checkpoint_path(self, iteration, epoch):
+    def single_checkpoint_path(self, iteration, epoch):
         path = os.path.join(self.model_path, "{}_{}".format(self.iteration_name, iteration), "{}_{}".format(self.epoch_name, epoch))
         return path
