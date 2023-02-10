@@ -1,0 +1,8 @@
+
+tfDVI	mnist	0.054	0.674	
+TimeVis	mnist	0.044	0.784	
+tfDVI	fmnist	0.22	0.89	
+TimeVis	fmnist	0.142	0.838	
+tfDVI	cifar10	0.14	0.564
+TimeVis	cifar10	0.216	0.566	
+	
