@@ -10,21 +10,14 @@ import pickle
 import shutil
 
 import torch.nn
-from torch.utils.data import DataLoader
-from torch.utils.data import WeightedRandomSampler
 import torchvision
 
 from scipy.special import softmax
 
-from strategy import StrategyAbstractClass, DeepDebugger
+from strategy import StrategyAbstractClass
 
 from singleVis.utils import *
-from singleVis.custom_weighted_random_sampler import CustomWeightedRandomSampler
-from singleVis.edge_dataset import DataHandler, HybridDataHandler
-from singleVis.spatial_edge_constructor import SingleEpochSpatialEdgeConstructor
 from singleVis.trajectory_manager import Recommender
-from singleVis.eval.evaluator import ALEvaluator
-from singleVis.segmenter import DenseALSegmenter
 
 active_learning_path = "../../ActiveLearning"
 sys.path.append(active_learning_path)
@@ -178,7 +171,7 @@ class ActiveLearningContext(VisContext):
             "acc_idxs": acc_idxs,
             "rej_idxs": rej_idxs
         }
-        path = os.path.join(self.strategy.data_provider.content_path, "Model", "Iteration_{}".format(iteration), "{}_acc_rej.json".format(file_name))
+        path = os.path.join(self.strategy.data_provider.checkpoint_path(iteration), "{}_acc_rej.json".format(file_name))
         with open(path, "w") as f:
             json.dump(d, f)
         print("Successfully save the acc and rej idxs selected by user at Iteration {}...".format(iteration))
@@ -187,7 +180,7 @@ class ActiveLearningContext(VisContext):
         # delete [iteration,...)
         max_i = self.get_max_iter()
         for i in range(iteration, max_i+1, 1):
-            path = os.path.join(self.strategy.data_provider.content_path, "Model", "Iteration_{}".format(i))
+            path = self.strategy.data_provider.checkpoint_path(iteration)
             shutil.rmtree(path)
         iter_structure_path = os.path.join(self.strategy.data_provider.content_path, "iteration_structure.json")
         with open(iter_structure_path, "r") as f:
@@ -203,7 +196,7 @@ class ActiveLearningContext(VisContext):
 
     def get_epoch_index(self, iteration):
         """get the training data index for an epoch"""
-        index_file = os.path.join(self.strategy.data_provider.model_path, "Iteration_{:d}".format(iteration), "index.json")
+        index_file = os.path.join(self.strategy.data_provider.checkpoint_path(iteration), "index.json")
         index = load_labelled_data_index(index_file)
         return index
 
@@ -214,6 +207,7 @@ class ActiveLearningContext(VisContext):
         GPU = self.strategy.config["GPU"]
         NET = self.strategy.config["TRAINING"]["NET"]
         DATA_NAME = self.strategy.config["DATASET"]
+        TOTAL_EPOCH = self.strategy.config["TRAINING"]["total_epoch"]
         sys.path.append(CONTENT_PATH)
 
         # record output information
@@ -228,7 +222,7 @@ class ActiveLearningContext(VisContext):
         n_pool = self.strategy.config["TRAINING"]["train_num"]  # 50000
         n_test = self.strategy.config["TRAINING"]['test_num']   # 10000
 
-        resume_path = os.path.join(CONTENT_PATH, "Model", "Iteration_{}".format(iteration))
+        resume_path = self.strategy.data_provider.checkpoint_path(iteration)
 
         idxs_lb = np.array(json.load(open(os.path.join(resume_path, "index.json"), "r")))
         
@@ -253,7 +247,7 @@ class ActiveLearningContext(VisContext):
             print("Query time is {:.2f}".format(t1-t0))
         elif strategy == "TBSampling":
             # TODO hard coded parameters...
-            period = 80
+            period = int(2/3*TOTAL_EPOCH)
             print(DATA_NAME)
             print("TBSampling")
             print('================Round {:d}==============='.format(iteration+1))
@@ -264,7 +258,7 @@ class ActiveLearningContext(VisContext):
         
         elif strategy == "Feedback":
             # TODO hard coded parameters...suggest_abnormal
-            period = 80
+            period = int(2/3*TOTAL_EPOCH)
             print(DATA_NAME)
             print("Feedback")
             print('================Round {:d}==============='.format(iteration+1))
@@ -306,7 +300,7 @@ class ActiveLearningContext(VisContext):
         # loading neural network
         from Model.model import resnet18
         task_model = resnet18()
-        resume_path = os.path.join(CONTENT_PATH, "Model", "Iteration_{}".format(iteration))
+        resume_path = self.strategy.data_provider.checkpoint_path(iteration)
         state_dict = torch.load(os.path.join(resume_path, "subject_model.pth"), map_location=torch.device("cpu"))
         task_model.load_state_dict(state_dict)
 
@@ -314,7 +308,7 @@ class ActiveLearningContext(VisContext):
         task_model_type = "pytorch"
         # start experiment
         n_pool = self.strategy.config["TRAINING"]["train_num"]  # 50000
-        save_path = os.path.join(CONTENT_PATH, "Model", "Iteration_{}".format(NEW_ITERATION))
+        save_path = self.strategy.data_provider.checkpoint_path(NEW_ITERATION)
         os.makedirs(save_path, exist_ok=True)
 
         from query_strategies.random import RandomSampling
@@ -340,10 +334,11 @@ class ActiveLearningContext(VisContext):
     def get_max_iter(self):
         path  = os.path.join(self.strategy.data_provider.content_path, "Model")
         dir_list = os.listdir(path)
+        iteration_name = self.strategy.data_provider.iteration_name
         max_iter = -1
         for dir in dir_list:
-            if "Iteration_" in dir:
-                i = int(dir.replace("Iteration_",""))
+            if "{}_".format(iteration_name) in dir:
+                i = int(dir.replace("{}_".format(iteration_name),""))
                 max_iter = max(max_iter, i)
         return max_iter
 
@@ -354,19 +349,19 @@ class ActiveLearningContext(VisContext):
         :param indices: list, selected indices
         :return:
         """
-        save_location = os.path.join(self.strategy.data_provider.model_path, "Iteration_{}".format(iteration), "human_select.json")
+        save_location = os.path.join(self.strategy.data_provider.checkpoint_path(iteration), "human_select.json")
         with open(save_location, "w") as f:
             json.dump(indices, f)
     
     def save_iteration_index(self, iteration, idxs):
-        new_iteration_dir = os.path.join(self.strategy.data_provider.content_path, "Model", "Iteration_{}".format(iteration))
+        new_iteration_dir = self.strategy.data_provider.checkpoint_path(iteration)
         os.makedirs(new_iteration_dir, exist_ok=True)
         save_location = os.path.join(new_iteration_dir, "index.json")
         with open(save_location, "w") as f:
             json.dump(idxs.tolist(), f)
     
     def save_subject_model(self, iteration, state_dict):
-        new_iteration_dir = os.path.join(self.strategy.data_provider.content_path, "Model", "Iteration_{}".format(iteration))
+        new_iteration_dir = self.strategy.data_provider.checkpoint_path(iteration)
         model_path = os.path.join(new_iteration_dir, "subject_model.pth")
         torch.save(state_dict, model_path)
 
@@ -380,12 +375,12 @@ class ActiveLearningContext(VisContext):
     #                                                                                                               #
     #################################################################################################################
     def _save(self, iteration, ftm):
-        with open(os.path.join(self.strategy.data_provider.content_path, "Model","Iteration_{}".format(iteration), 'sample_recommender.pkl'), 'wb') as f:
+        with open(os.path.join(self.strategy.data_provider.checkpoint_path(iteration), 'sample_recommender.pkl'), 'wb') as f:
             pickle.dump(ftm, f, pickle.HIGHEST_PROTOCOL)
 
     def _init_detection(self, iteration, lb_idxs, period=80):
         # prepare trajectory
-        embedding_path = os.path.join(self.strategy.data_provider.content_path,"Model", "Iteration_{}".format(iteration),'trajectory_embeddings.npy')
+        embedding_path = os.path.join(self.strategy.data_provider.checkpoint_path(iteration),'trajectory_embeddings.npy')
         if os.path.exists(embedding_path):
             trajectories = np.load(embedding_path)
             print("Load trajectories from cache!")
@@ -401,7 +396,7 @@ class ActiveLearningContext(VisContext):
             trajectories = np.transpose(embeddings_2d, [1,0,2])
             np.save(embedding_path, trajectories)
         # prepare uncertainty
-        uncertainty_path = os.path.join(self.strategy.data_provider.content_path, "Model","Iteration_{}".format(iteration), 'uncertainties.npy')
+        uncertainty_path = os.path.join(self.strategy.data_provider.checkpoint_path(iteration), 'uncertainties.npy')
         if os.path.exists(uncertainty_path):
             uncertainty = np.load(uncertainty_path)
         else:
@@ -411,7 +406,7 @@ class ActiveLearningContext(VisContext):
             np.save(uncertainty_path, uncertainty)
         ulb_idxs = self.strategy.data_provider.get_unlabeled_idx(len(uncertainty), lb_idxs)
         # prepare sampling manager
-        ntd_path = os.path.join(self.strategy.data_provider.content_path, "Model","Iteration_{}".format(iteration), 'sample_recommender.pkl')
+        ntd_path = os.path.join(self.strategy.data_provider.checkpoint_path(iteration), 'sample_recommender.pkl')
         if os.path.exists(ntd_path):
             with open(ntd_path, 'rb') as f:
                 ntd = pickle.load(f)
