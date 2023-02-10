@@ -384,6 +384,10 @@ class NormalDataProvider(DataProvider):
         preds = self.get_pred(epoch, data)
         border = is_B(preds)
         return border
+    
+    def checkpoint_path(self, epoch):
+        path = os.path.join(self.model_path, "{}_{}".format(self.epoch_name, epoch))
+        return path
 
     
 class ActiveLearningDataProvider(DataProvider):
@@ -707,6 +711,10 @@ class ActiveLearningDataProvider(DataProvider):
         border = is_B(preds)
         return border
     
+    def checkpoint_path(self, epoch):
+        path = os.path.join(self.model_path, "{}_{}".format(self.iteration_name, epoch))
+        return path
+    
 class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
     def __init__(self, content_path, model, base_epoch_start, epoch_num, device, classes, iteration_name="Iteration", epoch_name="Epoch", verbose=1):
         super().__init__(content_path, model, base_epoch_start, device, classes, iteration_name, verbose)
@@ -1026,3 +1034,7 @@ class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
         preds = self.get_pred(iteration, epoch, data)
         border = is_B(preds)
         return border
+    
+    def checkpoint_path(self, iteration, epoch):
+        path = os.path.join(self.model_path, "{}_{}".format(self.iteration_name, iteration), "{}_{}".format(self.epoch_name, epoch))
+        return path
