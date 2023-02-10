@@ -1,25 +1,14 @@
-import os, sys
+import os
 import json
 import time
 import csv
-import torch
 import numpy as np
-from umap.umap_ import find_ab_params
 import pickle
-import gc
 import base64
 
 vis_path = ".."
 from context import VisContext, ActiveLearningContext, AnormalyContext
 from strategy import DeepDebugger, TimeVis, DeepVisualInsight
-
-from singleVis.SingleVisualizationModel import VisModel
-from singleVis.losses import SingleVisLoss, UmapLoss, ReconstructionLoss, SmoothnessLoss, HybridLoss
-from singleVis.trainer import SingleVisTrainer, HybridVisTrainer
-from singleVis.data import NormalDataProvider, ActiveLearningDataProvider, DenseActiveLearningDataProvider
-from singleVis.eval.evaluator import Evaluator
-from singleVis.visualizer import visualizer, DenseALvisualizer
-from singleVis.projector import Projector, ALProjector, DenseALProjector
 
 """Interface align"""
 
@@ -29,7 +18,7 @@ def initialize_strategy(CONTENT_PATH, VIS_METHOD):
         conf = json.load(f)
     config = conf[VIS_METHOD]
 
-    if VIS_METHOD == "DeepVisualInsight":
+    if VIS_METHOD == "DVI":
         strategy = DeepVisualInsight(CONTENT_PATH, config)
     elif VIS_METHOD == "TimeVis":
         strategy = TimeVis(CONTENT_PATH, config)
@@ -51,142 +40,54 @@ def initialize_context(strategy, setting):
     else:
         raise NotImplementedError
 
-def initialize_backend(CONTENT_PATH, VIS_METHOD, dense_al=False):    
-    # load hyperparameters
-    CLASSES = config["CLASSES"]
-    DATASET = config["DATASET"]
-    GPU_ID = config["GPU"]
-    DEVICE = torch.device("cuda:{}".format(GPU_ID) if torch.cuda.is_available() else "cpu")
-    #################################################   VISUALIZATION PARAMETERS    ########################################
-    PREPROCESS = config["VISUALIZATION"]["PREPROCESS"]
-    B_N_EPOCHS = config["VISUALIZATION"]["BOUNDARY"]["B_N_EPOCHS"]
-    L_BOUND = config["VISUALIZATION"]["BOUNDARY"]["L_BOUND"]
-    LAMBDA = config["VISUALIZATION"]["LAMBDA"]
-    # HIDDEN_LAYER = config["VISUALIZATION"]["HIDDEN_LAYER"]
-    ENCODER_DIMS = config["VISUALIZATION"]["ENCODER_DIMS"]
-    DECODER_DIMS = config["VISUALIZATION"]["DECODER_DIMS"]  
-    N_NEIGHBORS = config["VISUALIZATION"]["N_NEIGHBORS"]
-    MAX_EPOCH = config["VISUALIZATION"]["MAX_EPOCH"]
-    S_N_EPOCHS = config["VISUALIZATION"]["S_N_EPOCHS"]
-    PATIENT = config["VISUALIZATION"]["PATIENT"]
-    VIS_MODEL_NAME = config["VISUALIZATION"]["VIS_MODEL_NAME"]
-    RESOLUTION = config["VISUALIZATION"]["RESOLUTION"]
-    EVALUATION_NAME = config["VISUALIZATION"]["EVALUATION_NAME"]
-    NET = config["TRAINING"]["NET"]
-    
+def initialize_backend(CONTENT_PATH, VIS_METHOD, SETTING):
+    """ initialize backend for visualization
 
-    SETTING = config["SETTING"] # active learning
-    if SETTING == "normal" or SETTING == "abnormal":
-        EPOCH_START = config["EPOCH_START"]
-        EPOCH_END = config["EPOCH_END"]
-        EPOCH_PERIOD = config["EPOCH_PERIOD"]
+    Args:
+        CONTENT_PATH (str): the directory to training process
+        VIS_METHOD (str): visualization strategy
+            "DVI", "TimeVis", "DeepDebugger",...
+        setting (str): context
+            "normal", "active learning", "dense al", "abnormal"
 
-        INIT_NUM = config["VISUALIZATION"]["INIT_NUM"]
-        ALPHA = config["VISUALIZATION"]["ALPHA"]
-        BETA = config["VISUALIZATION"]["BETA"]
-        MAX_HAUSDORFF = config["VISUALIZATION"]["MAX_HAUSDORFF"]
-        T_N_EPOCHS = config["VISUALIZATION"]["T_N_EPOCHS"]
-    elif SETTING == "active learning":
-        BASE_ITERATION = config["BASE_ITERATION"]
-        TOTAL_EPOCH = config["TRAINING"]["total_epoch"]
-    else:
-        raise NotImplementedError
+    Raises:
+        NotImplementedError: _description_
 
-    import Model.model as subject_model
-    net = eval("subject_model.{}()".format(NET))
-
-    # ########################################################################################################################
-    #                                                      TRAINING SETTING                                                  #
-    # ########################################################################################################################
-
-    # model = SingleVisualizationModel(input_dims=512, output_dims=2, units=256, hidden_layer=HIDDEN_LAYER)
-    model = VisModel(ENCODER_DIMS, DECODER_DIMS)
-
-    if SETTING == "normal" or SETTING == "abnormal":
-        data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, split=-1, device=DEVICE, classes=CLASSES, verbose=1)
-        SEGMENTS = config["VISUALIZATION"]["SEGMENTS"]
-        projector = Projector(vis_model=model, content_path=CONTENT_PATH, segments=SEGMENTS, device=DEVICE)
-    elif SETTING == "active learning":
-        DENSE_VIS_MODEL_NAME = config["VISUALIZATION"]["DENSE_VIS_MODEL_NAME"]
-        if dense_al:
-            data_provider = DenseActiveLearningDataProvider(CONTENT_PATH, net, BASE_ITERATION, epoch_num=TOTAL_EPOCH, split=-1, device=DEVICE, classes=CLASSES,verbose=1)
-            projector = DenseALProjector(vis_model=model, content_path=CONTENT_PATH, vis_model_name=DENSE_VIS_MODEL_NAME, device=DEVICE)
-        else:
-            data_provider = ActiveLearningDataProvider(CONTENT_PATH, net, BASE_ITERATION, split=-1, device=DEVICE, classes=CLASSES, verbose=1)
-            projector = ALProjector(vis_model=model, content_path=CONTENT_PATH, vis_model_name=VIS_MODEL_NAME, device=DEVICE)
-        
-    # ########################################################################################################################
-    # #                                                       TRAIN                                                          #
-    # ########################################################################################################################
-    
-    if SETTING == "active learning":
-        negative_sample_rate = 5
-        min_dist = .1
-        _a, _b = find_ab_params(1.0, min_dist)
-        umap_loss_fn = UmapLoss(negative_sample_rate, DEVICE, _a, _b, repulsion_strength=1.0)
-        recon_loss_fn = ReconstructionLoss(beta=1.0)
-        if dense_al:
-            smooth_loss_fn = SmoothnessLoss(margin=1.)
-            S_LAMBDA = config["VISUALIZATION"]["S_LAMBDA"]
-            criterion = HybridLoss(umap_loss_fn, recon_loss_fn, smooth_loss_fn, lambd1=LAMBDA, lambd2=S_LAMBDA)
-            optimizer = torch.optim.Adam(model.parameters(), lr=.01, weight_decay=1e-5)
-            lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=4, gamma=.1)
-            trainer = HybridVisTrainer(model, criterion, optimizer, lr_scheduler,edge_loader=None, DEVICE=DEVICE)
-        else:
-            criterion = SingleVisLoss(umap_loss_fn, recon_loss_fn, lambd=LAMBDA)
-            optimizer = torch.optim.Adam(model.parameters(), lr=.01, weight_decay=1e-5)
-            lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=4, gamma=.1)
-            trainer = SingleVisTrainer(model, criterion, optimizer, lr_scheduler,edge_loader=None, DEVICE=DEVICE)
-    
-    # ########################################################################################################################
-    # #                                                       EVALUATION                                                     #
-    # ########################################################################################################################
-
-    if dense_al:
-        vis = DenseALvisualizer(data_provider, projector, RESOLUTION)
-    else:
-        vis = visualizer(data_provider, projector, RESOLUTION)
-    evaluator = Evaluator(data_provider, projector)
-
-    if SETTING == "normal":
-        timevis = TimeVisBackend(data_provider, projector, vis, evaluator, **config)
-    elif SETTING == "abnormal":
-        timevis = AnormalyTimeVisBackend(data_provider, projector, vis, evaluator, period=100, **config)
-    elif SETTING == "active learning":
-        timevis = ActiveLearningTimeVisBackend(data_provider, projector, trainer, vis, evaluator, dense_al, **config)
-    
-    del config
-    gc.collect()
-    return timevis
+    Returns:
+        backend: a context with a specific strategy
+    """
+    strategy = initialize_strategy(CONTENT_PATH, VIS_METHOD)
+    context = initialize_context(strategy=strategy, setting=SETTING)
+    return context
 
 
 def update_epoch_projection(context, EPOCH, predicates):
-    train_data = timevis.data_provider.train_representation(EPOCH)
-    test_data = timevis.data_provider.test_representation(EPOCH)
+
+    train_data = context.strategy.data_provider.train_representation(EPOCH)
+    test_data = context.strategy.data_provider.test_representation(EPOCH)
     all_data = np.concatenate((train_data, test_data), axis=0)
+
+    embedding_path = os.path.join(context.strategy.data_provider.checkpoint_path(EPOCH), "embedding.npy")
     
-    fname = "Epoch" if timevis.data_provider.mode == "normal" or timevis.data_provider.mode == "abnormal" else "Iteration"
-    embedding_path = os.path.join(timevis.data_provider.model_path, "{}_{}".format(fname, EPOCH), "embedding.npy")
     if os.path.exists(embedding_path):
         embedding_2d = np.load(embedding_path)
     else:
-        embedding_2d = timevis.projector.batch_project(EPOCH, all_data)
+        embedding_2d = context.strategy.projector.batch_project(EPOCH, all_data)
         np.save(embedding_path, embedding_2d)
 
-    train_labels = timevis.data_provider.train_labels(EPOCH)
-    test_labels = timevis.data_provider.test_labels(EPOCH)
+    train_labels = context.strategy.data_provider.train_labels(EPOCH)
+    test_labels = context.strategy.data_provider.test_labels(EPOCH)
     labels = np.concatenate((train_labels, test_labels), axis=0).tolist()
 
-    training_data_number = timevis.hyperparameters["TRAINING"]["train_num"]
-    testing_data_number = timevis.hyperparameters["TRAINING"]["test_num"]
+    training_data_number = context.strategy.config["TRAINING"]["train_num"]
+    testing_data_number = context.strategy.config["TRAINING"]["test_num"]
     training_data_index = list(range(training_data_number))
     testing_data_index = list(range(training_data_number, training_data_number + testing_data_number))
 
     # return the image of background
     # read cache if exists
-    fname = "Epoch" if timevis.data_provider.mode == "normal" or timevis.data_provider.mode == "abnormal" else "Iteration"
-    bgimg_path = os.path.join(timevis.data_provider.model_path, "{}_{}".format(fname, EPOCH), "bgimg.png")
-    grid_path = os.path.join(timevis.data_provider.model_path, "{}_{}".format(fname, EPOCH), "grid.pkl")
+    bgimg_path = os.path.join(context.strategy.data_provider.checkpoint_path(EPOCH), "bgimg.png")
+    grid_path = os.path.join(context.strategy.data_provider.checkpoint_path(EPOCH), "grid.pkl")
     if os.path.exists(bgimg_path) and os.path.exists(grid_path):
         with open(os.path.join(grid_path), "rb") as f:
             grid = pickle.load(f)
@@ -194,26 +95,24 @@ def update_epoch_projection(context, EPOCH, predicates):
             img_stream = img_f.read()
         b_fig = base64.b64encode(img_stream).decode()
     else:
-        x_min, y_min, x_max, y_max, b_fig = timevis.vis.get_background(EPOCH, timevis.hyperparameters["VISUALIZATION"]["RESOLUTION"])
+        x_min, y_min, x_max, y_max, b_fig = context.strategy.vis.get_background(EPOCH, context.strategy.config["VISUALIZATION"]["RESOLUTION"])
         grid = [x_min, y_min, x_max, y_max]
         # formating
         grid = [float(i) for i in grid]
         b_fig = str(b_fig, encoding='utf-8')
 
     # save results, grid and decision_view
-    save_path = timevis.data_provider.model_path
-    iteration_name = "Epoch" if timevis.data_provider.mode == "normal" or timevis.data_provider.mode == "abnormal" else "Iteration"
-    save_path = os.path.join(save_path, "{}_{}".format(iteration_name, EPOCH))
+    save_path = context.strategy.data_provider.checkpoint_path(EPOCH)
     with open(os.path.join(save_path, "grid.pkl"), "wb") as f:
         pickle.dump(grid, f)
     np.save(os.path.join(save_path, "embedding.npy"), embedding_2d)
     
-    color = timevis.vis.get_standard_classes_color() * 255
+    color = context.strategy.vis.get_standard_classes_color() * 255
     color = color.astype(int).tolist()
 
     # TODO fix its structure
-    file_name = timevis.hyperparameters["VISUALIZATION"]["EVALUATION_NAME"]
-    evaluation = timevis.evaluator.get_eval(file_name=file_name)
+    file_name = context.strategy.config["VISUALIZATION"]["EVALUATION_NAME"]
+    evaluation = context.strategy.evaluator.get_eval(file_name=file_name)
     eval_new = dict()
     eval_new["train_acc"] = evaluation["train_acc"][str(EPOCH)]
     eval_new["test_acc"] = evaluation["test_acc"][str(EPOCH)]
@@ -221,40 +120,35 @@ def update_epoch_projection(context, EPOCH, predicates):
     label_color_list = []
     label_list = []
     label_name_dict = dict()
-    for i, label in enumerate(timevis.hyperparameters["CLASSES"]):
+    for i, label in enumerate(context.strategy.config["CLASSES"]):
         label_name_dict[i] = label
         
     for label in labels:
         label_color_list.append(color[int(label)])
-        label_list.append(timevis.hyperparameters["CLASSES"][int(label)])
+        label_list.append(context.strategy.config["CLASSES"][int(label)])
 
     prediction_list = []
-    prediction = timevis.data_provider.get_pred(EPOCH, all_data).argmax(1)
+    prediction = context.strategy.data_provider.get_pred(EPOCH, all_data).argmax(1)
 
     for i in range(len(prediction)):
-        prediction_list.append(timevis.hyperparameters["CLASSES"][prediction[i]])
+        prediction_list.append(context.strategy.config["CLASSES"][prediction[i]])
     
-    if timevis.hyperparameters["SETTING"] == "normal" or timevis.hyperparameters["SETTING"] == "abnormal":
-        max_iter = (timevis.hyperparameters["EPOCH_END"] - timevis.hyperparameters["EPOCH_START"]) // timevis.hyperparameters["EPOCH_PERIOD"] + 1
-    elif timevis.hyperparameters["SETTING"] == "active learning":
-        # TODO fix this, could be larger than EPOCH
-        max_iter = timevis.get_max_iter()
-        # max_iter = max(timevis.hyperparameters["BASE_ITERATION"], EPOCH)
-
+    max_iter = context.get_max_iter()
+    
     # current_index = timevis.get_epoch_index(EPOCH)
     # selected_points = np.arange(training_data_number + testing_data_number)[current_index]
     selected_points = np.arange(training_data_number + testing_data_number)
     for key in predicates.keys():
         if key == "label":
-            tmp = np.array(timevis.filter_label(predicates[key]))
+            tmp = np.array(context.filter_label(predicates[key]))
         elif key == "type":
-            tmp = np.array(timevis.filter_type(predicates[key], int(EPOCH)))
+            tmp = np.array(context.filter_type(predicates[key], int(EPOCH)))
         else:
             tmp = np.arange(training_data_number + testing_data_number)
         selected_points = np.intersect1d(selected_points, tmp)
     
     properties = np.concatenate((np.zeros(training_data_number, dtype=np.int16), 2*np.ones(testing_data_number, dtype=np.int16)), axis=0)
-    lb = timevis.get_epoch_index(EPOCH)
+    lb = context.get_epoch_index(EPOCH)
     ulb = np.setdiff1d(training_data_index, lb)
     properties[ulb] = 1
     
