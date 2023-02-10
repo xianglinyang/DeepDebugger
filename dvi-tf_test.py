@@ -97,20 +97,20 @@ save_dir = os.path.join(data_provider.content_path, "img")
 if not os.path.exists(save_dir):
     os.mkdir(save_dir)
 for i in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
-    vis.savefig(i, path=os.path.join(save_dir, "{}_{}_{}.png".format(DATASET, i, VIS_METHOD)))
+    vis.save_default_fig(i, path=os.path.join(save_dir, "{}_{}_{}.png".format(DATASET, i, VIS_METHOD)))
 
     
 ########################################################################################################################
 #                                                       EVALUATION                                                     #
 ########################################################################################################################
-eval_epochs = range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD)
-EVAL_EPOCH_DICT = {
-    "mnist":[1,10,15],
-    "fmnist":[1,25,50],
-    "cifar10":[1,100,199]
-}
-eval_epochs = EVAL_EPOCH_DICT[DATASET]
-evaluator = Evaluator(data_provider, projector)
+# eval_epochs = range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD)
+# EVAL_EPOCH_DICT = {
+#     "mnist":[1,10,15],
+#     "fmnist":[1,25,50],
+#     "cifar10":[1,100,199]
+# }
+# eval_epochs = EVAL_EPOCH_DICT[DATASET]
+# evaluator = Evaluator(data_provider, projector)
 
-for eval_epoch in eval_epochs:
-    evaluator.save_epoch_eval(eval_epoch, 15, temporal_k=5, file_name="{}".format(EVALUATION_NAME))
+# for eval_epoch in eval_epochs:
+#     evaluator.save_epoch_eval(eval_epoch, 15, temporal_k=5, file_name="{}".format(EVALUATION_NAME))

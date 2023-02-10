@@ -10,7 +10,7 @@ import pandas as pd
 import argparse
 
 from singleVis.data import ActiveLearningDataProvider
-from singleVis.utils import generate_random_trajectory
+from singleVis.utils import generate_random_trajectory, generate_random_trajectory_momentum
 
 def add_noise(rate, acc_idxs, rej_idxs):
     if rate == 0:
@@ -295,15 +295,36 @@ data = None
 #############################################
 xs = dvi_tm.embeddings_2d[:, -dvi_tm.period:, 0]
 ys = dvi_tm.embeddings_2d[:, -dvi_tm.period:, 1]
-new_sample = generate_random_trajectory(xs.min(), ys.min(), xs.max(), ys.max(), dvi_tm.period)
-dvi_new_score = dvi_tm.score_new_sample(new_sample)
-data = record(data, dvi_new_score, "RA", DATASET, "DVI", RATE, 0.0)
+vx = xs[:, 1:]-xs[:, :-1]
+vy = ys[:, 1:]-ys[:, :-1]
+
+for _ in range(100):
+    # new_sample = generate_random_trajectory(xs.min(), ys.min(), xs.max(), ys.max(), dvi_tm.period)
+    idx = np.random.choice(len(xs), 1)[0]
+    init_position = [xs[idx, 0], ys[idx, 0]]
+    vx_mean = vx[idx]+1
+    vy_mean = vy[idx]-1
+    new_sample = generate_random_trajectory_momentum(init_position, dvi_tm.period ,1,.1, vx_mean, vy_mean)
+    dvi_new_score = dvi_tm.score_new_sample(new_sample)
+    # data = record(data, dvi_new_score, "RA", DATASET, "DVI", RATE, 0.0)
+    data = record(data, dvi_new_score, "RA_M", DATASET, "DVI", RATE, 0.0)
 
 xs = timevis_tm.embeddings_2d[:, -timevis_tm.period:, 0]
 ys = timevis_tm.embeddings_2d[:, -timevis_tm.period:, 1]
-new_sample = generate_random_trajectory(xs.min(), ys.min(), xs.max(), ys.max(), timevis_tm.period)
-tv_new_score = timevis_tm.score_new_sample(new_sample)
-data = record(data, tv_new_score, "RA", DATASET, "TimeVis", RATE, 0.0)
+vx = xs[:, 1:]-xs[:, :-1]
+vy = ys[:, 1:]-ys[:, :-1]
+
+for _ in range(100):
+    # new_sample = generate_random_trajectory(xs.min(), ys.min(), xs.max(), ys.max(), timevis_tm.period)
+    idx = np.random.choice(len(xs), 1)[0]
+    init_position = [xs[idx, 0], ys[idx, 0]]
+    vx_mean = vx[idx]+1
+    vy_mean = vy[idx]-1
+    new_sample = generate_random_trajectory_momentum(init_position, timevis_tm.period ,1,.1, vx_mean, vy_mean)
+    
+    tv_new_score = timevis_tm.score_new_sample(new_sample)
+    # data = record(data, tv_new_score, "RA", DATASET, "TimeVis", RATE, 0.0)
+    data = record(data, tv_new_score, "RA_M", DATASET, "TimeVis", RATE, 0.0)
 
 #############################################
 #                    Save                   #
