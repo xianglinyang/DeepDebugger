@@ -18,9 +18,10 @@ from strategy import StrategyAbstractClass
 
 from singleVis.utils import *
 from singleVis.trajectory_manager import Recommender
+from singleVis.active_sampling import random_sampling, uncerainty_sampling
 
-active_learning_path = "../../ActiveLearning"
-sys.path.append(active_learning_path)
+# active_learning_path = "../../ActiveLearning"
+# sys.path.append(active_learning_path)
 
 '''the context for different dataset setting'''
 class Context(ABC):
@@ -235,18 +236,32 @@ class ActiveLearningContext(VisContext):
         print('number of unlabeled pool: {}'.format(n_pool - NUM_INIT_LB))
         print('number of testing pool: {}'.format(n_test))
 
-        if strategy == "Random" or strategy == "Uncertainty":
+        if strategy == "Random":
             print(DATA_NAME)
             print(strategy)
             print('================Round {:d}==============='.format(iteration+1))
             # query new samples
             t0 = time.time()
             # TODO implement active learning
-            new_indices, scores = active_sampling.query(strategy, iteration, idxs_lb, acc_idxs, rej_idxs, NUM_QUERY, period)
+            new_indices, scores = random_sampling(n_pool, idxs_lb, acc_idxs, rej_idxs, NUM_QUERY)
             t1 = time.time()
             print("Query time is {:.2f}".format(t1-t0))
+        
+        elif strategy == "Uncertainty":
+            print(DATA_NAME)
+            print(strategy)
+            print('================Round {:d}==============='.format(iteration+1))
+            samples = self.strategy.data_provider.train_representation(iteration)
+            pred = self.strategy.data_provider.get_pred(iteration, samples)
+            confidence = np.amax(softmax(pred, axis=1), axis=1)
+            uncertainty = 1-confidence
+            # query new samples
+            t0 = time.time()
+            new_indices, scores = uncerainty_sampling(n_pool, idxs_lb, acc_idxs, rej_idxs, NUM_QUERY, uncertainty=uncertainty)
+            t1 = time.time()
+            print("Query time is {:.2f}".format(t1-t0))
+        
         elif strategy == "TBSampling":
-            # TODO hard coded parameters...
             period = int(2/3*TOTAL_EPOCH)
             print(DATA_NAME)
             print("TBSampling")
@@ -257,7 +272,6 @@ class ActiveLearningContext(VisContext):
             print("Query time is {:.2f}".format(t1-t0))
         
         elif strategy == "Feedback":
-            # TODO hard coded parameters...suggest_abnormal
             period = int(2/3*TOTAL_EPOCH)
             print(DATA_NAME)
             print("Feedback")
@@ -275,60 +289,62 @@ class ActiveLearningContext(VisContext):
         return new_indices, true_labels[new_indices], scores
     
     def al_train(self, iteration, indices):
-        # customize ....
-        CONTENT_PATH = self.strategy.data_provider.content_path
-        # record output information
-        now = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime(time.time())) 
-        sys.stdout = open(os.path.join(CONTENT_PATH, now+".txt"), "w")
+        # TODO fix
+        raise NotImplementedError
+        # # customize ....
+        # CONTENT_PATH = self.strategy.data_provider.content_path
+        # # record output information
+        # now = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime(time.time())) 
+        # sys.stdout = open(os.path.join(CONTENT_PATH, now+".txt"), "w")
 
-        # for reproduce purpose
-        print("New indices:\t{}".format(len(indices)))
-        self.save_human_selection(iteration, indices)
-        lb_idx = self.get_epoch_index(iteration)
-        train_idx = np.hstack((lb_idx, indices))
-        print("Training indices:\t{}".format(len(train_idx)))
-        print("Valid indices:\t{}".format(len(set(train_idx))))
+        # # for reproduce purpose
+        # print("New indices:\t{}".format(len(indices)))
+        # self.save_human_selection(iteration, indices)
+        # lb_idx = self.get_epoch_index(iteration)
+        # train_idx = np.hstack((lb_idx, indices))
+        # print("Training indices:\t{}".format(len(train_idx)))
+        # print("Valid indices:\t{}".format(len(set(train_idx))))
 
-        TOTAL_EPOCH = self.strategy.config["TRAINING"]["total_epoch"]
-        NET = self.strategy.config["TRAINING"]["NET"]
-        DEVICE = self.strategy.data_provider.DEVICE
-        NEW_ITERATION = self.get_max_iter() + 1
-        GPU = self.strategy.config["GPU"]
-        DATA_NAME = self.strategy.config["DATASET"]
-        sys.path.append(CONTENT_PATH)
+        # TOTAL_EPOCH = self.strategy.config["TRAINING"]["total_epoch"]
+        # NET = self.strategy.config["TRAINING"]["NET"]
+        # DEVICE = self.strategy.data_provider.DEVICE
+        # NEW_ITERATION = self.get_max_iter() + 1
+        # GPU = self.strategy.config["GPU"]
+        # DATA_NAME = self.strategy.config["DATASET"]
+        # sys.path.append(CONTENT_PATH)
 
-        # loading neural network
-        from Model.model import resnet18
-        task_model = resnet18()
-        resume_path = self.strategy.data_provider.checkpoint_path(iteration)
-        state_dict = torch.load(os.path.join(resume_path, "subject_model.pth"), map_location=torch.device("cpu"))
-        task_model.load_state_dict(state_dict)
+        # # loading neural network
+        # from Model.model import resnet18
+        # task_model = resnet18()
+        # resume_path = self.strategy.data_provider.checkpoint_path(iteration)
+        # state_dict = torch.load(os.path.join(resume_path, "subject_model.pth"), map_location=torch.device("cpu"))
+        # task_model.load_state_dict(state_dict)
 
-        self.save_iteration_index(NEW_ITERATION, train_idx)
-        task_model_type = "pytorch"
-        # start experiment
-        n_pool = self.strategy.config["TRAINING"]["train_num"]  # 50000
-        save_path = self.strategy.data_provider.checkpoint_path(NEW_ITERATION)
-        os.makedirs(save_path, exist_ok=True)
+        # self.save_iteration_index(NEW_ITERATION, train_idx)
+        # task_model_type = "pytorch"
+        # # start experiment
+        # n_pool = self.strategy.config["TRAINING"]["train_num"]  # 50000
+        # save_path = self.strategy.data_provider.checkpoint_path(NEW_ITERATION)
+        # os.makedirs(save_path, exist_ok=True)
 
-        from query_strategies.random import RandomSampling
-        q_strategy = RandomSampling(task_model, task_model_type, n_pool, lb_idx, 10, DATA_NAME, NET, gpu=GPU, **self.hyperparameters["TRAINING"])
-        # print information
-        print('================Round {:d}==============='.format(NEW_ITERATION))
-        # update
-        q_strategy.update_lb_idxs(train_idx)
-        resnet_model = resnet18()
-        train_dataset = torchvision.datasets.CIFAR10(root="..//data//CIFAR10", download=True, train=True, transform=self.hyperparameters["TRAINING"]['transform_tr'])
-        test_dataset = torchvision.datasets.CIFAR10(root="..//data//CIFAR10", download=True, train=False, transform=self.hyperparameters["TRAINING"]['transform_te'])
-        t1 = time.time()
-        q_strategy.train(total_epoch=TOTAL_EPOCH, task_model=resnet_model, complete_dataset=train_dataset,save_path=None)
-        t2 = time.time()
-        print("Training time is {:.2f}".format(t2-t1))
-        self.save_subject_model(NEW_ITERATION, q_strategy.task_model.state_dict())
+        # from query_strategies.random import RandomSampling
+        # q_strategy = RandomSampling(task_model, task_model_type, n_pool, lb_idx, 10, DATA_NAME, NET, gpu=GPU, **self.hyperparameters["TRAINING"])
+        # # print information
+        # print('================Round {:d}==============='.format(NEW_ITERATION))
+        # # update
+        # q_strategy.update_lb_idxs(train_idx)
+        # resnet_model = resnet18()
+        # train_dataset = torchvision.datasets.CIFAR10(root="..//data//CIFAR10", download=True, train=True, transform=self.hyperparameters["TRAINING"]['transform_tr'])
+        # test_dataset = torchvision.datasets.CIFAR10(root="..//data//CIFAR10", download=True, train=False, transform=self.hyperparameters["TRAINING"]['transform_te'])
+        # t1 = time.time()
+        # q_strategy.train(total_epoch=TOTAL_EPOCH, task_model=resnet_model, complete_dataset=train_dataset,save_path=None)
+        # t2 = time.time()
+        # print("Training time is {:.2f}".format(t2-t1))
+        # self.save_subject_model(NEW_ITERATION, q_strategy.task_model.state_dict())
 
-        # compute accuracy at each round
-        accu = q_strategy.test_accu(test_dataset)
-        print('Accuracy {:.3f}'.format(100*accu))
+        # # compute accuracy at each round
+        # accu = q_strategy.test_accu(test_dataset)
+        # print('Accuracy {:.3f}'.format(100*accu))
     
     
     def get_max_iter(self):
