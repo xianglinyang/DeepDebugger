@@ -33,9 +33,9 @@ def find_cluster(trajectories, sub_labels, new_sample):
     dists = dists[:, 1]
     max_dist = dists.max()
     if nearest_neighbor_dist< max_dist:
-        return cls_idx
+        return cls_idx, nearest_neighbor_idx
     else:
-        return -1
+        return -1, -1
 
     
 
@@ -361,20 +361,21 @@ class Recommender:
         selected_idxs = not_selected[args]
         return selected_idxs, scores[selected_idxs]
     
-    def score_new_sample(self, sample_trajectory):
+    def score_new_sample(self, sample_trajectory, return_nearest=False):
         new_position = sample_trajectory.reshape(-1)
         new_v = sample_trajectory[1:, :] - sample_trajectory[:-1, :]
         new_a = (new_v[1:,:]-new_v[:-1,:]).reshape(-1)
         new_v = new_v.reshape(-1)
 
-        position_cls = find_cluster(self.position, self.predict_p_sub_labels, new_position)
-        v_cls = find_cluster(self.v, self.predict_v_sub_labels, new_v)
-        a_cls = find_cluster(self.a, self.predict_a_sub_labels, new_a)
+        position_cls, p_nearest_idx = find_cluster(self.position, self.predict_p_sub_labels, new_position)
+        v_cls, v_nearest_idx = find_cluster(self.v, self.predict_v_sub_labels, new_v)
+        a_cls, a_nearest_idx = find_cluster(self.a, self.predict_a_sub_labels, new_a)
 
         new_p_score = self.p_scores[position_cls] if position_cls>=0 else 1-1/self.train_num
         new_v_score = self.v_scores[v_cls] if v_cls>=0 else 1-1/self.train_num
         new_a_score = self.a_scores[a_cls] if a_cls>=0 else 1-1/self.train_num
-
+        if return_nearest:
+            return (new_p_score, new_v_score, new_a_score), (p_nearest_idx, v_nearest_idx, a_nearest_idx)
         return new_p_score, new_v_score, new_a_score
 
         
