@@ -26,7 +26,7 @@ from singleVis.visualizer import VisualizerAbstractClass, visualizer
 from singleVis.utils import find_neighbor_preserving_rate
 
 class StrategyAbstractClass(ABC):
-    def __init__(self, CONTENT_PATH, **config):
+    def __init__(self, CONTENT_PATH, config):
         self._config = config
         self.CONTENT_PATH = CONTENT_PATH
     
