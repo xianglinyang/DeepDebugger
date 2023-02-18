@@ -3,10 +3,12 @@ import json
 import time
 import csv
 import numpy as np
+import sys
 import pickle
 import base64
 
 vis_path = ".."
+sys.path.append(vis_path)
 from context import VisContext, ActiveLearningContext, AnormalyContext
 from strategy import DeepDebugger, TimeVis, DeepVisualInsight
 
