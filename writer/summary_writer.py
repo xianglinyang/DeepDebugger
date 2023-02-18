@@ -71,8 +71,9 @@ class SummaryWriter(SummaryWriterAbstractClass):
     def add_testing_data(self, dataloader):
         testset_data = None
         testset_label = None
-        for batch_idx, (inputs, targets) in enumerate(dataloader):
-            if testset_data != None:
+        for batch in dataloader:
+            inputs, targets = batch
+            if testset_data is not None:
                 testset_data = torch.cat((testset_data, inputs), 0)
                 testset_label = torch.cat((testset_label, targets), 0)
             else:
