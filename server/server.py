@@ -31,14 +31,14 @@ def update_projection():
     predicates = res["predicates"]
     username = res['username']
     
-    sys.path.append(CONTENT_PATH)
+    # sys.path.append(CONTENT_PATH)
     context = initialize_backend(CONTENT_PATH, VIS_METHOD, SETTING)
     EPOCH = (iteration-1)*context.strategy.data_provider.p + context.strategy.data_provider.s
 
     embedding_2d, grid, decision_view, label_name_dict, label_color_list, label_list, max_iter, training_data_index, \
     testing_data_index, eval_new, prediction_list, selected_points, properties = update_epoch_projection(context, EPOCH, predicates)
 
-    sys.path.remove(CONTENT_PATH)
+    # sys.path.remove(CONTENT_PATH)
     # add_line(API_result_path,['TT',username])
     return make_response(jsonify({'result': embedding_2d, 'grid_index': grid, 'grid_color': 'data:image/png;base64,' + decision_view,
                                   'label_name_dict':label_name_dict,
@@ -279,14 +279,14 @@ def clear_cache(con_paths):
 @app.route('/login', methods=["POST"])
 @cross_origin()
 def login():
-    # data = request.get_json()
+    data = request.get_json()
     # username = data["username"]
     # password = data["password"]
-
-    active_learning_path = '/home/xianglin/projects/DVI_data/exp_al'
-    noisy_detection_path = '/home/xianglin/projects/DVI_data/exp_anormaly'
+    content_path = data["content_path"]
     # clear_cache(con_paths)
-    return make_response(jsonify({"normal_content_path": active_learning_path, "unormaly_content_path": noisy_detection_path, "isControl":True}), 200)
+
+    # Verify username and password
+    return make_response(jsonify({"normal_content_path": content_path, "unormaly_content_path": content_path}), 200)
 
 @app.route('/boundingbox_record', methods=["POST"])
 @cross_origin()
