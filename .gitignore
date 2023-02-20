@@ -131,3 +131,6 @@ dmypy.json
 data/
 
 singleVis/plot/plot_results/
+
+*.xlsx
+*.csv
