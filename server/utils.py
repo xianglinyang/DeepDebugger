@@ -24,7 +24,7 @@ def initialize_strategy(CONTENT_PATH, VIS_METHOD):
         strategy = DeepVisualInsight(CONTENT_PATH, config)
     elif VIS_METHOD == "TimeVis":
         strategy = TimeVis(CONTENT_PATH, config)
-    elif VIS_METHOD == DeepDebugger(CONTENT_PATH, config):
+    elif VIS_METHOD == "DeepDebugger":
         strategy = DeepDebugger(CONTENT_PATH, config)
     else:
         raise NotImplementedError
@@ -38,9 +38,11 @@ def initialize_context(strategy, setting):
     elif setting == "dense al":
         context == ActiveLearningContext(strategy)
     elif setting == "abnormal":
-        context = AnormalyContext(strategy, 80)
+        # TODO fix period
+        context = AnormalyContext(strategy)
     else:
         raise NotImplementedError
+    return context
 
 def initialize_backend(CONTENT_PATH, VIS_METHOD, SETTING):
     """ initialize backend for visualization

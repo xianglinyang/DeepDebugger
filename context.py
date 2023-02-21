@@ -463,9 +463,12 @@ class ActiveLearningContext(VisContext):
 
 class AnormalyContext(VisContext):
 
-    def __init__(self, strategy, period,) -> None:
+    def __init__(self, strategy) -> None:
         super().__init__(strategy)
-        self.period = period
+        EPOCH_START = self.strategy.config["EPOCH_START"]
+        EPOCH_END = self.strategy.config["EPOCH_END"]
+        EPOCH_PERIOD = self.strategy.config["EPOCH_PERIOD"]
+        self.period = int(2/3*((EPOCH_END-EPOCH_START)/EPOCH_PERIOD+1))
         file_path = os.path.join(self.strategy.data_provider.content_path, 'clean_label.json')
         with open(file_path, "r") as f:
             self.clean_labels = np.array(json.load(f))
@@ -511,12 +514,12 @@ class AnormalyContext(VisContext):
             np.save(uncertainty_path, uncertainty)
         
         # prepare sampling manager
-        ntd_path = os.path.join(self.strategy.data_provider.content_path, 'sample_recommender.pkl')
+        ntd_path = os.path.join(self.strategy.data_provider.content_path, '{}_sample_recommender.pkl'.format(self.strategy.VIS_METHOD))
         if os.path.exists(ntd_path):
             with open(ntd_path, 'rb') as f:
                 ntd = pickle.load(f)
         else:
-            ntd = Recommender(uncertainty, trajectories, 30,period=self.period,metric="a")
+            ntd = Recommender(uncertainty, trajectories, 30, self.period)
             print("Detecting abnormal....")
             ntd.clustered()
             print("Finish detection!")

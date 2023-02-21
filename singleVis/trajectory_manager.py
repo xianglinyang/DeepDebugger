@@ -230,7 +230,7 @@ class FeedbackSampling(TrajectoryManager):
 
 # TODO: extension for new features. make features a dictionary
 class Recommender:
-    def __init__(self, uncertainty, embeddings_2d, cls_num, period=100):
+    def __init__(self, uncertainty, embeddings_2d, cls_num, period):
         """ Recommend samples based on uncertainty and embeddings
         """
         self.uncertainty = uncertainty
