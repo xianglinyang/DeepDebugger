@@ -163,9 +163,8 @@ class VisContext(Context):
 
 class ActiveLearningContext(VisContext):
     '''Active learning dataset'''
-    def __init__(self, strategy, dense) -> None:
+    def __init__(self, strategy) -> None:
         super().__init__(strategy)
-        self.dense = dense
     
     def save_acc_and_rej(self, iteration, acc_idxs, rej_idxs, file_name):
         d = {
@@ -212,8 +211,8 @@ class ActiveLearningContext(VisContext):
         sys.path.append(CONTENT_PATH)
 
         # record output information
-        now = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime(time.time())) 
-        sys.stdout = open(os.path.join(CONTENT_PATH, now+".txt"), "w")
+        # now = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime(time.time())) 
+        # sys.stdout = open(os.path.join(CONTENT_PATH, now+".txt"), "w")
 
         # loading neural network
         import Model.model as subject_model
@@ -284,7 +283,7 @@ class ActiveLearningContext(VisContext):
             raise NotImplementedError
             
         # TODO return the suggest labels, need to develop pesudo label generation technique in the future
-        true_labels = self.strategy.data_provider.train_labels(iteration)
+        true_labels = self.strategy.data_provider.train_labels_all(iteration)
 
         return new_indices, true_labels[new_indices], scores
     
@@ -391,7 +390,7 @@ class ActiveLearningContext(VisContext):
     #                                                                                                               #
     #################################################################################################################
     def _save(self, iteration, ftm):
-        with open(os.path.join(self.strategy.data_provider.checkpoint_path(iteration), 'sample_recommender.pkl'), 'wb') as f:
+        with open(os.path.join(self.strategy.data_provider.checkpoint_path(iteration), '{}_sample_recommender.pkl'.format(self.strategy.VIS_METHOD)), 'wb') as f:
             pickle.dump(ftm, f, pickle.HIGHEST_PROTOCOL)
 
     def _init_detection(self, iteration, lb_idxs, period=80):
@@ -422,12 +421,12 @@ class ActiveLearningContext(VisContext):
             np.save(uncertainty_path, uncertainty)
         ulb_idxs = self.strategy.data_provider.get_unlabeled_idx(len(uncertainty), lb_idxs)
         # prepare sampling manager
-        ntd_path = os.path.join(self.strategy.data_provider.checkpoint_path(iteration), 'sample_recommender.pkl')
+        ntd_path = os.path.join(self.strategy.data_provider.checkpoint_path(iteration), '{}_sample_recommender.pkl'.format(self.strategy.VIS_METHOD))
         if os.path.exists(ntd_path):
             with open(ntd_path, 'rb') as f:
                 ntd = pickle.load(f)
         else:
-            ntd = Recommender(uncertainty[ulb_idxs], trajectories[ulb_idxs], 30, period=period,metric="a")
+            ntd = Recommender(uncertainty[ulb_idxs], trajectories[ulb_idxs], 30, period=period)
             print("Detecting abnormal....")
             ntd.clustered()
             print("Finish detection!")
@@ -483,7 +482,7 @@ class AnormalyContext(VisContext):
     #################################################################################################################
 
     def _save(self, ntd):
-        with open(os.path.join(self.strategy.data_provider.content_path, 'sample_recommender.pkl'), 'wb') as f:
+        with open(os.path.join(self.strategy.data_provider.content_path, '{}_sample_recommender.pkl'.format(self.strategy.VIS_METHOD)), 'wb') as f:
             pickle.dump(ntd, f, pickle.HIGHEST_PROTOCOL)
 
     def _init_detection(self):
