@@ -10,35 +10,40 @@ import base64
 vis_path = ".."
 sys.path.append(vis_path)
 from context import VisContext, ActiveLearningContext, AnormalyContext
-from strategy import DeepDebugger, TimeVis, DeepVisualInsight
+from strategy import DeepDebugger, TimeVis, DeepVisualInsight, DVIAL
 
 """Interface align"""
 
-def initialize_strategy(CONTENT_PATH, VIS_METHOD):
+def initialize_strategy(CONTENT_PATH, VIS_METHOD, SETTING):
     # initailize strategy (visualization method)
     with open(os.path.join(CONTENT_PATH, "config.json"), "r") as f:
         conf = json.load(f)
     config = conf[VIS_METHOD]
 
-    if VIS_METHOD == "DVI":
-        strategy = DeepVisualInsight(CONTENT_PATH, config)
-    elif VIS_METHOD == "TimeVis":
-        strategy = TimeVis(CONTENT_PATH, config)
-    elif VIS_METHOD == "DeepDebugger":
-        strategy = DeepDebugger(CONTENT_PATH, config)
+    if SETTING == "normal" or SETTING == "abnormal":
+        if VIS_METHOD == "DVI" and SETTING == "normal":
+            strategy = DeepVisualInsight(CONTENT_PATH, config)
+        elif VIS_METHOD == "TimeVis":
+            strategy = TimeVis(CONTENT_PATH, config)
+        elif VIS_METHOD == "DeepDebugger":
+            strategy = DeepDebugger(CONTENT_PATH, config)
+        else:
+            raise NotImplementedError
     else:
-        raise NotImplementedError
+        if VIS_METHOD == "DVI":
+            dense = True if SETTING == "dense al" else False
+            strategy = DVIAL(CONTENT_PATH, config, dense=dense)
+        else:
+            raise NotImplementedError
+
     return strategy
 
 def initialize_context(strategy, setting):
     if setting == "normal":
         context = VisContext(strategy)
-    elif setting == "active learning":
+    elif setting == "active learning" or setting == "dense al":
         context = ActiveLearningContext(strategy)
-    elif setting == "dense al":
-        context == ActiveLearningContext(strategy)
     elif setting == "abnormal":
-        # TODO fix period
         context = AnormalyContext(strategy)
     else:
         raise NotImplementedError
@@ -60,7 +65,7 @@ def initialize_backend(CONTENT_PATH, VIS_METHOD, SETTING):
     Returns:
         backend: a context with a specific strategy
     """
-    strategy = initialize_strategy(CONTENT_PATH, VIS_METHOD)
+    strategy = initialize_strategy(CONTENT_PATH, VIS_METHOD, SETTING)
     context = initialize_context(strategy=strategy, setting=SETTING)
     return context
 
