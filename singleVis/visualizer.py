@@ -354,10 +354,12 @@ class visualizer(VisualizerAbstractClass):
         :return:
             color : numpy.ndarray, shape (10, 3)
         '''
+        # TODO 10 classes?
         mesh_max_class = self.class_num - 1
-        mesh_classes = np.arange(10)
+        mesh_classes = np.arange(len(self.classes))
         color = self.cmap(mesh_classes / mesh_max_class)
         color = color[:, 0:3]
+        color = np.concatenate((color, np.zeros((1,3))), axis=0)
         return color
 
 class DenseALvisualizer(visualizer):
