@@ -33,19 +33,25 @@ def update_projection():
     
     # sys.path.append(CONTENT_PATH)
     context = initialize_backend(CONTENT_PATH, VIS_METHOD, SETTING)
-    EPOCH = (iteration-1)*context.strategy.data_provider.p + context.strategy.data_provider.s
+    # use the true one
+    # EPOCH = (iteration-1)*context.strategy.data_provider.p + context.strategy.data_provider.s
+    EPOCH = int(iteration)
 
     embedding_2d, grid, decision_view, label_name_dict, label_color_list, label_list, max_iter, training_data_index, \
     testing_data_index, eval_new, prediction_list, selected_points, properties = update_epoch_projection(context, EPOCH, predicates)
 
     # sys.path.remove(CONTENT_PATH)
     # add_line(API_result_path,['TT',username])
-    return make_response(jsonify({'result': embedding_2d, 'grid_index': grid, 'grid_color': 'data:image/png;base64,' + decision_view,
+    return make_response(jsonify({'result': embedding_2d, 
+                                  'grid_index': grid, 
+                                  'grid_color': 'data:image/png;base64,' + decision_view,
                                   'label_name_dict':label_name_dict,
-                                  'label_color_list': label_color_list, 'label_list': label_list,
+                                  'label_color_list': label_color_list, 
+                                  'label_list': label_list,
                                   'maximum_iteration': max_iter, 
                                   'training_data': training_data_index,
-                                  'testing_data': testing_data_index, 'evaluation': eval_new,
+                                  'testing_data': testing_data_index, 
+                                  'evaluation': eval_new,
                                   'prediction_list': prediction_list,
                                   "selectedPoints":selected_points.tolist(),
                                   "properties":properties.tolist()}), 200)
@@ -64,6 +70,7 @@ def filter():
 
     sys.path.append(CONTENT_PATH)
     context = initialize_backend(CONTENT_PATH, VIS_METHOD, SETTING)
+    # TODO: fix when active learning
     EPOCH = (iteration-1)*context.strategy.data_provider.p + context.strategy.data_provider.s
 
     training_data_number = context.strategy.config["TRAINING"]["train_num"]
@@ -139,6 +146,7 @@ def al_query():
     VIS_METHOD = data['vis_method']
     SETTING = data["setting"]
 
+    # TODO fix iteration, align with frontend
     iteration = data["iteration"]
     strategy = data["strategy"]
     budget = int(data["budget"])

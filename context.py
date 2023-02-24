@@ -47,6 +47,25 @@ class VisContext(Context):
     '''Normal setting'''
     #################################################################################################################
     #                                                                                                               #
+    #                                                  Adapter                                                      #
+    #                                                                                                               #
+    #################################################################################################################
+
+    def train_representation_data(self, EPOCH):
+        return self.strategy.data_provider.train_representation(EPOCH)
+    
+    def test_representation_data(self, EPOCH):
+        return self.strategy.data_provider.test_representation(EPOCH)
+    
+    def train_labels(self, EPOCH):
+        return self.strategy.data_provider.train_labels(EPOCH)
+
+    def test_labels(self, EPOCH):
+        return self.strategy.data_provider.test_labels(EPOCH)
+    
+
+    #################################################################################################################
+    #                                                                                                               #
     #                                                data Panel                                                     #
     #                                                                                                               #
     #################################################################################################################
@@ -165,6 +184,25 @@ class ActiveLearningContext(VisContext):
     '''Active learning dataset'''
     def __init__(self, strategy) -> None:
         super().__init__(strategy)
+
+    '''Active learning setting'''
+    #################################################################################################################
+    #                                                                                                               #
+    #                                                  Adapter                                                      #
+    #                                                                                                               #
+    #################################################################################################################
+
+    def train_representation_data(self, EPOCH):
+        return self.strategy.data_provider.train_representation_all(EPOCH)
+    
+    def train_labels(self, EPOCH):
+        labels = self.strategy.data_provider.train_labels_all(EPOCH)
+        idx_lb = self.strategy.data_provider.get_labeled_idx(EPOCH)
+        pool_num = len(labels)
+        idxs_ulb = self.get_unlabeled_idx(pool_num, idx_lb)
+        labels[idxs_ulb] = -1
+        return labels
+
     
     def save_acc_and_rej(self, iteration, acc_idxs, rej_idxs, file_name):
         d = {
