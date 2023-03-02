@@ -16,7 +16,7 @@ from singleVis.SingleVisualizationModel import VisModel
 from singleVis.losses import HybridLoss, SmoothnessLoss, UmapLoss, ReconstructionLoss, TemporalLoss, DVILoss, SingleVisLoss
 from singleVis.edge_dataset import HybridDataHandler, DVIDataHandler, DataHandler
 from singleVis.trainer import HybridVisTrainer, DVITrainer, SingleVisTrainer
-from singleVis.data import DataProviderAbstractClass, NormalDataProvider, ActiveLearningDataProvider
+from singleVis.data import DataProviderAbstractClass, NormalDataProvider, ActiveLearningDataProvider, DenseActiveLearningDataProvider
 from singleVis.spatial_edge_constructor import kcHybridSpatialEdgeConstructor, SingleEpochSpatialEdgeConstructor, kcSpatialEdgeConstructor
 from singleVis.temporal_edge_constructor import GlobalTemporalEdgeConstructor
 from singleVis.projector import DeepDebuggerProjector, DVIProjector, ProjectorAbstractClass, TimeVisProjector, ALProjector
@@ -278,7 +278,7 @@ class TimeVis(StrategyAbstractClass):
         sys.path.append(self.CONTENT_PATH)
         # record output information
         now = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime(time.time())) 
-        sys.stdout = open(os.path.join(CONTENT_PATH, now+".txt"), "w")
+        sys.stdout = open(os.path.join(self.CONTENT_PATH, now+".txt"), "w")
 
         CLASSES = self.config["CLASSES"]
         GPU_ID = self.config["GPU"]
@@ -601,13 +601,22 @@ class DeepDebugger(StrategyAbstractClass):
         self._evaluate()
 
 class DVIAL(StrategyAbstractClass):
-    def __init__(self, CONTENT_PATH, config):
+    def __init__(self, CONTENT_PATH, config, dense):
         super().__init__(CONTENT_PATH, config)
+        resume_iter = config["BASE_ITERATION"]
+        self.VIS_METHOD = "DVIAL"
+        self.dense = dense
+        self._init(resume_iteration=resume_iter)
     
     def _init(self, resume_iteration=-1):
+        sys.path.append(self.CONTENT_PATH)
+        # record output information
+        # now = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime(time.time())) 
+        # sys.stdout = open(os.path.join(self.CONTENT_PATH, now+".txt"), "w")
+
         CLASSES = self.config["CLASSES"]
         BASE_ITERATION = self.config["BASE_ITERATION"]
-        GPU_ID = self.config["GPU_ID"]
+        GPU_ID = self.config["GPU"]
         self.DEVICE = torch.device("cuda:{}".format(GPU_ID) if torch.cuda.is_available() else "cpu")
 
         #################################################   VISUALIZATION PARAMETERS    ########################################
@@ -622,9 +631,13 @@ class DVIAL(StrategyAbstractClass):
         import Model.model as subject_model
         net = eval("subject_model.{}()".format(NET))
 
-        self.data_provider = ActiveLearningDataProvider(self.CONTENT_PATH, net, BASE_ITERATION, device=self.DEVICE, classes=CLASSES, verbose=1)
+        if self.dense:
+            # TODO fix 200
+            self.data_provider = DenseActiveLearningDataProvider(self.CONTENT_PATH, net, BASE_ITERATION, 200, device=self.DEVICE, classes=CLASSES, iteration_name="Iteration", epoch_name="Epoch", verbose=1)
+        else:
+            self.data_provider = ActiveLearningDataProvider(self.CONTENT_PATH, net, BASE_ITERATION, device=self.DEVICE, classes=CLASSES, iteration_name="Iteration", verbose=1)
         self.model = VisModel(ENCODER_DIMS, DECODER_DIMS)
-        self.projector = ALProjector(vis_model=self.model, content_path=self.CONTENT_PATH, vis_model_name=VIS_MODEL_NAME, iteration_name="Iteration", device=self.DEVICE)
+        self.projector = ALProjector(vis_model=self.model, content_path=self.CONTENT_PATH, vis_model_name=VIS_MODEL_NAME, device=self.DEVICE)
 
         if resume_iteration > 0:
             self.projector.load(resume_iteration)
