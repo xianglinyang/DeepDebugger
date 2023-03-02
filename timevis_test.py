@@ -59,7 +59,7 @@ L_BOUND = VISUALIZATION_PARAMETER["BOUNDARY"]["L_BOUND"]
 INIT_NUM = VISUALIZATION_PARAMETER["INIT_NUM"]
 ALPHA = VISUALIZATION_PARAMETER["ALPHA"]
 BETA = VISUALIZATION_PARAMETER["BETA"]
-MAX_HAUSDORFF = VISUALIZATION_PARAMETER["MAX_HAUSDORFF"]
+# MAX_HAUSDORFF = VISUALIZATION_PARAMETER["MAX_HAUSDORFF"]
 ENCODER_DIMS = VISUALIZATION_PARAMETER["ENCODER_DIMS"]
 DECODER_DIMS = VISUALIZATION_PARAMETER["DECODER_DIMS"]
 S_N_EPOCHS = VISUALIZATION_PARAMETER["S_N_EPOCHS"]
@@ -96,7 +96,7 @@ projector = TimeVisProjector(vis_model=model, content_path=CONTENT_PATH, vis_mod
 ########################################################################################################################
 from singleVis.visualizer import visualizer
 
-vis = visualizer(data_provider, projector, 200)
+vis = visualizer(data_provider, projector, 200, cmap="tab10")
 save_dir = os.path.join(data_provider.content_path, "img")
 os.makedirs(save_dir, exist_ok=True)
 

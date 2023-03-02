@@ -82,16 +82,15 @@ DEVICE = torch.device("cuda:{}".format(GPU_ID) if torch.cuda.is_available() else
 
 import Model.model as subject_model
 net = eval("subject_model.{}()".format(NET))
-# net = subject_model.resnet18(num_classes=12, in_channels=1)
 
 ########################################################################################################################
 #                                                    TRAINING SETTING                                                  #
 ########################################################################################################################
 data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=DEVICE, classes=CLASSES, epoch_name="Epoch", verbose=1)
-# if PREPROCESS:
-#     data_provider._meta_data()
-#     if B_N_EPOCHS >0:
-#         data_provider._estimate_boundary(LEN//10, l_bound=L_BOUND)
+if PREPROCESS:
+    data_provider._meta_data()
+    if B_N_EPOCHS >0:
+        data_provider._estimate_boundary(LEN//10, l_bound=L_BOUND)
 
 
 model = VisModel(ENCODER_DIMS, DECODER_DIMS)
