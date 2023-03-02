@@ -42,6 +42,11 @@ class SummaryWriterAbstractClass(ABC):
     def add_checkpoint_data(self, relative_path, state_dict, idxs):
         pass
 
+    # @abstractmethod
+    # def add_source(self, ):
+    #     pass
+    # sprite images, text,...
+
 
 class SummaryWriter(SummaryWriterAbstractClass):
 
