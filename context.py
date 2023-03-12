@@ -197,10 +197,10 @@ class ActiveLearningContext(VisContext):
     
     def train_labels(self, EPOCH):
         labels = self.strategy.data_provider.train_labels_all(EPOCH)
-        idx_lb = self.strategy.data_provider.get_labeled_idx(EPOCH)
-        pool_num = len(labels)
-        idxs_ulb = self.get_unlabeled_idx(pool_num, idx_lb)
-        labels[idxs_ulb] = -1
+        # idx_lb = self.strategy.data_provider.get_labeled_idx(EPOCH)
+        # pool_num = len(labels)
+        # idxs_ulb = np.setdiff1d(np.arange(pool_num), idx_lb)
+        # labels[idxs_ulb] = -1
         return labels
 
     
@@ -321,7 +321,7 @@ class ActiveLearningContext(VisContext):
             raise NotImplementedError
             
         # TODO return the suggest labels, need to develop pesudo label generation technique in the future
-        true_labels = self.strategy.data_provider.train_labels_all(iteration)
+        true_labels = self.strategy.data_provider.train_labels_all(iteration, TOTAL_EPOCH)
 
         return new_indices, true_labels[new_indices], scores
     
@@ -453,6 +453,7 @@ class ActiveLearningContext(VisContext):
         if os.path.exists(uncertainty_path):
             uncertainty = np.load(uncertainty_path)
         else:
+            epoch_num = (self.strategy.data_provider.e - self.strategy.data_provider.s)//self.strategy.data_provider.p + 1
             samples = self.strategy.data_provider.train_representation(iteration, epoch_num)
             pred = self.strategy.data_provider.get_pred(iteration, epoch_num, samples)
             uncertainty = 1 - np.amax(softmax(pred, axis=1), axis=1)
