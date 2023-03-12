@@ -518,6 +518,7 @@ class Evaluator(EvaluatorAbstractClass):
         return corrs.mean()
     
     def eval_moving_invariants_train(self, e_s, e_t, resolution=500):
+
         train_data_s = self.data_provider.train_representation(e_s)
         train_data_t = self.data_provider.train_representation(e_t)
 
@@ -533,9 +534,11 @@ class Evaluator(EvaluatorAbstractClass):
         predictions_s = pred_s.argmax(1)
         predictions_t = pred_t.argmax(1)
 
+        # TODO implement more case where loss is not cross entropy
         confident_sample = np.logical_and(np.logical_not(s_B),np.logical_not(t_B))
         diff_pred = predictions_s!=predictions_t
 
+        # select confident and moving samples
         selected = np.logical_and(diff_pred, confident_sample)
 
         # background related
@@ -567,7 +570,6 @@ class Evaluator(EvaluatorAbstractClass):
         close_s_B = grid_s_B[knn_indices].squeeze()
         s_true = np.logical_and(close_s_pred==predictions_s, close_s_B == s_B)
         
-
         high_neigh = NearestNeighbors(n_neighbors=1, radius=0.4)
         high_neigh.fit(grid_view_t)
         _, knn_indices = high_neigh.kneighbors(low_t, n_neighbors=1, return_distance=True)
@@ -576,7 +578,11 @@ class Evaluator(EvaluatorAbstractClass):
         close_t_B = grid_t_B[knn_indices].squeeze()
         t_true = np.logical_and(close_t_pred==predictions_t, close_t_B == t_B)
 
-        return np.sum(np.logical_and(s_true[selected], t_true[selected])), np.sum(s_true[selected]), np.sum(t_true[selected]), np.sum(selected)
+        moving_sample_num = np.sum(selected)
+        true_num = np.sum(np.logical_and(s_true[selected], t_true[selected]))
+        print(f'moving invariant Low/High:\t{true_num}/{moving_sample_num}')
+
+        return true_num, moving_sample_num
     
 
     def eval_moving_invariants_test(self, e_s, e_t, resolution=500):
@@ -637,7 +643,12 @@ class Evaluator(EvaluatorAbstractClass):
         close_t_pred = grid_predictions_t[knn_indices].squeeze()
         close_t_B = grid_t_B[knn_indices].squeeze()
         t_true = np.logical_and(close_t_pred==predictions_t, close_t_B == t_B)
-        return np.sum(np.logical_and(s_true[selected], t_true[selected])), np.sum(s_true[selected]), np.sum(t_true[selected]), np.sum(selected)
+
+        moving_sample_num = np.sum(selected)
+        true_num = np.sum(np.logical_and(s_true[selected], t_true[selected]))
+        print(f'moving invariant Low/High:\t{true_num}/{moving_sample_num}')
+
+        return true_num, moving_sample_num
     
     def eval_fixing_invariants_train(self, e_s, e_t, high_threshold, low_threshold, metric="euclidean"):
         train_data_s = self.data_provider.train_representation(e_s)
@@ -877,8 +888,8 @@ class Evaluator(EvaluatorAbstractClass):
         # evaluation["tr_test"][epoch_key] = self.eval_temporal_global_corr_test(n_epoch)
         
         # weighted global temporal ranking
-        evaluation["wtr_train"][epoch_key] = self.eval_temporal_weighted_global_corr_train(n_epoch)
-        evaluation["wtr_test"][epoch_key] = self.eval_temporal_weighted_global_corr_test(n_epoch)
+        # evaluation["wtr_train"][epoch_key] = self.eval_temporal_weighted_global_corr_train(n_epoch)
+        # evaluation["wtr_test"][epoch_key] = self.eval_temporal_weighted_global_corr_test(n_epoch)
 
         # # local temporal ranking
         # evaluation["tlr_train"][epoch_key] = self.eval_temporal_local_corr_train(n_epoch, 3)
