@@ -2,6 +2,7 @@
 from abc import ABC, abstractmethod
 
 import torch
+import tensorflow as tf
 import sys
 import os
 import time
@@ -12,14 +13,14 @@ from torch.utils.data import WeightedRandomSampler
 from umap.umap_ import find_ab_params
 
 from singleVis.custom_weighted_random_sampler import CustomWeightedRandomSampler
-from singleVis.SingleVisualizationModel import VisModel
-from singleVis.losses import HybridLoss, SmoothnessLoss, UmapLoss, ReconstructionLoss, TemporalLoss, DVILoss, SingleVisLoss
-from singleVis.edge_dataset import HybridDataHandler, DVIDataHandler, DataHandler
+from singleVis.SingleVisualizationModel import VisModel, tfModel
+from singleVis.losses import HybridLoss, SmoothnessLoss, UmapLoss, ReconstructionLoss, TemporalLoss, DVILoss, SingleVisLoss, umap_loss, reconstruction_loss, regularize_loss
+from singleVis.edge_dataset import HybridDataHandler, DVIDataHandler, DataHandler, construct_edge_dataset
 from singleVis.trainer import HybridVisTrainer, DVITrainer, SingleVisTrainer
 from singleVis.data import DataProviderAbstractClass, NormalDataProvider, ActiveLearningDataProvider, DenseActiveLearningDataProvider
-from singleVis.spatial_edge_constructor import kcHybridSpatialEdgeConstructor, SingleEpochSpatialEdgeConstructor, kcSpatialEdgeConstructor
+from singleVis.spatial_edge_constructor import kcHybridSpatialEdgeConstructor, SingleEpochSpatialEdgeConstructor, kcSpatialEdgeConstructor, tfEdgeConstructor
 from singleVis.temporal_edge_constructor import GlobalTemporalEdgeConstructor
-from singleVis.projector import DeepDebuggerProjector, DVIProjector, ProjectorAbstractClass, TimeVisProjector, ALProjector
+from singleVis.projector import DeepDebuggerProjector, DVIProjector, ProjectorAbstractClass, TimeVisProjector, ALProjector, tfDVIProjector
 from singleVis.segmenter import Segmenter
 from singleVis.eval.evaluator import Evaluator, ALEvaluator, EvaluatorAbstractClass
 from singleVis.visualizer import VisualizerAbstractClass, visualizer
@@ -97,13 +98,13 @@ class DeepVisualInsight(StrategyAbstractClass):
     def __init__(self, CONTENT_PATH, config):
         super().__init__(CONTENT_PATH, config)
         self._init()
-        self.VIS_METHOD = "DeepVisualInsight"
+        self.VIS_METHOD = "DVI"
     
     def _init(self):
         sys.path.append(self.CONTENT_PATH)
-        # record output information
-        now = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime(time.time())) 
-        sys.stdout = open(os.path.join(self.CONTENT_PATH, now+".txt"), "w")
+        # # record output information
+        # now = time.strftime("%Y-%m-%d-%H_%M_%S", time.localtime(time.time())) 
+        # sys.stdout = open(os.path.join(self.CONTENT_PATH, now+".txt"), "w")
 
         CLASSES = self.config["CLASSES"]
         GPU_ID = self.config["GPU"]
@@ -140,7 +141,7 @@ class DeepVisualInsight(StrategyAbstractClass):
         self.umap_fn = umap_loss_fn
         self.recon_fn = recon_loss_fn
         self.temporal_fn = temporal_loss_fn
-        self._projector = DVIProjector(vis_model=self.model, content_path=self.CONTENT_PATH, vis_model_name=VIS_MODEL_NAME, device=self.DEVICE)
+        self.projector(DVIProjector(vis_model=self.model, content_path=self.CONTENT_PATH, vis_model_name=VIS_MODEL_NAME, device=self.DEVICE))
         self.vis(visualizer(self.data_provider, self.projector, 200, "tab10"))
         self.evaluator(Evaluator(self.data_provider, self.projector))
 
@@ -261,6 +262,182 @@ class DeepVisualInsight(StrategyAbstractClass):
         for eval_epoch in eval_epochs:
             self.evaluator.save_epoch_eval(eval_epoch, N_NEIGHBORS, temporal_k=5, file_name="{}".format(EVALUATION_NAME))
 
+
+    def visualize_embedding(self):
+        self._preprocess()
+        self._train()
+        self._visualize()
+        self._evaluate()
+
+
+class tfDeepVisualInsight(StrategyAbstractClass):
+    def __init__(self, CONTENT_PATH, config):
+        super().__init__(CONTENT_PATH, config)
+        self._init()
+        self.VIS_METHOD = "tfDVI"
+    
+    def _init(self):
+        sys.path.append(self.CONTENT_PATH)
+
+        CLASSES = self.config["CLASSES"]
+        GPU_ID = self.config["GPU"]
+        EPOCH_START = self.config["EPOCH_START"]
+        EPOCH_END = self.config["EPOCH_END"]
+        EPOCH_PERIOD = self.config["EPOCH_PERIOD"]
+
+        # Training parameter (subject model)
+        TRAINING_PARAMETER = self.config["TRAINING"]
+        NET = TRAINING_PARAMETER["NET"]
+
+        # Training parameter (visualization model)
+        VISUALIZATION_PARAMETER = self.config["VISUALIZATION"]
+        B_N_EPOCHS = VISUALIZATION_PARAMETER["BOUNDARY"]["B_N_EPOCHS"]
+
+        # define hyperparameters
+        self.DEVICE = torch.device("cuda:{}".format(GPU_ID) if torch.cuda.is_available() else "cpu")
+
+        import Model.model as subject_model
+        net = eval("subject_model.{}()".format(NET))
+
+        self.data_provider = NormalDataProvider(self.CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=self.DEVICE, classes=CLASSES, epoch_name="Epoch", verbose=1)
+        
+        # Define Projector
+        self.flag = "_temporal_id{}".format("_withoutB" if B_N_EPOCHS==0 else "")
+        self.projector = tfDVIProjector(self.CONTENT_PATH, flag=self.flag)
+        self.vis = visualizer(self.data_provider, self.projector, 200, "tab10")
+        self.evaluator = Evaluator(self.data_provider, self.projector)
+
+    def _preprocess(self):
+        PREPROCESS = self.config["VISUALIZATION"]["PREPROCESS"]
+        # Training parameter (subject model)
+        TRAINING_PARAMETER = self.config["TRAINING"]
+        LEN = TRAINING_PARAMETER["train_num"]
+        # Training parameter (visualization model)
+        VISUALIZATION_PARAMETER = self.config["VISUALIZATION"]
+        B_N_EPOCHS = VISUALIZATION_PARAMETER["BOUNDARY"]["B_N_EPOCHS"]
+        L_BOUND = VISUALIZATION_PARAMETER["BOUNDARY"]["L_BOUND"]
+        if PREPROCESS:
+            self.data_provider._meta_data()
+            if B_N_EPOCHS >0:
+                self.data_provider._estimate_boundary(LEN//10, l_bound=L_BOUND)
+    
+    def _train(self):
+        EPOCH_START = self.config["EPOCH_START"]
+        EPOCH_END = self.config["EPOCH_END"]
+        EPOCH_PERIOD = self.config["EPOCH_PERIOD"]
+        VISUALIZATION_PARAMETER = self.config["VISUALIZATION"]
+        LAMBDA1 = VISUALIZATION_PARAMETER["LAMBDA1"]
+        LAMBDA2 = VISUALIZATION_PARAMETER["LAMBDA2"]
+        ENCODER_DIMS = VISUALIZATION_PARAMETER["ENCODER_DIMS"]
+        DECODER_DIMS = VISUALIZATION_PARAMETER["DECODER_DIMS"]
+        B_N_EPOCHS = VISUALIZATION_PARAMETER["BOUNDARY"]["B_N_EPOCHS"]
+        S_N_EPOCHS = VISUALIZATION_PARAMETER["S_N_EPOCHS"]
+        N_NEIGHBORS = VISUALIZATION_PARAMETER["N_NEIGHBORS"]
+        PATIENT = VISUALIZATION_PARAMETER["PATIENT"]
+        MAX_EPOCH = VISUALIZATION_PARAMETER["MAX_EPOCH"]
+        BATCH_SIZE = VISUALIZATION_PARAMETER["BATCH_SIZE"]
+        VIS_MODEL_NAME = VISUALIZATION_PARAMETER["VIS_MODEL_NAME"]
+        # Define Losses
+        losses = {}
+        loss_weights = {}
+
+        negative_sample_rate = 5
+        min_dist = .1
+        _a, _b = find_ab_params(1.0, min_dist)
+        # umap loss
+        umap_loss_fn = umap_loss(
+            BATCH_SIZE,
+            negative_sample_rate,
+            _a,
+            _b,
+        )
+        losses["umap"] = umap_loss_fn
+        loss_weights["umap"] = 1.0
+
+        recon_loss_fn = reconstruction_loss(beta=1)
+        losses["reconstruction"] = recon_loss_fn
+        loss_weights["reconstruction"] = LAMBDA1
+
+        regularize_loss_fn = regularize_loss()
+        losses["regularization"] = regularize_loss_fn
+        loss_weights["regularization"] = LAMBDA2  # TODO: change this weight
+
+        # define training
+        optimizer = tf.keras.optimizers.Adam()
+
+        # Define visualization models
+        weights_dict = {}
+        self.model = tfModel(optimizer=optimizer, encoder_dims=ENCODER_DIMS, decoder_dims=DECODER_DIMS, loss=losses, loss_weights=loss_weights, batch_size=BATCH_SIZE, prev_trainable_variables=None)
+        callbacks = [
+            tf.keras.callbacks.EarlyStopping(
+                monitor='loss',
+                min_delta=10 ** -2,
+                patience=8,
+                verbose=1,
+            ),
+            tf.keras.callbacks.LearningRateScheduler(lambda epoch: 1e-3 if epoch < 8 else 1e-4),
+            tf.keras.callbacks.LambdaCallback(on_train_end=lambda logs: weights_dict.update(
+                {'prev': [tf.identity(tf.stop_gradient(x)) for x in self.model.trainable_weights]})),
+        ]
+        # edge constructor
+        spatial_cons = tfEdgeConstructor(self.data_provider, S_N_EPOCHS, B_N_EPOCHS, N_NEIGHBORS)
+
+        
+        for iteration in range(EPOCH_START, EPOCH_END+EPOCH_PERIOD, EPOCH_PERIOD):
+            self.model.compile(
+                optimizer=optimizer, loss=losses, loss_weights=loss_weights,
+            )
+            t0 = time.time()
+            edge_to, edge_from, probs, feature_vectors, attention, n_rate = spatial_cons.construct(iteration-EPOCH_PERIOD, iteration)
+            t1 = time.time()
+            edge_dataset = construct_edge_dataset(edge_to, edge_from, probs, feature_vectors, attention, n_rate, BATCH_SIZE)
+            steps_per_epoch = int(
+                len(edge_to) / BATCH_SIZE / 10
+            )
+            t2 = time.time()
+            # create embedding
+            self.model.fit(
+                edge_dataset,
+                epochs=200, # a large value, because we have early stop callback
+                steps_per_epoch=steps_per_epoch,
+                callbacks=callbacks,
+                max_queue_size=100,
+            )
+            t3 = time.time()
+            # save for later use
+            self.model.prev_trainable_variables = weights_dict["prev"]
+            # save
+            self.model.encoder.save(os.path.join(CONTENT_PATH, "Model", "Epoch_{:d}".format(iteration), "encoder" + self.flag))
+            self.model.decoder.save(os.path.join(CONTENT_PATH, "Model", "Epoch_{:d}".format(iteration), "decoder" + self.flag))
+            print("save visualized model for Epoch {:d}".format(iteration))
+
+            # save time result
+            # TODO
+            # save_dir = self.data_provider.model_path
+            # trainer.record_time(save_dir, "time_{}.json".format(VIS_MODEL_NAME), "complex_construction", str(iteration), t1-t0)
+            # trainer.record_time(save_dir, "time_{}.json".format(VIS_MODEL_NAME), "training", str(iteration), t3-t2)
+    
+    def _visualize(self):
+        EPOCH_START = self.config["EPOCH_START"]
+        EPOCH_END = self.config["EPOCH_END"]
+        EPOCH_PERIOD = self.config["EPOCH_PERIOD"]
+
+        save_dir = os.path.join(self.data_provider.content_path, "img")
+        if not os.path.exists(save_dir):
+            os.mkdir(save_dir)
+        for i in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
+            self.vis.savefig(i, path=os.path.join(save_dir, "{}_{}.png".format(self.VIS_METHOD, i)))
+
+    def _evaluate(self):
+        EPOCH_START = self.config["EPOCH_START"]
+        EPOCH_END = self.config["EPOCH_END"]
+        EPOCH_PERIOD = self.config["EPOCH_PERIOD"]
+        VISUALIZATION_PARAMETER = self.config["VISUALIZATION"]
+        EVALUATION_NAME = VISUALIZATION_PARAMETER["EVALUATION_NAME"]
+        N_NEIGHBORS = VISUALIZATION_PARAMETER["N_NEIGHBORS"]
+        eval_epochs = list(range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD))
+        for eval_epoch in eval_epochs:
+            self.evaluator.save_epoch_eval(eval_epoch, N_NEIGHBORS, temporal_k=5, file_name="{}".format(EVALUATION_NAME))
 
     def visualize_embedding(self):
         self._preprocess()
@@ -601,11 +778,10 @@ class DeepDebugger(StrategyAbstractClass):
         self._evaluate()
 
 class DVIAL(StrategyAbstractClass):
-    def __init__(self, CONTENT_PATH, config, dense):
+    def __init__(self, CONTENT_PATH, config):
         super().__init__(CONTENT_PATH, config)
         resume_iter = config["BASE_ITERATION"]
         self.VIS_METHOD = "DVIAL"
-        self.dense = dense
         self._init(resume_iteration=resume_iter)
     
     def _init(self, resume_iteration=-1):
@@ -631,11 +807,7 @@ class DVIAL(StrategyAbstractClass):
         import Model.model as subject_model
         net = eval("subject_model.{}()".format(NET))
 
-        if self.dense:
-            # TODO fix 200
-            self.data_provider = DenseActiveLearningDataProvider(self.CONTENT_PATH, net, BASE_ITERATION, 200, device=self.DEVICE, classes=CLASSES, iteration_name="Iteration", epoch_name="Epoch", verbose=1)
-        else:
-            self.data_provider = ActiveLearningDataProvider(self.CONTENT_PATH, net, BASE_ITERATION, device=self.DEVICE, classes=CLASSES, iteration_name="Iteration", verbose=1)
+        self.data_provider = ActiveLearningDataProvider(self.CONTENT_PATH, net, BASE_ITERATION, device=self.DEVICE, classes=CLASSES, iteration_name="Iteration", verbose=1)
         self.model = VisModel(ENCODER_DIMS, DECODER_DIMS)
         self.projector = ALProjector(vis_model=self.model, content_path=self.CONTENT_PATH, vis_model_name=VIS_MODEL_NAME, device=self.DEVICE)
 
