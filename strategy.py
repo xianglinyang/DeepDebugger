@@ -20,10 +20,10 @@ from singleVis.trainer import HybridVisTrainer, DVITrainer, SingleVisTrainer
 from singleVis.data import DataProviderAbstractClass, NormalDataProvider, ActiveLearningDataProvider, DenseActiveLearningDataProvider
 from singleVis.spatial_edge_constructor import kcHybridSpatialEdgeConstructor, SingleEpochSpatialEdgeConstructor, kcSpatialEdgeConstructor, tfEdgeConstructor
 from singleVis.temporal_edge_constructor import GlobalTemporalEdgeConstructor
-from singleVis.projector import DeepDebuggerProjector, DVIProjector, ProjectorAbstractClass, TimeVisProjector, ALProjector, tfDVIProjector
+from singleVis.projector import DeepDebuggerProjector, DVIProjector, ProjectorAbstractClass, TimeVisProjector, ALProjector, tfDVIProjector, tfDVIDenseALProjector, TimeVisDenseALProjector
 from singleVis.segmenter import Segmenter
-from singleVis.eval.evaluator import Evaluator, ALEvaluator, EvaluatorAbstractClass
-from singleVis.visualizer import VisualizerAbstractClass, visualizer
+from singleVis.eval.evaluator import Evaluator, ALEvaluator, EvaluatorAbstractClass, DenseALEvaluator
+from singleVis.visualizer import VisualizerAbstractClass, visualizer, DenseALvisualizer
 from singleVis.utils import find_neighbor_preserving_rate
 
 class StrategyAbstractClass(ABC):
@@ -908,6 +908,153 @@ class DVIAL(StrategyAbstractClass):
         self._train(iteration)
         self._evaluate(iteration)
         self._visualize(iteration)
+
+
+class tfDVIDenseAL(StrategyAbstractClass):
+    def __init__(self, CONTENT_PATH, config):
+        super().__init__(CONTENT_PATH, config)
+        resume_iter = config["BASE_ITERATION"]
+        self.VIS_METHOD = "tfDVIDenseAL"
+        self._init(resume_iteration=resume_iter)
+    
+    def _init(self, resume_iteration=-1):
+        sys.path.append(self.CONTENT_PATH)
+
+        CLASSES = self.config["CLASSES"]
+        BASE_ITERATION = self.config["BASE_ITERATION"]
+        GPU_ID = self.config["GPU"]
+        self.DEVICE = torch.device("cuda:{}".format(GPU_ID) if torch.cuda.is_available() else "cpu")
+
+        #################################################   VISUALIZATION PARAMETERS    ########################################
+        EPOCH_NUM = self.config["TRAINING"]["total_epoch"]
+        ENCODER_DIMS = self.config["VISUALIZATION"]["ENCODER_DIMS"]
+        DECODER_DIMS = self.config["VISUALIZATION"]["DECODER_DIMS"]
+        VIS_MODEL_NAME = self.config["VISUALIZATION"]["VIS_MODEL_NAME"]
+
+        ############################################   ACTIVE LEARNING MODEL PARAMETERS    ######################################
+        TRAINING_PARAMETERS = self.config["TRAINING"]
+        NET = TRAINING_PARAMETERS["NET"]
+
+        import Model.model as subject_model
+        net = eval("subject_model.{}()".format(NET))
+
+        self.data_provider = DenseActiveLearningDataProvider(self.CONTENT_PATH, net, BASE_ITERATION, EPOCH_NUM, device=self.DEVICE, classes=CLASSES, iteration_name="Iteration", epoch_name="Epoch", verbose=1)
+        self.projector = tfDVIDenseALProjector(vis_model=self.model, content_path=self.CONTENT_PATH, vis_model_name=VIS_MODEL_NAME, device=self.DEVICE)
+
+        if resume_iteration > 0:
+            self.projector.load(resume_iteration, EPOCH_NUM)
+            
+        self.evaluator = DenseALEvaluator(self.data_provider, self.projector)
+        self.vis = DenseALvisualizer(self.data_provider, self.projector, 200)
+        
+
+    def _preprocess(self, iteration):
+        PREPROCESS = self.config["VISUALIZATION"]["PREPROCESS"]
+        B_N_EPOCHS = self.config["VISUALIZATION"]["BOUNDARY"]["B_N_EPOCHS"]
+        L_BOUND = self.config["VISUALIZATION"]["BOUNDARY"]["L_BOUND"]
+
+        if PREPROCESS:
+            self.data_provider._meta_data(iteration)
+            LEN = len(self.data_provider.train_labels(iteration))
+            if B_N_EPOCHS >0:
+                self.data_provider._estimate_boundary(iteration, LEN//10, l_bound=L_BOUND)
+
+    def _train(self, iteration):
+        # TODO
+        pass
+
+    def _evaluate(self, iteration):
+        EVALUATION_NAME = self.config["VISUALIZATION"]["EVALUATION_NAME"]
+        self.evaluator.save_epoch_eval(iteration, file_name=EVALUATION_NAME)
+
+    def _visualize(self, iteration):
+        save_dir = os.path.join(self.data_provider.content_path, "img")
+        os.makedirs(save_dir, exist_ok=True)
+        data = self.data_provider.train_representation(iteration)
+        pred = self.data_provider.get_pred(iteration, data).argmax(1)
+        labels = self.data_provider.train_labels(iteration)
+        self.vis.savefig_cus(iteration, data, pred, labels, path=os.path.join(save_dir, "{}_al.png".format(iteration)))
+
+    def visualize_embedding(self, iteration, resume_iter=-1):
+        self._init(resume_iter)
+        self._preprocess(iteration)
+        self._train(iteration)
+        self._evaluate(iteration)
+        self._visualize(iteration)
+
+class TimeVisDenseAL(StrategyAbstractClass):
+    def __init__(self, CONTENT_PATH, config):
+        super().__init__(CONTENT_PATH, config)
+        resume_iter = config["BASE_ITERATION"]
+        self.VIS_METHOD = "TimeVisDenseAL"
+        self._init(resume_iteration=resume_iter)
+    
+    def _init(self, resume_iteration=-1):
+        sys.path.append(self.CONTENT_PATH)
+
+        CLASSES = self.config["CLASSES"]
+        BASE_ITERATION = self.config["BASE_ITERATION"]
+        GPU_ID = self.config["GPU"]
+        self.DEVICE = torch.device("cuda:{}".format(GPU_ID) if torch.cuda.is_available() else "cpu")
+
+        #################################################   VISUALIZATION PARAMETERS    ########################################
+        EPOCH_NUM = self.config["TRAINING"]["total_epoch"]
+        ENCODER_DIMS = self.config["VISUALIZATION"]["ENCODER_DIMS"]
+        DECODER_DIMS = self.config["VISUALIZATION"]["DECODER_DIMS"]
+        VIS_MODEL_NAME = self.config["VISUALIZATION"]["VIS_MODEL_NAME"]
+
+        ############################################   ACTIVE LEARNING MODEL PARAMETERS    ######################################
+        TRAINING_PARAMETERS = self.config["TRAINING"]
+        NET = TRAINING_PARAMETERS["NET"]
+
+        import Model.model as subject_model
+        net = eval("subject_model.{}()".format(NET))
+
+        self.data_provider = DenseActiveLearningDataProvider(self.CONTENT_PATH, net, BASE_ITERATION, EPOCH_NUM, device=self.DEVICE, classes=CLASSES, iteration_name="Iteration", epoch_name="Epoch", verbose=1)
+        self.model = VisModel(encoder_dims=ENCODER_DIMS, decoder_dims=DECODER_DIMS)
+        self.projector = TimeVisDenseALProjector(vis_model=self.model, content_path=self.CONTENT_PATH, vis_model_name=VIS_MODEL_NAME, device=self.DEVICE)
+
+        if resume_iteration > 0:
+            self.projector.load(resume_iteration, EPOCH_NUM)
+            
+        self.evaluator = DenseALEvaluator(self.data_provider, self.projector)
+        self.vis = DenseALvisualizer(self.data_provider, self.projector, 200)
+        
+
+    def _preprocess(self, iteration):
+        PREPROCESS = self.config["VISUALIZATION"]["PREPROCESS"]
+        B_N_EPOCHS = self.config["VISUALIZATION"]["BOUNDARY"]["B_N_EPOCHS"]
+        L_BOUND = self.config["VISUALIZATION"]["BOUNDARY"]["L_BOUND"]
+
+        if PREPROCESS:
+            self.data_provider._meta_data(iteration)
+            LEN = len(self.data_provider.train_labels(iteration))
+            if B_N_EPOCHS >0:
+                self.data_provider._estimate_boundary(iteration, LEN//10, l_bound=L_BOUND)
+
+    def _train(self, iteration):
+        # TODO
+        pass
+
+    def _evaluate(self, iteration):
+        EVALUATION_NAME = self.config["VISUALIZATION"]["EVALUATION_NAME"]
+        self.evaluator.save_epoch_eval(iteration, file_name=EVALUATION_NAME)
+
+    def _visualize(self, iteration):
+        save_dir = os.path.join(self.data_provider.content_path, "img")
+        os.makedirs(save_dir, exist_ok=True)
+        data = self.data_provider.train_representation(iteration)
+        pred = self.data_provider.get_pred(iteration, data).argmax(1)
+        labels = self.data_provider.train_labels(iteration)
+        self.vis.savefig_cus(iteration, data, pred, labels, path=os.path.join(save_dir, "{}_al.png".format(iteration)))
+
+    def visualize_embedding(self, iteration, resume_iter=-1):
+        self._init(resume_iter)
+        self._preprocess(iteration)
+        self._train(iteration)
+        self._evaluate(iteration)
+        self._visualize(iteration)
+
 
 if __name__ == "__main__":
     import json
