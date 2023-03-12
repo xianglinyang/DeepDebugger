@@ -122,7 +122,7 @@ print("constructing complex in {:.1f} seconds.".format(t1-t0))
 dataset = DataHandler(edge_to, edge_from, feature_vectors, attention)
 n_samples = int(np.sum(S_N_EPOCHS * probs) // 1)
 # chosse sampler based on the number of dataset
-if len(edge_to) > 2^24:
+if len(edge_to) > pow(2,24):
     sampler = CustomWeightedRandomSampler(probs, n_samples, replacement=True)
 else:
     sampler = WeightedRandomSampler(probs, n_samples, replacement=True)
