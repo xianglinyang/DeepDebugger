@@ -19,11 +19,11 @@ VIS_METHOD = "tfDVI" # DeepVisualInsight
 ########################################################################################################################
 #                                                     LOAD PARAMETERS                                                  #
 ########################################################################################################################
-os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"   # see issue #152
-os.environ["CUDA_VISIBLE_DEVICES"]="0,1,2"
+# os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"   # see issue #152
+# os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
 parser = argparse.ArgumentParser(description='Process hyperparameters...')
-parser.add_argument('--content_path', type=str)
+parser.add_argument('--content_path',"-c", type=str)
 args = parser.parse_args()
 
 CONTENT_PATH = args.content_path
@@ -61,9 +61,9 @@ DECODER_DIMS = VISUALIZATION_PARAMETER["DECODER_DIMS"]
 S_N_EPOCHS = VISUALIZATION_PARAMETER["S_N_EPOCHS"]
 N_NEIGHBORS = VISUALIZATION_PARAMETER["N_NEIGHBORS"]
 PATIENT = VISUALIZATION_PARAMETER["PATIENT"]
+FLAG = VISUALIZATION_PARAMETER["FLAG"]
 MAX_EPOCH = VISUALIZATION_PARAMETER["MAX_EPOCH"]
 
-VIS_MODEL_NAME = VISUALIZATION_PARAMETER["VIS_MODEL_NAME"]
 EVALUATION_NAME = VISUALIZATION_PARAMETER["EVALUATION_NAME"]
 
 # Define hyperparameters
@@ -83,34 +83,28 @@ if PREPROCESS:
         data_provider._estimate_boundary(LEN//10, l_bound=L_BOUND)
 
 # Define Projector
-flag = "_temporal_id_withoutB"
-projector = tfDVIProjector(CONTENT_PATH, flag=flag)
+
+projector = tfDVIProjector(CONTENT_PATH, flag=FLAG)
 
 ########################################################################################################################
 #                                                      VISUALIZATION                                                   #
 ########################################################################################################################
 
-from singleVis.visualizer import visualizer
+# from singleVis.visualizer import visualizer
 
-vis = visualizer(data_provider, projector, 200, "tab10")
-save_dir = os.path.join(data_provider.content_path, "img")
-if not os.path.exists(save_dir):
-    os.mkdir(save_dir)
-for i in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
-    vis.save_default_fig(i, path=os.path.join(save_dir, "{}_{}_{}.png".format(DATASET, i, VIS_METHOD)))
+# vis = visualizer(data_provider, projector, 200, "tab10")
+# save_dir = os.path.join(data_provider.content_path, "img")
+# if not os.path.exists(save_dir):
+#     os.mkdir(save_dir)
+# for i in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
+#     vis.save_default_fig(i, path=os.path.join(save_dir, "{}_{}_{}.png".format(DATASET, i, VIS_METHOD)))
 
     
 ########################################################################################################################
 #                                                       EVALUATION                                                     #
 ########################################################################################################################
-# eval_epochs = range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD)
-# EVAL_EPOCH_DICT = {
-#     "mnist":[1,10,15],
-#     "fmnist":[1,25,50],
-#     "cifar10":[1,100,199]
-# }
-# eval_epochs = EVAL_EPOCH_DICT[DATASET]
-# evaluator = Evaluator(data_provider, projector)
+eval_epochs = range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD)
+evaluator = Evaluator(data_provider, projector)
 
-# for eval_epoch in eval_epochs:
-#     evaluator.save_epoch_eval(eval_epoch, 15, temporal_k=5, file_name="{}".format(EVALUATION_NAME))
+for eval_epoch in eval_epochs:
+    evaluator.save_epoch_eval(eval_epoch, 15, temporal_k=5, file_name="{}".format(EVALUATION_NAME))
