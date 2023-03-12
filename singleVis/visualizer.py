@@ -359,7 +359,7 @@ class visualizer(VisualizerAbstractClass):
         mesh_classes = np.arange(len(self.classes))
         color = self.cmap(mesh_classes / mesh_max_class)
         color = color[:, 0:3]
-        color = np.concatenate((color, np.zeros((1,3))), axis=0)
+        # color = np.concatenate((color, np.zeros((1,3))), axis=0)
         return color
 
 class DenseALvisualizer(visualizer):
