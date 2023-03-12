@@ -156,7 +156,7 @@ def al_query():
     isRecommend = data["isRecommend"]
 
     sys.path.append(CONTENT_PATH)
-    context = initialize_backend(CONTENT_PATH, VIS_METHOD, SETTING)
+    context = initialize_backend(CONTENT_PATH, VIS_METHOD, SETTING, dense=True)
     # TODO add new sampling rule
     indices, labels, scores = context.al_query(iteration, budget, strategy, np.array(acc_idxs).astype(np.int64), np.array(rej_idxs).astype(np.int64))
 

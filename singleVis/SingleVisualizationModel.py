@@ -64,23 +64,17 @@ class VisModel(nn.Module):
         self._init_autoencoder()
     
     def _init_autoencoder(self):
-        self.encoder = nn.Sequential(
-            nn.Linear(self.encoder_dims[0], self.encoder_dims[1]),
-            nn.ReLU(True))
-        if len(self.encoder_dims) > 2:
-            for i in range(1, len(self.encoder_dims)-2):
-                self.encoder.add_module("{}".format(len(self.encoder)), nn.Linear(self.encoder_dims[i], self.encoder_dims[i+1]))
-                self.encoder.add_module("{}".format(len(self.encoder)), nn.ReLU(True))
-            self.encoder.add_module("{}".format(len(self.encoder)), nn.Linear(self.encoder_dims[-2], self.encoder_dims[-1]))
+        self.encoder = nn.Sequential(nn.Flatten())
+        for i in range(0, len(self.encoder_dims)-2):
+            self.encoder.add_module("{}".format(len(self.encoder)), nn.Linear(self.encoder_dims[i], self.encoder_dims[i+1]))
+            self.encoder.add_module("{}".format(len(self.encoder)), nn.ReLU(True))
+        self.encoder.add_module("{}".format(len(self.encoder)), nn.Linear(self.encoder_dims[-2], self.encoder_dims[-1]))
         
-        self.decoder = nn.Sequential(
-            nn.Linear(self.decoder_dims[0], self.decoder_dims[1]),
-            nn.ReLU(True))
-        if len(self.decoder_dims) > 2:
-            for i in range(1, len(self.decoder_dims)-2):
-                self.decoder.add_module("{}".format(len(self.decoder)), nn.Linear(self.decoder_dims[i], self.decoder_dims[i+1]))
-                self.decoder.add_module("{}".format(len(self.decoder)), nn.ReLU(True))
-            self.decoder.add_module("{}".format(len(self.decoder)), nn.Linear(self.decoder_dims[-2], self.decoder_dims[-1]))
+        self.decoder = nn.Sequential()
+        for i in range(0, len(self.decoder_dims)-2):
+            self.decoder.add_module("{}".format(len(self.decoder)), nn.Linear(self.decoder_dims[i], self.decoder_dims[i+1]))
+            self.decoder.add_module("{}".format(len(self.decoder)), nn.ReLU(True))
+        self.decoder.add_module("{}".format(len(self.decoder)), nn.Linear(self.decoder_dims[-2], self.decoder_dims[-1]))
 
 
     def forward(self, edge_to, edge_from):
