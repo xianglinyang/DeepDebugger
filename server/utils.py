@@ -10,38 +10,46 @@ import base64
 vis_path = ".."
 sys.path.append(vis_path)
 from context import VisContext, ActiveLearningContext, AnormalyContext
-from strategy import DeepDebugger, TimeVis, DeepVisualInsight, DVIAL
+from strategy import DeepDebugger, TimeVis, tfDeepVisualInsight, DVIAL, tfDVIDenseAL, TimeVisDenseAL
 
 """Interface align"""
 
-def initialize_strategy(CONTENT_PATH, VIS_METHOD, SETTING):
+def initialize_strategy(CONTENT_PATH, VIS_METHOD, SETTING, dense=False):
     # initailize strategy (visualization method)
     with open(os.path.join(CONTENT_PATH, "config.json"), "r") as f:
         conf = json.load(f)
+        
     config = conf[VIS_METHOD]
 
     if SETTING == "normal" or SETTING == "abnormal":
-        if VIS_METHOD == "DVI" and SETTING == "normal":
-            strategy = DeepVisualInsight(CONTENT_PATH, config)
+        if VIS_METHOD == "DVI":
+            strategy = tfDeepVisualInsight(CONTENT_PATH, config)
         elif VIS_METHOD == "TimeVis":
             strategy = TimeVis(CONTENT_PATH, config)
         elif VIS_METHOD == "DeepDebugger":
             strategy = DeepDebugger(CONTENT_PATH, config)
         else:
             raise NotImplementedError
-    else:
-        if VIS_METHOD == "DVI":
-            dense = True if SETTING == "dense al" else False
-            strategy = DVIAL(CONTENT_PATH, config, dense=dense)
+    elif SETTING == "active learning":
+        if dense:
+            if VIS_METHOD == "DVI":
+                strategy = tfDVIDenseAL(CONTENT_PATH, config)
+            elif VIS_METHOD == "TimeVis":
+                strategy = TimeVisDenseAL(CONTENT_PATH, config)
+            else:
+                raise NotImplementedError
         else:
-            raise NotImplementedError
+            strategy = DVIAL(CONTENT_PATH, config)
+    
+    else:
+        raise NotImplementedError
 
     return strategy
 
 def initialize_context(strategy, setting):
     if setting == "normal":
         context = VisContext(strategy)
-    elif setting == "active learning" or setting == "dense al":
+    elif setting == "active learning":
         context = ActiveLearningContext(strategy)
     elif setting == "abnormal":
         context = AnormalyContext(strategy)
@@ -49,7 +57,7 @@ def initialize_context(strategy, setting):
         raise NotImplementedError
     return context
 
-def initialize_backend(CONTENT_PATH, VIS_METHOD, SETTING):
+def initialize_backend(CONTENT_PATH, VIS_METHOD, SETTING, dense=False):
     """ initialize backend for visualization
 
     Args:
@@ -65,7 +73,7 @@ def initialize_backend(CONTENT_PATH, VIS_METHOD, SETTING):
     Returns:
         backend: a context with a specific strategy
     """
-    strategy = initialize_strategy(CONTENT_PATH, VIS_METHOD, SETTING)
+    strategy = initialize_strategy(CONTENT_PATH, VIS_METHOD, SETTING, dense)
     context = initialize_context(strategy=strategy, setting=SETTING)
     return context
 
@@ -77,8 +85,8 @@ def update_epoch_projection(context, EPOCH, predicates):
     test_data = context.test_representation_data(EPOCH)
     all_data = np.concatenate((train_data, test_data), axis=0)
 
-    train_labels = context.strategy.data_provider.train_labels(EPOCH)
-    test_labels = context.strategy.data_provider.test_labels(EPOCH)
+    train_labels = context.train_labels(EPOCH)
+    test_labels = context.test_labels(EPOCH)
     labels = np.concatenate((train_labels, test_labels), axis=0).tolist()
 
     embedding_path = os.path.join(context.strategy.data_provider.checkpoint_path(EPOCH), "embedding.npy")
@@ -128,7 +136,7 @@ def update_epoch_projection(context, EPOCH, predicates):
     label_list = []
     label_name_dict = dict()
     CLASSES = context.strategy.config["CLASSES"]
-    CLASSES = CLASSES.append("unlabel")
+    # CLASSES.append("unlabel")
     for i, label in enumerate(CLASSES):
         label_name_dict[i] = label
         
