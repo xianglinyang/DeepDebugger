@@ -280,13 +280,14 @@ class NormalDataProvider(DataProvider):
         # load train data
         testing_data_loc = os.path.join(self.content_path, "Testing_data", "testing_dataset_label.pth")
         try:
-            testing_labels = torch.load(testing_data_loc).to(device=self.DEVICE)
+            testing_labels = torch.load(testing_data_loc).to(device="cpu")
             index_file = os.path.join(self.model_path, "{}_{:d}".format(self.epoch_name, epoch), "test_index.json")
+            print(index_file)
             if os.path.exists(index_file):
                 idxs = load_labelled_data_index(index_file)
                 testing_labels = testing_labels[idxs]
         except Exception as e:
-            print("no train labels saved for Epoch {}".format(epoch))
+            print("no test labels saved for Epoch {}".format(epoch))
             testing_labels = None
         return testing_labels.cpu().numpy()
 
