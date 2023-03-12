@@ -854,23 +854,23 @@ class Evaluator(EvaluatorAbstractClass):
             evaluation["temporal_test_mean"] = dict()
 
         epoch_key = str(n_epoch)
-        if epoch_key not in evaluation["nn_train"]:
-            evaluation["nn_train"][epoch_key] = dict()
-        evaluation["nn_train"][epoch_key][n_key] = self.eval_nn_train(n_epoch, n_neighbors)
-        if epoch_key not in evaluation["nn_test"]:
-            evaluation["nn_test"][epoch_key] = dict()
-        evaluation["nn_test"][epoch_key][n_key] = self.eval_nn_test(n_epoch, n_neighbors)
+        # if epoch_key not in evaluation["nn_train"]:
+        #     evaluation["nn_train"][epoch_key] = dict()
+        # evaluation["nn_train"][epoch_key][n_key] = self.eval_nn_train(n_epoch, n_neighbors)
+        # if epoch_key not in evaluation["nn_test"]:
+        #     evaluation["nn_test"][epoch_key] = dict()
+        # evaluation["nn_test"][epoch_key][n_key] = self.eval_nn_test(n_epoch, n_neighbors)
         # if epoch_key not in evaluation["b_train"]:
         #     evaluation["b_train"][epoch_key] = dict()
         # evaluation["b_train"][epoch_key][n_key] = self.eval_b_train(n_epoch, n_neighbors)
         # if epoch_key not in evaluation["b_test"]:
         #     evaluation["b_test"][epoch_key] = dict()
         # evaluation["b_test"][epoch_key][n_key] = self.eval_b_test(n_epoch, n_neighbors)
-        evaluation["ppr_train"][epoch_key] = self.eval_inv_train(n_epoch)
-        evaluation["ppr_test"][epoch_key] = self.eval_inv_test(n_epoch)
+        # evaluation["ppr_train"][epoch_key] = self.eval_inv_train(n_epoch)
+        # evaluation["ppr_test"][epoch_key] = self.eval_inv_test(n_epoch)
 
-        evaluation["ppr_dist_train"][epoch_key] = self.eval_inv_dist_train(n_epoch)
-        evaluation["ppr_dist_test"][epoch_key] = self.eval_inv_dist_test(n_epoch)
+        # evaluation["ppr_dist_train"][epoch_key] = self.eval_inv_dist_train(n_epoch)
+        # evaluation["ppr_dist_test"][epoch_key] = self.eval_inv_dist_test(n_epoch)
 
         evaluation["train_acc"][epoch_key] = self.train_acc(n_epoch)
         evaluation["test_acc"][epoch_key] = self.test_acc(n_epoch)
