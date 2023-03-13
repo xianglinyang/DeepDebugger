@@ -87,7 +87,7 @@ def update_epoch_projection(context, EPOCH, predicates):
 
     train_labels = context.train_labels(EPOCH)
     test_labels = context.test_labels(EPOCH)
-    labels = np.concatenate((train_labels, test_labels), axis=0).tolist()
+    labels = np.concatenate((train_labels, test_labels), axis=0).astype(int)
 
     embedding_path = os.path.join(context.strategy.data_provider.checkpoint_path(EPOCH), "embedding.npy")
     if os.path.exists(embedding_path):
@@ -122,9 +122,6 @@ def update_epoch_projection(context, EPOCH, predicates):
             pickle.dump(grid, f)
         np.save(embedding_path, embedding_2d)
     
-    color = context.strategy.vis.get_standard_classes_color() * 255
-    color = color.astype(int).tolist()
-
     # TODO fix its structure
     file_name = context.strategy.config["VISUALIZATION"]["EVALUATION_NAME"]
     evaluation = context.strategy.evaluator.get_eval(file_name=file_name)
@@ -132,17 +129,13 @@ def update_epoch_projection(context, EPOCH, predicates):
     eval_new["train_acc"] = evaluation["train_acc"][str(EPOCH)]
     eval_new["test_acc"] = evaluation["test_acc"][str(EPOCH)]
 
-    label_color_list = []
-    label_list = []
-    label_name_dict = dict()
-    CLASSES = context.strategy.config["CLASSES"]
-    # CLASSES.append("unlabel")
-    for i, label in enumerate(CLASSES):
-        label_name_dict[i] = label
-        
-    for label in labels:
-        label_color_list.append(color[int(label)])
-        label_list.append(CLASSES[int(label)])
+    color = context.strategy.vis.get_standard_classes_color() * 255
+    color = color.astype(int)
+
+    CLASSES = np.array(context.strategy.config["CLASSES"])
+    label_color_list = color[labels].tolist()
+    label_list = CLASSES[labels].tolist()
+    label_name_dict = dict(enumerate(CLASSES))
 
     prediction_list = []
     prediction = context.strategy.data_provider.get_pred(EPOCH, all_data).argmax(1)
