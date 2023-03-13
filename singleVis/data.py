@@ -592,13 +592,13 @@ class ActiveLearningDataProvider(DataProvider):
             train_data = None
         return train_data
     
-    def train_labels_all(self, epoch):
+    def train_labels_all(self):
         # load train data
         training_data_loc = os.path.join(self.content_path, "Training_data", "training_dataset_label.pth")
         try:
             training_labels = torch.load(training_data_loc, map_location="cpu")
         except Exception as e:
-            print("no train labels saved for Iteration {}".format(epoch))
+            print("no train labels saved")
             training_labels = None
         return training_labels.numpy()
 
@@ -893,7 +893,7 @@ class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
             train_data = None
         return train_data
     
-    def train_labels_ulb(self, iteration, epoch):
+    def train_labels_ulb(self, iteration):
         # load train data
         training_data_loc = os.path.join(self.content_path, "Training_data", "training_dataset_label.pth")
         lb_idxs = self.get_labeled_idx(iteration)
@@ -902,11 +902,11 @@ class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
             ulb_idxs = self.get_unlabeled_idx(len(training_labels), lb_idxs)
             training_labels = training_labels[ulb_idxs]
         except Exception as e:
-            print("no train labels saved for Iteration {}".format(epoch))
+            print("no train labels saved for Iteration {}".format(iteration))
             training_labels = None
         return training_labels.numpy()
     
-    def train_labels(self, iteration, epoch):
+    def train_labels(self, iteration):
         # load labelled train labels
         training_data_loc = os.path.join(self.content_path, "Training_data", "training_dataset_label.pth")
         index_file = os.path.join(self.model_path, "{}_{:d}".format(self.iteration_name, iteration), "index.json")
@@ -915,17 +915,17 @@ class DenseActiveLearningDataProvider(ActiveLearningDataProvider):
             training_labels = torch.load(training_data_loc, map_location="cpu")
             training_labels = training_labels[lb_idxs]
         except Exception as e:
-            print("no train labels saved for Iteration {}".format(epoch))
+            print("no train labels saved for Iteration {}".format(iteration))
             training_labels = None
         return training_labels.numpy()
 
-    def train_labels_all(self, iteration, epoch):
+    def train_labels_all(self):
         # load train data
         training_data_loc = os.path.join(self.content_path, "Training_data", "training_dataset_label.pth")
         try:
             training_labels = torch.load(training_data_loc, map_location="cpu")
         except Exception as e:
-            print("no train labels saved for Iteration {}".format(epoch))
+            print("no train labels saved")
             training_labels = None
         return training_labels.numpy()
 
