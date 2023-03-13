@@ -910,12 +910,17 @@ class DVIAL(StrategyAbstractClass):
         self._visualize(iteration)
 
 
-class tfDVIDenseAL(StrategyAbstractClass):
+class DenseAL(StrategyAbstractClass):
     def __init__(self, CONTENT_PATH, config):
         super().__init__(CONTENT_PATH, config)
-        resume_iter = config["BASE_ITERATION"]
+        self.VIS_METHOD = "DenseAL"
+
+
+class tfDVIDenseAL(DenseAL):
+    def __init__(self, CONTENT_PATH, config):
+        super().__init__(CONTENT_PATH, config)
         self.VIS_METHOD = "tfDVIDenseAL"
-        self._init(resume_iteration=resume_iter)
+        self._init(resume_iteration=config["BASE_ITERATION"])
     
     def _init(self, resume_iteration=-1):
         sys.path.append(self.CONTENT_PATH)
@@ -927,9 +932,7 @@ class tfDVIDenseAL(StrategyAbstractClass):
 
         #################################################   VISUALIZATION PARAMETERS    ########################################
         EPOCH_NUM = self.config["TRAINING"]["total_epoch"]
-        ENCODER_DIMS = self.config["VISUALIZATION"]["ENCODER_DIMS"]
-        DECODER_DIMS = self.config["VISUALIZATION"]["DECODER_DIMS"]
-        VIS_MODEL_NAME = self.config["VISUALIZATION"]["VIS_MODEL_NAME"]
+        FLAG = self.config["VISUALIZATION"]["FLAG"]
 
         ############################################   ACTIVE LEARNING MODEL PARAMETERS    ######################################
         TRAINING_PARAMETERS = self.config["TRAINING"]
@@ -939,7 +942,7 @@ class tfDVIDenseAL(StrategyAbstractClass):
         net = eval("subject_model.{}()".format(NET))
 
         self.data_provider = DenseActiveLearningDataProvider(self.CONTENT_PATH, net, BASE_ITERATION, EPOCH_NUM, device=self.DEVICE, classes=CLASSES, iteration_name="Iteration", epoch_name="Epoch", verbose=1)
-        self.projector = tfDVIDenseALProjector(vis_model=self.model, content_path=self.CONTENT_PATH, vis_model_name=VIS_MODEL_NAME, device=self.DEVICE)
+        self.projector = tfDVIDenseALProjector(content_path=self.CONTENT_PATH, flag=FLAG)
 
         if resume_iteration > 0:
             self.projector.load(resume_iteration, EPOCH_NUM)
@@ -982,12 +985,11 @@ class tfDVIDenseAL(StrategyAbstractClass):
         self._evaluate(iteration)
         self._visualize(iteration)
 
-class TimeVisDenseAL(StrategyAbstractClass):
+class TimeVisDenseAL(DenseAL):
     def __init__(self, CONTENT_PATH, config):
         super().__init__(CONTENT_PATH, config)
-        resume_iter = config["BASE_ITERATION"]
         self.VIS_METHOD = "TimeVisDenseAL"
-        self._init(resume_iteration=resume_iter)
+        self._init(resume_iteration=config["BASE_ITERATION"])
     
     def _init(self, resume_iteration=-1):
         sys.path.append(self.CONTENT_PATH)

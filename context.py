@@ -192,11 +192,11 @@ class ActiveLearningContext(VisContext):
     #                                                                                                               #
     #################################################################################################################
 
-    def train_representation_data(self, EPOCH):
-        return self.strategy.data_provider.train_representation_all(EPOCH)
+    def train_representation_data(self, iteration):
+        return self.strategy.data_provider.train_representation_all(iteration)
     
-    def train_labels(self, EPOCH):
-        labels = self.strategy.data_provider.train_labels_all(EPOCH)
+    def train_labels(self, iteration):
+        labels = self.strategy.data_provider.train_labels_all()
         # idx_lb = self.strategy.data_provider.get_labeled_idx(EPOCH)
         # pool_num = len(labels)
         # idxs_ulb = np.setdiff1d(np.arange(pool_num), idx_lb)
@@ -321,7 +321,7 @@ class ActiveLearningContext(VisContext):
             raise NotImplementedError
             
         # TODO return the suggest labels, need to develop pesudo label generation technique in the future
-        true_labels = self.strategy.data_provider.train_labels_all(iteration, TOTAL_EPOCH)
+        true_labels = self.strategy.data_provider.train_labels_all()
 
         return new_indices, true_labels[new_indices], scores
     
@@ -432,20 +432,26 @@ class ActiveLearningContext(VisContext):
             pickle.dump(ftm, f, pickle.HIGHEST_PROTOCOL)
 
     def _init_detection(self, iteration, lb_idxs, period=80):
-        # prepare trajectory
+        # must be in the dense setting
+        assert "Dense" in self.strategy.VIS_METHOD
+        
+        # prepare high dimensional trajectory
         embedding_path = os.path.join(self.strategy.data_provider.checkpoint_path(iteration),'trajectory_embeddings.npy')
         if os.path.exists(embedding_path):
             trajectories = np.load(embedding_path)
             print("Load trajectories from cache!")
         else:
             # extract samples
-            train_num = self.strategy.data_provider.train_num
+            TOTAL_EPOCH = self.strategy.config["TRAINING"]["total_epoch"]
+            EPOCH_START = self.strategy.config["TRAINING"]["epoch_start"]
+            EPOCH_END = self.strategy.config["TRAINING"]["epoch_end"]
+            EPOCH_PERIOD = self.strategy.config["TRAINING"]["epoch_period"]
+            train_num = len(self.train_labels())
             # change epoch_NUM
-            epoch_num = (self.strategy.data_provider.e - self.strategy.data_provider.s)//self.strategy.data_provider.p + 1
-            embeddings_2d = np.zeros((epoch_num, train_num, 2))
-            for i in range(self.strategy.data_provider.s, self.strategy.data_provider.e+1, self.strategy.data_provider.p):
-                id = (i - self.strategy.data_provider.s)//self.strategy.data_provider.p
-                embeddings_2d[id] = self.strategy.projector.batch_project(iteration, i, self.strategy.data_provider.train_representation(iteration, i))
+            embeddings_2d = np.zeros((TOTAL_EPOCH, train_num, 2))
+            for i in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
+                id = (i - EPOCH_START)//EPOCH_PERIOD
+                embeddings_2d[id] = self.strategy.projector.batch_project(iteration, i, self.strategy.data_provider.train_representation_all(iteration, i))
             trajectories = np.transpose(embeddings_2d, [1,0,2])
             np.save(embedding_path, trajectories)
         # prepare uncertainty
@@ -453,9 +459,14 @@ class ActiveLearningContext(VisContext):
         if os.path.exists(uncertainty_path):
             uncertainty = np.load(uncertainty_path)
         else:
-            epoch_num = (self.strategy.data_provider.e - self.strategy.data_provider.s)//self.strategy.data_provider.p + 1
-            samples = self.strategy.data_provider.train_representation(iteration, epoch_num)
-            pred = self.strategy.data_provider.get_pred(iteration, epoch_num, samples)
+            TOTAL_EPOCH = self.strategy.config["TRAINING"]["total_epoch"]
+            EPOCH_START = self.strategy.config["TRAINING"]["epoch_start"]
+            EPOCH_END = self.strategy.config["TRAINING"]["epoch_end"]
+            EPOCH_PERIOD = self.strategy.config["TRAINING"]["epoch_period"]
+            train_num = len(self.train_labels())
+
+            samples = self.strategy.data_provider.train_representation_all(iteration, EPOCH_END)
+            pred = self.strategy.data_provider.get_pred(iteration, EPOCH_END, samples)
             uncertainty = 1 - np.amax(softmax(pred, axis=1), axis=1)
             np.save(uncertainty_path, uncertainty)
         ulb_idxs = self.strategy.data_provider.get_unlabeled_idx(len(uncertainty), lb_idxs)
