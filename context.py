@@ -313,7 +313,7 @@ class ActiveLearningContext(VisContext):
         else:
             raise NotImplementedError
             
-        true_labels = self.train_labels()
+        true_labels = self.train_labels(iteration)
 
         return new_indices, true_labels[new_indices], scores
     
@@ -438,7 +438,7 @@ class ActiveLearningContext(VisContext):
             EPOCH_START = self.strategy.config["TRAINING"]["epoch_start"]
             EPOCH_END = self.strategy.config["TRAINING"]["epoch_end"]
             EPOCH_PERIOD = self.strategy.config["TRAINING"]["epoch_period"]
-            train_num = len(self.train_labels())
+            train_num = len(self.train_labels(None))
             # change epoch_NUM
             embeddings_2d = np.zeros((TOTAL_EPOCH, train_num, 2))
             for i in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
@@ -455,7 +455,7 @@ class ActiveLearningContext(VisContext):
             EPOCH_START = self.strategy.config["TRAINING"]["epoch_start"]
             EPOCH_END = self.strategy.config["TRAINING"]["epoch_end"]
             EPOCH_PERIOD = self.strategy.config["TRAINING"]["epoch_period"]
-            train_num = len(self.train_labels())
+            train_num = len(self.train_labels(None))
 
             samples = self.strategy.data_provider.train_representation_all(iteration, EPOCH_END)
             pred = self.strategy.data_provider.get_pred(iteration, EPOCH_END, samples)
