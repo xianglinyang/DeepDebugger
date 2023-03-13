@@ -398,6 +398,10 @@ class ActiveLearningDataProvider(DataProvider):
         self.mode = "al"
         self.iteration_name = iteration_name
     
+    @property
+    def pool_num(self):
+        return len(self.train_labels_all())
+    
     def label_num(self, iteration):
         return len(self.get_labeled_idx(iteration))
 

@@ -10,7 +10,6 @@ import pickle
 import shutil
 
 import torch.nn
-import torchvision
 
 from scipy.special import softmax
 
@@ -197,10 +196,6 @@ class ActiveLearningContext(VisContext):
     
     def train_labels(self, iteration):
         labels = self.strategy.data_provider.train_labels_all()
-        # idx_lb = self.strategy.data_provider.get_labeled_idx(EPOCH)
-        # pool_num = len(labels)
-        # idxs_ulb = np.setdiff1d(np.arange(pool_num), idx_lb)
-        # labels[idxs_ulb] = -1
         return labels
 
     
@@ -242,7 +237,6 @@ class ActiveLearningContext(VisContext):
         """get the index of new selection from different strategies"""
         CONTENT_PATH = self.strategy.data_provider.content_path
         NUM_QUERY = budget
-        GPU = self.strategy.config["GPU"]
         NET = self.strategy.config["TRAINING"]["NET"]
         DATA_NAME = self.strategy.config["DATASET"]
         TOTAL_EPOCH = self.strategy.config["TRAINING"]["total_epoch"]
@@ -255,7 +249,6 @@ class ActiveLearningContext(VisContext):
         # loading neural network
         import Model.model as subject_model
         task_model = eval("subject_model.{}()".format(NET))
-        task_model_type = "pytorch"
         # start experiment
         n_pool = self.strategy.config["TRAINING"]["train_num"]  # 50000
         n_test = self.strategy.config["TRAINING"]['test_num']   # 10000
@@ -320,8 +313,7 @@ class ActiveLearningContext(VisContext):
         else:
             raise NotImplementedError
             
-        # TODO return the suggest labels, need to develop pesudo label generation technique in the future
-        true_labels = self.strategy.data_provider.train_labels_all()
+        true_labels = self.train_labels()
 
         return new_indices, true_labels[new_indices], scores
     
