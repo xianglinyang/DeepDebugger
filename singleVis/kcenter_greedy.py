@@ -157,3 +157,21 @@ class kCenterGreedy(object):
     if return_min:
       return new_batch, self.min_distances.max()
     return new_batch
+
+
+def fps(data, num):
+  import torch
+  from dgl.geometry import farthest_point_sampler
+  data = torch.from_numpy(data[np.newaxis,:,:]).to(device=torch.device("cuda"))
+  point_idxs = farthest_point_sampler(data, num).squeeze(axis=0)
+  point_idxs = point_idx.cpu().numpy()
+  return point_idxs
+
+if __name__ == "__main__":
+
+  data = np.random.rand(500,10)
+  selected_idxs = np.random.choice(500, size=10, replace=False)
+
+  kc = kCenterGreedy(data)
+  _ = kc.select_batch_with_budgets(selected_idxs, 50)
+  c0 = kc.hausdorff()
