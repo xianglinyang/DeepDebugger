@@ -22,6 +22,7 @@ from singleVis.data import NormalDataProvider
 from singleVis.spatial_edge_constructor import SingleEpochSpatialEdgeConstructor
 from singleVis.projector import DVIProjector
 from singleVis.eval.evaluator import Evaluator
+from singleVis.utils import knn
 ########################################################################################################################
 #                                                     DVI PARAMETERS                                                   #
 ########################################################################################################################
@@ -62,6 +63,7 @@ LEN = TRAINING_PARAMETER["train_num"]
 EPOCH_START = config["EPOCH_START"]
 EPOCH_END = config["EPOCH_END"]
 EPOCH_PERIOD = config["EPOCH_PERIOD"]
+EPOCH_NAME = config["EPOCH_NAME"]
 
 # Training parameter (visualization model)
 VISUALIZATION_PARAMETER = config["VISUALIZATION"]
@@ -88,7 +90,7 @@ net = eval("subject_model.{}()".format(NET))
 #                                                    TRAINING SETTING                                                  #
 ########################################################################################################################
 # Define data_provider
-data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=DEVICE, classes=CLASSES,verbose=1)
+data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=DEVICE, classes=CLASSES, epoch_name=EPOCH_NAME, verbose=1)
 if PREPROCESS:
     data_provider._meta_data()
     if B_N_EPOCHS >0:
@@ -129,7 +131,7 @@ dataset = DataHandler(edge_to, edge_from, feature_vectors, attention)
 
 n_samples = int(np.sum(S_N_EPOCHS * probs) // 1)
 # chose sampler based on the number of dataset
-if len(edge_to) > 2^24:
+if len(edge_to) > pow(2,24):
     sampler = CustomWeightedRandomSampler(probs, n_samples, replacement=True)
 else:
     sampler = WeightedRandomSampler(probs, n_samples, replacement=True)
@@ -171,13 +173,13 @@ trainer.save(save_dir=save_dir, file_name="{}".format(VIS_MODEL_NAME))
 #                                                      VISUALIZATION                                                   #
 ########################################################################################################################
 
-from singleVis.visualizer import visualizer
+# from singleVis.visualizer import visualizer
 
-vis = visualizer(data_provider, projector, 200, "tab10")
-save_dir = os.path.join(data_provider.content_path, "img")
-if not os.path.exists(save_dir):
-    os.mkdir(save_dir)
-vis.savefig(I, path=os.path.join(save_dir, "{}_{}_{}.png".format(DATASET, I, VIS_METHOD)))
+# vis = visualizer(data_provider, projector, 200, "tab10")
+# save_dir = os.path.join(data_provider.content_path, "img")
+# if not os.path.exists(save_dir):
+#     os.mkdir(save_dir)
+# vis.savefig(I, path=os.path.join(save_dir, "{}_{}_{}.png".format(DATASET, I, VIS_METHOD)))
 
 
 ########################################################################################################################
