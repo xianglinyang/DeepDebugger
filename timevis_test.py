@@ -28,7 +28,7 @@ VIS_METHOD= "TimeVis"
 #                                                     LOAD PARAMETERS                                                  #
 ########################################################################################################################
 parser = argparse.ArgumentParser(description='Process hyperparameters...')
-parser.add_argument('--content_path', type=str)
+parser.add_argument('--content_path', '-c', type=str)
 args = parser.parse_args()
 
 CONTENT_PATH = args.content_path
@@ -45,6 +45,7 @@ GPU_ID = config["GPU"]
 EPOCH_START = config["EPOCH_START"]
 EPOCH_END = config["EPOCH_END"]
 EPOCH_PERIOD = config["EPOCH_PERIOD"]
+EPOCH_NAME = config["EPOCH_NAME"]
 
 # Training parameter (subject model)
 TRAINING_PARAMETER = config["TRAINING"]
@@ -82,7 +83,7 @@ net = eval("subject_model.{}()".format(NET))
 ########################################################################################################################
 #                                                    TRAINING SETTING                                                  #
 ########################################################################################################################
-data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=DEVICE, epoch_name="Epoch", classes=CLASSES,verbose=1)
+data_provider = NormalDataProvider(CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=DEVICE, epoch_name=EPOCH_NAME, classes=CLASSES,verbose=1)
 if PREPROCESS:
     data_provider._meta_data()
     if B_N_EPOCHS >0:
@@ -106,7 +107,7 @@ for i in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
 ########################################################################################################################
 #                                                       EVALUATION                                                     #
 ########################################################################################################################
-# eval_epochs = range(EPOCH_START, EPOCH_END, EPOCH_PERIOD)
-# evaluator = Evaluator(data_provider, projector)
-# for eval_epoch in eval_epochs:
-#     evaluator.save_epoch_eval(eval_epoch, 15, temporal_k=5, file_name="{}".format(EVALUATION_NAME))
+eval_epochs = range(EPOCH_START, EPOCH_END, EPOCH_PERIOD)
+evaluator = Evaluator(data_provider, projector)
+for eval_epoch in eval_epochs:
+    evaluator.save_epoch_eval(eval_epoch, 15, temporal_k=5, file_name="{}".format(EVALUATION_NAME))
