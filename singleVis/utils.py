@@ -226,6 +226,7 @@ def hausdorff_dist_cus(X, subset_idxs, metric="euclidean", verbose=1):
     t_e = time.time()
     if verbose > 0:
         print("Hausdorff distance {:.2f} for {:d}/{:d} in {:.3f} seconds...".format(hausdorff, len(subset_idxs),len(X), t_e-t_s))
+        print(f'mean min_dist:\t{np.mean(min_distances)}')
     return hausdorff, round(t_e-t_s,3)
 
 
@@ -352,6 +353,13 @@ def generate_random_trajectory_momentum(init_position, period, alpha, gamma, vx,
         ys[i] = ys[i-1] + v[1]
     return np.vstack((xs,ys)).transpose([1, 0])
     # return xs, ys
+
+def ranking_dist(a,b):  
+    n = len(a)
+    assert len(b) == n
+    i, j = np.meshgrid(np.arange(n), np.arange(n))
+    ndisordered = np.logical_or(np.logical_and(a[i] < a[j], b[i] > b[j]), np.logical_and(a[i] > a[j], b[i] < b[j])).sum()
+    return ndisordered / (n * (n - 1))
 
 
 
