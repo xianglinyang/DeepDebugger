@@ -64,7 +64,7 @@ class VisModel(nn.Module):
         self._init_autoencoder()
     
     def _init_autoencoder(self):
-        self.encoder = nn.Sequential(nn.Flatten())
+        self.encoder = nn.Sequential()
         for i in range(0, len(self.encoder_dims)-2):
             self.encoder.add_module("{}".format(len(self.encoder)), nn.Linear(self.encoder_dims[i], self.encoder_dims[i+1]))
             self.encoder.add_module("{}".format(len(self.encoder)), nn.ReLU(True))

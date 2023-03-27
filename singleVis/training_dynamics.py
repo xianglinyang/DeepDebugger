@@ -50,7 +50,7 @@ class TD:
         losses = np.transpose(losses, [1,0])
         return losses
     
-    def uncertainty_dynamics(self, ):
+    def uncertainty_dynamics(self):
         EPOCH_START = self.data_provider.s
         EPOCH_END = self.data_provider.e
         EPOCH_PERIOD = self.data_provider.p
@@ -62,15 +62,33 @@ class TD:
         for epoch in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
             representation = self.data_provider.train_representation(epoch)
             pred = self.data_provider.get_pred(epoch, representation)
-            idxs = list(enumerate(labels))
-            uncertainty = pred[idxs]
+            uncertainty = pred[np.arange(len(labels)), labels]
 
             if uncertainties is None:
                 uncertainties = np.expand_dims(uncertainty, axis=0)
             else:
                 uncertainties = np.concatenate((uncertainties, np.expand_dims(uncertainty, axis=0)), axis=0)
-        uncertainties = np.transpose(uncertainties, [1,0,2])
+        uncertainties = np.transpose(uncertainties, [1,0])
         return uncertainties
+    
+    def pred_dynamics(self):
+        EPOCH_START = self.data_provider.s
+        EPOCH_END = self.data_provider.e
+        EPOCH_PERIOD = self.data_provider.p
+
+        # epoch, num, 1
+        preds = None
+
+        for epoch in range(EPOCH_START, EPOCH_END+1, EPOCH_PERIOD):
+            representation = self.data_provider.train_representation(epoch)
+            pred = self.data_provider.get_pred(epoch, representation)
+
+            if preds is None:
+                preds = np.expand_dims(pred, axis=0)
+            else:
+                preds = np.concatenate((preds, np.expand_dims(pred, axis=0)), axis=0)
+        preds = np.transpose(preds, [1,0, 2])
+        return preds
     
     def dloss_dt_dynamics(self, ):
         return
@@ -124,7 +142,7 @@ class TD:
             embeddings[:, 1][noise_idxs],
             s=.4,
             c='black')
-
+        
         if save_path is None:
             plt.show()
         else:
