@@ -111,6 +111,7 @@ class DeepVisualInsight(StrategyAbstractClass):
         EPOCH_START = self.config["EPOCH_START"]
         EPOCH_END = self.config["EPOCH_END"]
         EPOCH_PERIOD = self.config["EPOCH_PERIOD"]
+        EPOCH_NAME = self.config["EPOCH_NAME"]
 
         # Training parameter (subject model)
         TRAINING_PARAMETER = self.config["TRAINING"]
@@ -130,7 +131,7 @@ class DeepVisualInsight(StrategyAbstractClass):
         import Model.model as subject_model
         net = eval("subject_model.{}()".format(NET))
 
-        self._data_provider = NormalDataProvider(self.CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=self.DEVICE, classes=CLASSES, epoch_name="Epoch", verbose=1)
+        self._data_provider = NormalDataProvider(self.CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=self.DEVICE, classes=CLASSES, epoch_name=EPOCH_NAME, verbose=1)
         self.model = VisModel(ENCODER_DIMS, DECODER_DIMS)
         negative_sample_rate = 5
         min_dist = .1
@@ -284,6 +285,7 @@ class tfDeepVisualInsight(StrategyAbstractClass):
         EPOCH_START = self.config["EPOCH_START"]
         EPOCH_END = self.config["EPOCH_END"]
         EPOCH_PERIOD = self.config["EPOCH_PERIOD"]
+        EPOCH_NAME = self.config["EPOCH_NAME"]
 
         # Training parameter (subject model)
         TRAINING_PARAMETER = self.config["TRAINING"]
@@ -299,7 +301,7 @@ class tfDeepVisualInsight(StrategyAbstractClass):
         import Model.model as subject_model
         net = eval("subject_model.{}()".format(NET))
 
-        self.data_provider = NormalDataProvider(self.CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=self.DEVICE, classes=CLASSES, epoch_name="Epoch", verbose=1)
+        self.data_provider = NormalDataProvider(self.CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=self.DEVICE, classes=CLASSES, epoch_name=EPOCH_NAME, verbose=1)
         
         # Define Projector
         self.flag = "_temporal_id{}".format("_withoutB" if B_N_EPOCHS==0 else "")
@@ -462,6 +464,7 @@ class TimeVis(StrategyAbstractClass):
         EPOCH_START = self.config["EPOCH_START"]
         EPOCH_END = self.config["EPOCH_END"]
         EPOCH_PERIOD = self.config["EPOCH_PERIOD"]
+        EPOCH_NAME = self.config["EPOCH_NAME"]
 
         # Training parameter (subject model)
         TRAINING_PARAMETER = self.config["TRAINING"]
@@ -481,7 +484,7 @@ class TimeVis(StrategyAbstractClass):
         import Model.model as subject_model
         net = eval("subject_model.{}()".format(NET))
 
-        self.data_provider = NormalDataProvider(self.CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=self.DEVICE, classes=CLASSES, epoch_name="Epoch", verbose=1)
+        self.data_provider = NormalDataProvider(self.CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=self.DEVICE, classes=CLASSES, epoch_name=EPOCH_NAME, verbose=1)
         self.model = VisModel(ENCODER_DIMS, DECODER_DIMS)
         negative_sample_rate = 5
         min_dist = .1
@@ -612,6 +615,7 @@ class DeepDebugger(StrategyAbstractClass):
         EPOCH_START = self.config["EPOCH_START"]
         EPOCH_END = self.config["EPOCH_END"]
         EPOCH_PERIOD = self.config["EPOCH_PERIOD"]
+        EPOCH_NAME = self.config["EPOCH_NAME"]
 
         # Training parameter (subject model)
         TRAINING_PARAMETER = self.config["TRAINING"]
@@ -631,7 +635,7 @@ class DeepDebugger(StrategyAbstractClass):
         import Model.model as subject_model
         net = eval("subject_model.{}()".format(NET))
 
-        self.data_provider = NormalDataProvider(self.CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=self.DEVICE, classes=CLASSES, epoch_name="Epoch", verbose=1)        
+        self.data_provider = NormalDataProvider(self.CONTENT_PATH, net, EPOCH_START, EPOCH_END, EPOCH_PERIOD, device=self.DEVICE, classes=CLASSES, epoch_name=EPOCH_NAME, verbose=1)        
         self.model = VisModel(ENCODER_DIMS, DECODER_DIMS)
         negative_sample_rate = 5
         min_dist = .1
