@@ -31,13 +31,10 @@ To install torch, please check [link](https://pytorch.org/get-started/locally/).
 
 Generally, we follow the following process to create meaningful visualization:
 1. Prepare data according to our format. 
-- Use our Summary writer.  [[tutorial1](tutorials/1-summary-writer.ipynb)] [[tutorial2](tutorials/1-example.ipynb)]
-- Do it in a manual way. See [data-arrangement](https://github.com/xianglinyang/DeepDebugger/wiki/Data-Arrangement).
+  - Use our Summary writer.  [[tutorial1](tutorials/1-summary-writer.ipynb)] [[tutorial2](tutorials/1-example.ipynb)]
+  - Do it in a manual way. See [data-arrangement](https://github.com/xianglinyang/DeepDebugger/wiki/Data-Arrangement).
 
-  Put all data under a folder:
-  ```python
-  content_path = /path/to/data
-  ```
+    Put all data under a folder `content_path = /path/to/data`
 2. Visualize the embedding
 Choose a visualization strategy (e.g., DVI, TimeVis or even your own visualization method!)
     - Use wrapped func from [Strategy](strategy.py) class
