@@ -1,5 +1,6 @@
 <h1 align="center">DeepDebugger: Touch what you image</h1>
-Official source code for ESEC/FSE 2023 Paper: DeepDebugger: An Interactive Time-Travelling Debugging Approach for Deep Classifiers
+Official source code for ESEC/FSE 2023 Paper: 
+<strong>DeepDebugger: An Interactive Time-Travelling Debugging Approach for Deep Classifiers</strong>
 
 <p align="left">
     <a href=''>
@@ -27,6 +28,8 @@ $ pip -r install requirements.txt
 To install torch, please check [link](https://pytorch.org/get-started/locally/).
 
 ## Usage
+
+### Quick Start
 > A tutoial in jupyter notebook is [here](tutorials/quick-start.py). 
 
 Generally, we follow the following process to create meaningful visualization:
@@ -59,6 +62,9 @@ Choose a visualization strategy (e.g., DVI, TimeVis or even your own visualizati
 3. Play with embedding visualization with our frontend or backend visualizer. [[repo](https://github.com/llmhyy/training-visualizer/)][[tutorial](tutorials/2-start-services.md)]
 
 4. (optional) Design your own visualization method. [[tutorial](tutorials/3-customize-visualization.ipynb)]
+
+### Full instructions
+Please see our [wiki](https://github.com/xianglinyang/DeepDebugger/wiki) for more details.
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
