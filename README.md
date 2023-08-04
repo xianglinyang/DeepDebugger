@@ -27,7 +27,6 @@ $ pip -r install requirements.txt
 To install torch, please check [link](https://pytorch.org/get-started/locally/).
 
 ## Usage
-### A quick start
 > A tutoial in jupyter notebook is [here](tutorials/quick-start.py). 
 
 Generally, we follow the following process to create meaningful visualization:
@@ -35,31 +34,31 @@ Generally, we follow the following process to create meaningful visualization:
 - Use our Summary writer.  [[tutorial1](tutorials/1-summary-writer.ipynb)] [[tutorial2](tutorials/1-example.ipynb)]
 - Do it in a manual way. See [data-arrangement](https://github.com/xianglinyang/DeepDebugger/wiki/Data-Arrangement).
 
-Put all data under a folder:
-```python
-content_path = /path/to/data
-```
+  Put all data under a folder:
+  ```python
+  content_path = /path/to/data
+  ```
 2. Visualize the embedding
 Choose a visualization strategy (e.g., DVI, TimeVis or even your own visualization method!)
-- Use wrapped func from [Strategy](strategy.py) class
-```python
-#--------DVI--------
-VIS_METHOD = "DVI"
-dvi_config = config[VIS_METHOD]
-dvi = DeepVisualInsight(CONTENT_PATH, dvi_config)
-dvi.visualize_embedding()
+    - Use wrapped func from [Strategy](strategy.py) class
+      ```python
+      #--------DVI--------
+      VIS_METHOD = "DVI"
+      dvi_config = config[VIS_METHOD]
+      dvi = DeepVisualInsight(CONTENT_PATH, dvi_config)
+      dvi.visualize_embedding()
 
-#--------TimeVis--------
-VIS_METHOD = "TimeVis"
-timevis_config = config[VIS_METHOD]
-timevis = TimeVis(CONTENT_PATH, timevis_config)
-timevis.visualize_embedding()
-```
-- Directly call the module.
-```console
-$ python dvi_main.py --content_path path/to/data
-$ python timevis_main.py --content_path path/to/data
-```
+      #--------TimeVis--------
+      VIS_METHOD = "TimeVis"
+      timevis_config = config[VIS_METHOD]
+      timevis = TimeVis(CONTENT_PATH, timevis_config)
+      timevis.visualize_embedding()
+      ```
+    - Directly call the module.
+      ```console
+      $ python dvi_main.py --content_path path/to/data
+      $ python timevis_main.py --content_path path/to/data
+      ```
 3. Play with embedding visualization with our frontend or backend visualizer. [[repo](https://github.com/llmhyy/training-visualizer/)][[tutorial](tutorials/2-start-services.md)]
 
 4. (optional) Design your own visualization method. [[tutorial](tutorials/3-customize-visualization.ipynb)]
