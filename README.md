@@ -64,7 +64,7 @@ Choose a visualization strategy (e.g., DVI, TimeVis or even your own visualizati
 4. (optional) Design your own visualization method. [[tutorial](tutorials/3-customize-visualization.ipynb)]
 
 ### Full instructions
-Please see our [wiki](https://github.com/xianglinyang/DeepDebugger/wiki) for more details.
+Please see our [wiki]([https://github.com/xianglinyang/DeepDebugger/wiki](https://github.com/xianglinyang/DeepDebugger/wiki/How-to-use-DeepDebugger)) for more details.
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
