@@ -81,7 +81,12 @@ python batch_run.py
 ## Citation
 If you find our tool helpful, please cite the following paper:
 ```bibtex
-@inproceedings{
+@inproceedings{yang2023deepdebugger,
+  title={DeepDebugger: An Interactive Time-Travelling Debugging Approach for Deep Classifiers},
+  author={Yang, Xianglin and Lin, Yun and Zhang, Yifan and Huang, Linpeng and Dong, Jin Song and Mei, Hong},
+  booktitle={Proceedings of the 31st ACM Joint European Software Engineering Conference and Symposium on the Foundations of Software Engineering},
+  pages={973--985},
+  year={2023}
 },
 @inproceedings{yang2022temporality,
   title={Temporality Spatialization: A Scalable and Faithful Time-Travelling Visualization for Deep Classifier Training},
